@@ -23,3 +23,9 @@ A hopefully-system-agnostic Foundry VTT module  that provides calendar and time 
 - **System integrations** - Combat rounds, rest mechanics, active effects
 - **Enhanced UI** - Theme system, search, compact/full views
 - **Event reminders** - Notification system for upcoming events
+
+## Development
+
+- **Alpha Release Milestone**: [View Milestone](https://github.com/Sayshal/Calendaria/milestone/1)
+- **Beta Release Milestone**: [View Milestone](https://github.com/Sayshal/Calendaria/milestone/2)
+- **Project Tracker**: [View Project](https://github.com/users/Sayshal/projects/3)
