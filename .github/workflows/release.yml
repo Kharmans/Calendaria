@@ -106,7 +106,7 @@ jobs:
 
     # Optional: Release to Foundry Package API (if you have the token)
     - name: Release Foundry Package
-      if: ${{ secrets.FOUNDRY_API_TOKEN != '' }}
+      if: ${{ secrets.FOUNDRY_API_TOKEN }}
       run: |
         cat << EOF > payload.json
         {
@@ -134,7 +134,7 @@ jobs:
 
     # Post release notification to Discord
     - name: Post to Discord
-      if: ${{ secrets.DISCORD_WEBHOOK != '' }}
+      if: ${{ secrets.DISCORD_WEBHOOK }}
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       run: |
