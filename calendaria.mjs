@@ -20,6 +20,8 @@ import { CalendarApplication } from './scripts/applications/calendar-application
 import { CalendarNoteDataModel } from './scripts/sheets/calendar-note-data-model.mjs';
 import { CalendarNoteSheet } from './scripts/sheets/calendar-note-sheet.mjs';
 import { CalendariaAPI } from './scripts/api.mjs';
+import { RENESCARA_CALENDAR, RENESCARA_DEFAULT_DATE } from './scripts/calendar/data/renescara-calendar.mjs';
+import { preLocalizeCalendar } from './scripts/calendar/calendar-utils.mjs';
 
 Hooks.once('init', async () => {
   registerSettings();
@@ -49,6 +51,26 @@ Hooks.once('init', async () => {
   log(3, 'Calendaria module initialized.');
 });
 
+// Prelocalize calendar data after i18n is ready
+Hooks.once('i18nInit', () => {
+  preLocalizeCalendar(RENESCARA_CALENDAR);
+  log(3, 'Prelocalized Renescara calendar data');
+});
+
+// Hook into D&D 5e's calendar setup to add our calendar BEFORE it reads the setting
+Hooks.once('dnd5e.setupCalendar', () => {
+  // Create a CalendariaCalendar instance with Renescara calendar definition
+  const renescaraCalendar = new CalendariaCalendar(RENESCARA_CALENDAR);
+
+  CONFIG.DND5E.calendar.calendars.push({
+    value: 'renescara',
+    label: 'CALENDARIA.Calendar.RENESCARA.Name',
+    config: renescaraCalendar
+  });
+
+  log(3, 'Added Renescarran Calendar to D&D 5e calendar selection');
+});
+
 Hooks.once('ready', async () => {
   // Initialize calendar system
   await CalendarManager.initialize();
@@ -59,10 +81,27 @@ Hooks.once('ready', async () => {
   // Initialize time tracking
   TimeTracker.initialize();
 
+  // Set initial world time if it's at 0 (new world)
+  if (game.user.isGM && game.time.worldTime === 0) {
+    log(3, 'Initializing world time to default Renescarran date...');
+
+    // Convert to world time and advance by that amount
+    const worldTime = game.time.calendar.componentsToTime(RENESCARA_DEFAULT_DATE);
+    await game.time.advance(worldTime);
+  }
+
   log(3, 'Calendaria ready.');
 });
 
 Hooks.once('setup', () => {
+  // For non-dnd5e systems, set Renescarran Calendar as the world calendar
+  if (!game.system.id.includes('dnd5e')) {
+    const renescaraCalendar = new CalendariaCalendar(RENESCARA_CALENDAR);
+    CONFIG.time.worldCalendarConfig = renescaraCalendar;
+    CONFIG.time.worldCalendarClass = CalendariaCalendar;
+    log(3, 'Set Renescarran Calendar as world calendar');
+  }
+
   if (CONFIG.DND5E?.calendar) {
     log(3, 'Replacing D&D 5e calendar with CalendariaHUD');
     CONFIG.DND5E.calendar.application = CalendariaHUD;

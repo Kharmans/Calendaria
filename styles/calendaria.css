@@ -569,7 +569,8 @@
 
 .week-grid {
   display: grid;
-  grid-template-columns: 60px repeat(7, minmax(120px, 1fr));
+  grid-template-columns: 120px repeat(24, minmax(50px, 1fr));
+  grid-template-rows: 40px repeat(7, minmax(60px, 1fr));
   gap: 1px;
   background: var(--calendaria-border-light);
   border: 1px solid var(--calendaria-border);
@@ -577,64 +578,46 @@
   overflow: hidden;
 }
 
-.week-time-column {
-  display: grid;
-  grid-template-rows: 50px repeat(24, 40px);
+.week-corner-header {
   background: var(--calendaria-bg-lighter);
-}
-
-.week-day-column {
-  display: grid;
-  grid-template-rows: subgrid;
-  grid-row: 1 / -1;
-  position: relative;
-  background: var(--calendaria-bg);
-
-  &.today {
-    background: rgb(255 100 0 / 5%);
-
-    .week-day-header {
-      background: rgb(255 100 0 / 15%);
-      border-bottom: 2px solid var(--calendaria-today);
-    }
-  }
-}
-
-.week-day-label-header {
-  padding: 0.75rem 0.5rem;
-  background: var(--calendaria-bg-lighter);
-  font-weight: 700;
-  font-size: 0.85rem;
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   border-bottom: 2px solid var(--calendaria-border);
+  border-right: 2px solid var(--calendaria-border);
 }
 
-.week-time-label {
-  padding: 0.5rem;
+.week-hour-label {
+  padding: 0;
+  margin: 0;
+  gap: 0;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--calendaria-text-dim);
-  text-align: right;
-  border-bottom: 1px solid var(--calendaria-border-light);
+  text-align: center;
+  background: var(--calendaria-bg-lighter);
+  border-bottom: 2px solid var(--calendaria-border);
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .week-day-header {
   padding: 0.5rem;
   background: var(--calendaria-bg);
-  border-bottom: 1px solid var(--calendaria-border);
+  border-right: 2px solid var(--calendaria-border);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  gap: 0.25rem;
   position: sticky;
-  top: 0;
+  left: 0;
   z-index: 5;
+
+  &.today {
+    background: rgb(255 100 0 / 15%);
+    border-right: 3px solid var(--calendaria-today);
+  }
 
   .day-name {
     font-weight: 700;
@@ -649,10 +632,11 @@
 
 .week-time-cell {
   background: var(--calendaria-bg);
-  border-bottom: 1px solid var(--calendaria-border-light);
-  min-height: 40px;
+  border-right: 1px solid var(--calendaria-border-light);
+  min-width: 50px;
   cursor: pointer;
   transition: background 0.15s ease;
+  position: relative;
 
   &:hover {
     background: var(--calendaria-bg-hover);
@@ -660,17 +644,18 @@
 
   &.current-hour {
     background: rgb(255 100 0 / 12%);
-    border-left: 3px solid var(--calendaria-today);
+    border-top: 3px solid var(--calendaria-today);
     box-shadow: inset 0 0 10px rgb(255 100 0 / 15%);
   }
 }
 
 .week-event-block {
-  padding: 6px 8px;
-  margin: 0 4px;
+  position: absolute;
+  inset: 2px;
+  padding: 4px 6px;
   border-radius: 4px;
-  border-left: 4px solid rgb(0 0 0 / 30%);
-  font-size: 12px;
+  border-top: 3px solid rgb(0 0 0 / 30%);
+  font-size: 11px;
   color: rgb(255 255 255);
   overflow: hidden;
   cursor: pointer;
@@ -681,8 +666,9 @@
   transition: all 0.15s ease;
   text-shadow: 0 1px 2px rgb(0 0 0 / 40%);
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-direction: row;
+  gap: 4px;
+  align-items: center;
   justify-content: flex-start;
 
   &:hover {
@@ -691,14 +677,15 @@
       0 4px 8px rgb(0 0 0 / 25%),
       inset 0 1px 0 rgb(255 255 255 / 30%);
     z-index: 20;
-    transform: translateX(-2px);
+    transform: translateY(-2px);
   }
 
   .event-time {
     font-weight: 700;
-    font-size: 10px;
+    font-size: 9px;
     opacity: 0.95;
     letter-spacing: 0.3px;
+    flex-shrink: 0;
   }
 
   .event-name {
@@ -837,7 +824,7 @@
   }
 
   .title-fieldset {
-    input[type="text"] {
+    input[type='text'] {
       width: 100%;
       padding: 0.5rem;
       border: 1px solid var(--color-border-light);

@@ -11,6 +11,7 @@ import { MODULE, SETTINGS, SYSTEM, HOOKS } from '../constants.mjs';
 import { log } from '../utils/logger.mjs';
 import CalendarRegistry from './calendar-registry.mjs';
 import CalendariaCalendar from './data/calendaria-calendar.mjs';
+import { RENESCARA_CALENDAR } from './data/renescara-calendar.mjs';
 
 export default class CalendarManager {
   /** Flag to prevent responding to our own calendar changes */
@@ -122,9 +123,15 @@ export default class CalendarManager {
   static async loadDefaultCalendars() {
     log(3, 'Loading default calendars...');
 
-    // For non-dnd5e systems, we'll add default calendars here later
-    // For now, just log that no defaults are available
-    log(2, 'No default calendars available for non-dnd5e systems yet');
+    // Load Renescarran Calendar as the default for non-dnd5e systems
+    try {
+      const calendar = new CalendariaCalendar(RENESCARA_CALENDAR);
+      CalendarRegistry.register('renescara', calendar);
+      CalendarRegistry.setActive('renescara');
+      log(3, 'Loaded Renescarran Calendar as default');
+    } catch (error) {
+      log(2, 'Error loading Renescarran Calendar:', error);
+    }
 
     // Save state
     await this.saveCalendars();
