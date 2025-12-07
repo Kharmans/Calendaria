@@ -503,36 +503,40 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
         const start = note.system.startDate;
         const end = note.system.endDate;
 
-        // Only process events that start this month
-        if (start.year !== year || start.month !== month) return null;
-
         // Check if end date has valid values (not just an empty object)
         const hasValidEndDate = end && end.year != null && end.month != null && end.day != null;
         if (!hasValidEndDate) return null;
-
-        // Calculate if this is truly a multi-day event
-        const startDay = start.day;
 
         // Check if end date is actually different from start date
         const isSameDay = end.year === start.year && end.month === start.month && end.day === start.day;
         if (isSameDay) return null; // Not multi-day
 
+        // Check if this event is visible in the current month
+        const startBeforeOrInMonth =
+          start.year < year || (start.year === year && start.month <= month);
+        const endInOrAfterMonth = end.year > year || (end.year === year && end.month >= month);
+
+        if (!startBeforeOrInMonth || !endInOrAfterMonth) return null;
+
+        // Determine if this is a continuation from a previous month
+        const isContinuation = start.year < year || (start.year === year && start.month < month);
+
+        // Calculate effective start/end days for this month
+        const startDay = isContinuation ? 1 : start.day;
         const endDay = end.month === month && end.year === year ? end.day : daysInMonth;
 
-        if (endDay <= startDay) return null; // End before start in current month
+        if (endDay < startDay) return null; // Invalid range
 
         // Calculate priority: all-day events appear first (priority -1), then by start hour
-        // All-day events have no hour set, or explicitly marked with allDay flag
         const isAllDay = start.hour == null || note.system.allDay;
         const priority = isAllDay ? -1 : start.hour;
 
-        return { note, start, end, startDay, endDay, priority };
+        return { note, start, end, startDay, endDay, priority, isContinuation };
       })
       .filter((e) => e !== null)
       .sort((a, b) => a.priority - b.priority); // Sort by priority (earlier = higher)
 
-    multiDayEvents.forEach(({ note, start, end, startDay, endDay }) => {
-
+    multiDayEvents.forEach(({ note, start, end, startDay, endDay, isContinuation }) => {
       // Calculate grid positions
       const startPosition = startDay - 1 + startDayOfWeek; // 0-indexed
       const endPosition = endDay - 1 + startDayOfWeek;
@@ -576,7 +580,8 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
           weekIndex: startWeekIndex,
           left,
           width,
-          row: eventRow
+          row: eventRow,
+          isContinuation
         });
       } else {
         // Event spans multiple weeks - create a bar for each week segment
@@ -592,6 +597,9 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
           const left = (startColumn / daysInWeek) * 100;
           const width = ((endColumn - startColumn + 1) / daysInWeek) * 100;
 
+          // First week segment of a continuation shows the >> icon
+          const showContinuationIcon = isContinuation && weekIdx === startWeekIndex;
+
           events.push({
             id: `${note.id}-week-${weekIdx}`,
             name: note.name,
@@ -602,7 +610,8 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
             left,
             width,
             row: eventRow,
-            isSegment: true
+            isSegment: true,
+            isContinuation: showContinuationIcon
           });
         }
       }

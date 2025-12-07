@@ -47,15 +47,19 @@
 
           <!-- Multi-day event bars -->
           {{#each multiDayEvents}}
-            <div class="event-bar"
+            <div class="event-bar{{#if isContinuation}} continuation{{/if}}"
                  style="left: {{left}}%; width: {{width}}%; top: calc(22px + {{row}} * 26px); background-color: {{color}};"
                  data-tooltip="{{name}}"
                  data-action="editNote"
                  data-note-id="{{id}}">
-              {{#if (eq iconType "fontawesome")}}
-                <i class="{{icon}} event-bar-icon"></i>
-              {{else if icon}}
-                <img src="{{icon}}" alt="{{name}}" class="event-bar-icon" />
+              {{#if isContinuation}}
+                <i class="fa-solid fa-angles-right event-bar-continuation"></i>
+              {{else}}
+                {{#if (eq iconType "fontawesome")}}
+                  <i class="{{icon}} event-bar-icon"></i>
+                {{else if icon}}
+                  <img src="{{icon}}" alt="{{name}}" class="event-bar-icon" />
+                {{/if}}
               {{/if}}
               <span class="event-bar-text">{{name}}</span>
             </div>
