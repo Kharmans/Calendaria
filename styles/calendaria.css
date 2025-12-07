@@ -812,6 +812,12 @@
   }
 }
 
+.calendar-note-sheet.minimized {
+  .window-title {
+    visibility: visible;
+  }
+}
+
 .calendar-note-form {
   display: flex;
   flex-direction: column;

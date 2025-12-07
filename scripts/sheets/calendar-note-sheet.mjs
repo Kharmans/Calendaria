@@ -31,6 +31,11 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
     form: { template: 'modules/calendaria/templates/sheets/calendar-note-form.hbs' }
   };
 
+  /** @override */
+  get title() {
+    return this.document.name;
+  }
+
   _attachPartListeners(partId, htmlElement, options) {
     super._attachPartListeners(partId, htmlElement, options);
 
