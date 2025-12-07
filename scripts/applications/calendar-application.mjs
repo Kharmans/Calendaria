@@ -454,10 +454,16 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
       // Only include events that start on this day
       if (start.year !== year || start.month !== month || start.day !== day) return false;
 
-      // Exclude multi-day events (they're shown as event bars instead)
-      if (end && (end.year !== start.year || end.month !== start.month || end.day !== start.day)) return false;
+      // Check if end date has valid values (not null/undefined)
+      const hasValidEndDate = end && end.year != null && end.month != null && end.day != null;
 
-      // Include single-day events and events without end dates
+      // If no valid end date, treat as single-day event - include it
+      if (!hasValidEndDate) return true;
+
+      // Exclude multi-day events (they're shown as event bars instead)
+      if (end.year !== start.year || end.month !== start.month || end.day !== start.day) return false;
+
+      // Include single-day events (start and end on same day)
       return true;
     });
   }
@@ -497,14 +503,23 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
         const start = note.system.startDate;
         const end = note.system.endDate;
 
-        // Only process events that start this month and have an end date
-        if (start.year !== year || start.month !== month || !end) return null;
+        // Only process events that start this month
+        if (start.year !== year || start.month !== month) return null;
+
+        // Check if end date has valid values (not just an empty object)
+        const hasValidEndDate = end && end.year != null && end.month != null && end.day != null;
+        if (!hasValidEndDate) return null;
 
         // Calculate if this is truly a multi-day event
         const startDay = start.day;
-        const endDay = end.month === month ? end.day : daysInMonth;
 
-        if (endDay <= startDay) return null; // Not multi-day
+        // Check if end date is actually different from start date
+        const isSameDay = end.year === start.year && end.month === start.month && end.day === start.day;
+        if (isSameDay) return null; // Not multi-day
+
+        const endDay = end.month === month && end.year === year ? end.day : daysInMonth;
+
+        if (endDay <= startDay) return null; // End before start in current month
 
         // Calculate priority: all-day events appear first (priority -1), then by start hour
         // All-day events have no hour set, or explicitly marked with allDay flag
@@ -656,29 +671,38 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
   async _onFirstRender(context, options) {
     await super._onFirstRender(context, options);
 
+    // Add context menu for notes (right-click to delete)
+    this.element.addEventListener('contextmenu', this._onNoteContextMenu.bind(this));
+
     // Set up hook to re-render when journal entries are updated, created, or deleted
-    this._hookIds = [];
+    this._hooks = [];
+
+    // Debounced render to avoid rapid consecutive renders
+    const debouncedRender = foundry.utils.debounce(() => this.render(), 100);
 
     // Listen for journal entry page updates
-    this._hookIds.push(
-      Hooks.on('updateJournalEntryPage', (page, changes, options, userId) => {
-        if (page.type === 'calendaria.calendar-note') this.render();
+    this._hooks.push({
+      name: 'updateJournalEntryPage',
+      id: Hooks.on('updateJournalEntryPage', (page, changes, options, userId) => {
+        if (page.type === 'calendaria.calendarnote') debouncedRender();
       })
-    );
+    });
 
     // Listen for journal entry page creation
-    this._hookIds.push(
-      Hooks.on('createJournalEntryPage', (page, options, userId) => {
-        if (page.type === 'calendaria.calendar-note') this.render();
+    this._hooks.push({
+      name: 'createJournalEntryPage',
+      id: Hooks.on('createJournalEntryPage', (page, options, userId) => {
+        if (page.type === 'calendaria.calendarnote') debouncedRender();
       })
-    );
+    });
 
     // Listen for journal entry page deletion
-    this._hookIds.push(
-      Hooks.on('deleteJournalEntryPage', (page, options, userId) => {
-        if (page.type === 'calendaria.calendar-note') this.render();
+    this._hooks.push({
+      name: 'deleteJournalEntryPage',
+      id: Hooks.on('deleteJournalEntryPage', (page, options, userId) => {
+        if (page.type === 'calendaria.calendarnote') debouncedRender();
       })
-    );
+    });
   }
 
   /**
@@ -688,9 +712,9 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
    */
   async _onClose(options) {
     // Remove all hook listeners
-    if (this._hookIds) {
-      this._hookIds.forEach((id) => Hooks.off(id));
-      this._hookIds = [];
+    if (this._hooks) {
+      this._hooks.forEach((hook) => Hooks.off(hook.name, hook.id));
+      this._hooks = [];
     }
 
     await super._onClose(options);
@@ -764,16 +788,11 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
       }
     });
 
-    // Open the note for editing
-    if (page) {
-      page.sheet.render(true);
-    }
-
     // Clear the selected time slot
     this._selectedTimeSlot = null;
 
-    // Refresh the calendar
-    await this.render();
+    // Open the note for editing (hook will handle calendar re-render)
+    if (page) page.sheet.render(true);
   }
 
   static async _onAddNoteToday(event, target) {
@@ -810,16 +829,11 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
       }
     });
 
-    // Open the note for editing
-    if (page) {
-      page.sheet.render(true);
-    }
-
     // Clear the selected time slot
     this._selectedTimeSlot = null;
 
-    // Refresh the calendar
-    await this.render();
+    // Open the note for editing (hook will handle calendar re-render)
+    if (page) page.sheet.render(true);
   }
 
   static async _onEditNote(event, target) {
@@ -934,5 +948,67 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     else this._selectedTimeSlot = { year, month, day, hour };
 
     await this.render();
+  }
+
+  /**
+   * Handle right-click context menu on notes
+   * @param {MouseEvent} event - The contextmenu event
+   */
+  async _onNoteContextMenu(event) {
+    // Check if clicked on a note indicator or event bar
+    const noteElement = event.target.closest('[data-note-id]');
+    if (!noteElement) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    let pageId = noteElement.dataset.noteId;
+
+    // Handle segmented event IDs (e.g., "abc123-week-1" -> "abc123")
+    if (pageId.includes('-week-')) pageId = pageId.split('-week-')[0];
+
+    const page = game.journal.find((j) => j.pages.get(pageId))?.pages.get(pageId);
+    if (!page || !page.isOwner) return;
+
+    // Use DialogV2 for context menu actions
+    const action = await foundry.applications.api.DialogV2.wait({
+      window: { title: page.name },
+      content: '',
+      buttons: [
+        {
+          action: 'edit',
+          icon: 'fas fa-edit',
+          label: 'Edit'
+        },
+        {
+          action: 'delete',
+          icon: 'fas fa-trash',
+          label: 'Delete'
+        }
+      ],
+      rejectClose: false,
+      position: {
+        width: 200,
+        left: event.clientX,
+        top: event.clientY
+      }
+    });
+
+    if (action === 'edit') {
+      page.sheet.render(true);
+    } else if (action === 'delete') {
+      const confirmed = await foundry.applications.api.DialogV2.confirm({
+        window: { title: 'Delete Note' },
+        content: `<p>Delete note "${page.name}"?</p>`,
+        rejectClose: false,
+        modal: true
+      });
+
+      if (confirmed) {
+        const journal = page.parent;
+        if (journal.pages.size === 1) await journal.delete();
+        else await page.delete();
+      }
+    }
   }
 }

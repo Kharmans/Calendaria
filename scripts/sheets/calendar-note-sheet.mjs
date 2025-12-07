@@ -19,7 +19,8 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
       selectIcon: this._onSelectIcon,
       selectDate: this._onSelectDate,
       saveAndClose: this._onSaveAndClose,
-      reset: this._onReset
+      reset: this._onReset,
+      deleteNote: this._onDeleteNote
     },
     form: {
       closeOnSubmit: false
@@ -77,6 +78,17 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
     resetBtn.dataset.tooltip = 'Reset Form';
     resetBtn.setAttribute('aria-label', 'Reset Form');
     controlsContainer.appendChild(resetBtn);
+
+    // Create Delete button (only for owners of existing notes)
+    if (this.document.isOwner && this.document.id) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'header-control icon fa-solid fa-trash';
+      deleteBtn.dataset.action = 'deleteNote';
+      deleteBtn.dataset.tooltip = 'Delete Note';
+      deleteBtn.setAttribute('aria-label', 'Delete Note');
+      controlsContainer.appendChild(deleteBtn);
+    }
   }
 
   async _prepareContext(options) {
@@ -94,17 +106,6 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
     const currentMonth = components.month ?? 0;
     const currentDay = (components.dayOfMonth ?? 0) + 1; // Convert 0-indexed to 1-indexed
 
-    // Debug logging
-    log(1, '[CalendarNoteSheet] Date defaults:', {
-      gameTimeComponents: game.time.components,
-      yearZero,
-      currentYear,
-      currentMonth,
-      currentDay,
-      startDate: this.document.system.startDate,
-      endDate: this.document.system.endDate
-    });
-
     // Auto-detect Font Awesome icons
     if (context.system.icon && context.system.icon.startsWith('fa')) context.iconType = 'fontawesome';
     else context.iconType = context.system.iconType || 'image';
@@ -120,18 +121,6 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
     const endMonth = this.document.system.endDate?.month ?? startMonth;
     const endDay = this.document.system.endDate?.day || startDay;
     context.endDateDisplay = this._formatDateDisplay(calendar, endYear, endMonth, endDay);
-
-    // Debug: Final calculated values
-    log(1, '[CalendarNoteSheet] Final date values:', {
-      startYear,
-      startMonth,
-      startDay,
-      endYear,
-      endMonth,
-      endDay,
-      startDateDisplay: context.startDateDisplay,
-      endDateDisplay: context.endDateDisplay
-    });
 
     // Format time as HH:mm
     const hour = String(this.document.system.startDate.hour ?? 12).padStart(2, '0');
@@ -397,15 +386,6 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
     const fallbackMonth = components.month ?? 0;
     const fallbackDay = (components.dayOfMonth ?? 0) + 1; // Convert 0-indexed to 1-indexed
 
-    log(1, '[CalendarNoteSheet] Date picker defaults:', {
-      gameTimeComponents: game.time.components,
-      yearZero,
-      fallbackYear,
-      fallbackMonth,
-      fallbackDay,
-      dateField
-    });
-
     // Get current date values from form (or use calendar's current date as fallback)
     const yearInput = form.querySelector(`input[name="system.${dateField}.year"]`);
     const monthInput = form.querySelector(`input[name="system.${dateField}.month"]`);
@@ -518,6 +498,31 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
     setTimeout(() => {
       this.close();
     }, 100);
+  }
+
+  /**
+   * Handle delete note button click
+   * @param {PointerEvent} event - The originating click event
+   * @param {HTMLElement} target - The capturing HTML element
+   */
+  static async _onDeleteNote(event, target) {
+    if (!this.document.isOwner) return;
+
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: { title: 'Delete Note' },
+      content: `<p>Delete note "${this.document.name}"?</p>`,
+      rejectClose: false,
+      modal: true
+    });
+
+    if (confirmed) {
+      const journal = this.document.parent;
+      await this.close();
+
+      // If journal only has this page, delete the entire journal
+      if (journal.pages.size === 1) await journal.delete();
+      else await this.document.delete();
+    }
   }
 
   /**
