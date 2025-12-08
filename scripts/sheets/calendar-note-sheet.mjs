@@ -180,10 +180,15 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
     const endDay = this.document.system.endDate?.day || startDay;
     context.endDateDisplay = this._formatDateDisplay(calendar, endYear, endMonth, endDay);
 
-    // Format time as HH:mm
-    const hour = String(this.document.system.startDate.hour ?? 12).padStart(2, '0');
-    const minute = String(this.document.system.startDate.minute ?? 0).padStart(2, '0');
-    context.timeValue = `${hour}:${minute}`;
+    // Format start time as HH:mm
+    const startHour = String(this.document.system.startDate.hour ?? 12).padStart(2, '0');
+    const startMinute = String(this.document.system.startDate.minute ?? 0).padStart(2, '0');
+    context.startTimeValue = `${startHour}:${startMinute}`;
+
+    // Format end time as HH:mm (defaults to start time + 1 hour if not set)
+    const endHour = String(this.document.system.endDate?.hour ?? ((this.document.system.startDate.hour ?? 12) + 1) % 24).padStart(2, '0');
+    const endMinute = String(this.document.system.endDate?.minute ?? this.document.system.startDate.minute ?? 0).padStart(2, '0');
+    context.endTimeValue = `${endHour}:${endMinute}`;
 
     // Prepare repeat options with selected state
     context.repeatOptions = [
@@ -260,10 +265,11 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
     }
 
     // Convert time input (HH:mm) to individual components
-    if (event.target?.name === 'system.startDate.time') {
+    if (event.target?.name === 'system.startDate.time' || event.target?.name === 'system.endDate.time') {
       const [hour, minute] = event.target.value.split(':').map(Number);
       if (!isNaN(hour) && !isNaN(minute)) {
         const form = event.target.closest('form');
+        const prefix = event.target.name.includes('startDate') ? 'system.startDate' : 'system.endDate';
         const updateField = (name, value) => {
           let input = form.querySelector(`input[name="${name}"]`);
           if (!input) {
@@ -275,18 +281,18 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
           input.value = value;
         };
 
-        updateField('system.startDate.hour', hour);
-        updateField('system.startDate.minute', minute);
+        updateField(`${prefix}.hour`, hour);
+        updateField(`${prefix}.minute`, minute);
       }
     }
 
-    // Handle All Day checkbox to disable/enable time input
+    // Handle All Day checkbox to disable/enable time inputs
     if (event.target?.name === 'system.allDay') {
       const form = event.target.closest('form');
-      const timeInput = form.querySelector('input[name="system.startDate.time"]');
-      if (timeInput) {
-        timeInput.disabled = event.target.checked;
-      }
+      const startTimeInput = form.querySelector('input[name="system.startDate.time"]');
+      const endTimeInput = form.querySelector('input[name="system.endDate.time"]');
+      if (startTimeInput) startTimeInput.disabled = event.target.checked;
+      if (endTimeInput) endTimeInput.disabled = event.target.checked;
     }
 
     // Handle color changes to update icon preview

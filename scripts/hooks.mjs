@@ -11,7 +11,9 @@ import { onRenderSceneConfig, onUpdateWorldTime } from './darkness.mjs';
 import CalendarManager from './calendar/calendar-manager.mjs';
 import NoteManager from './notes/note-manager.mjs';
 import TimeTracker from './time/time-tracker.mjs';
+import EventScheduler from './time/event-scheduler.mjs';
 import { CalendarApplication } from './applications/calendar-application.mjs';
+import { registerRestTimeHooks } from './integrations/rest-time.mjs';
 
 /**
  * Register all hooks for the Calendaria module.
@@ -24,6 +26,9 @@ export function registerHooks() {
 
   // Time tracking hooks
   Hooks.on('updateWorldTime', TimeTracker.onUpdateWorldTime.bind(TimeTracker));
+
+  // Event scheduler hooks (triggers notifications when time reaches note start dates)
+  Hooks.on('updateWorldTime', EventScheduler.onUpdateWorldTime.bind(EventScheduler));
 
   // Calendar Manager hooks
   if (SYSTEM.isDnd5e) Hooks.on('updateSetting', CalendarManager.onUpdateSetting.bind(CalendarManager));
@@ -39,6 +44,9 @@ export function registerHooks() {
 
   // Journal sidebar button
   Hooks.on('renderJournalDirectory', addJournalCalendarButton);
+
+  // System integrations
+  registerRestTimeHooks();
 
   log(3, 'Hooks registered');
 }

@@ -84,6 +84,20 @@ export function registerSettings() {
   });
 
   // ========================================//
+  //  Time Integration (dnd5e)               //
+  // ========================================//
+
+  /** Whether to advance world time during short/long rests */
+  game.settings.register(MODULE.ID, SETTINGS.ADVANCE_TIME_ON_REST, {
+    name: 'CALENDARIA.Settings.AdvanceTimeOnRest.Name',
+    hint: 'CALENDARIA.Settings.AdvanceTimeOnRest.Hint',
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: false
+  });
+
+  // ========================================//
   //  Sync & Multiplayer                     //
   // ========================================//
 

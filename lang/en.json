@@ -24,6 +24,8 @@
   "CALENDARIA.Calendar.RENESCARA.Month.AmbermoonShort": "Amber",
   "CALENDARIA.Calendar.RENESCARA.Month.Blossmoon": "Blossmoon",
   "CALENDARIA.Calendar.RENESCARA.Month.BlossmoonShort": "Bloss",
+  "CALENDARIA.Settings.AdvanceTimeOnRest.Name": "Advance Time on Rest",
+  "CALENDARIA.Settings.AdvanceTimeOnRest.Hint": "Automatically advance world time when characters take short or long rests (dnd5e only).",
   "CALENDARIA.Calendar.RENESCARA.Month.DayOfThreshold": "Day of Threshold",
   "CALENDARIA.Calendar.RENESCARA.Month.DayOfThresholdShort": "Threshold",
   "CALENDARIA.Calendar.RENESCARA.Month.Fadingmoon": "Fadingmoon",
@@ -282,7 +284,10 @@
   "CALENDARIA.UI.GmOnlyTooltip": "Hide this note from players",
   "CALENDARIA.UI.IconPickerTooltip": "Click to choose an icon. Right-click to switch between image and font modes",
   "CALENDARIA.UI.RepeatTooltip": "Set how often this note repeats",
+  "CALENDARIA.UI.SilentTooltip": "Suppress automatic notifications when this event triggers",
   "CALENDARIA.UI.StartDateTooltip": "Select start date for this note",
+  "CALENDARIA.UI.StartTimeTooltip": "Set the start time for this note",
+  "CALENDARIA.UI.EndTimeTooltip": "Set the end time for this note",
   "CALENDARIA.UI.TimeTooltip": "Set the time of day for this note",
   "TYPES.JournalEntryPage.calendaria.calendarnote": "Calendar Note"
 }

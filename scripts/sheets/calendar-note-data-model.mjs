@@ -79,7 +79,10 @@ export class CalendarNoteDataModel extends foundry.abstract.TypeDataModel {
       playlistId: new fields.StringField({ nullable: true, blank: true }),
 
       // Visibility
-      gmOnly: new fields.BooleanField({ initial: false })
+      gmOnly: new fields.BooleanField({ initial: false }),
+
+      // Notification control - when true, suppresses automatic notifications when event triggers
+      silent: new fields.BooleanField({ initial: false })
     };
   }
 }

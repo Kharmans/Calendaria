@@ -117,16 +117,14 @@ export default class TimeTracker {
     const thresholds = [];
 
     // Get start and end time in hours (as decimal)
-    const startHour = startComponents.hour + startComponents.minute / 60 + startComponents.second / 3600;
-    const endHour = endComponents.hour + endComponents.minute / 60 + endComponents.second / 3600;
+    const startHour = startComponents.hour + startComponents.minute / 60 + (startComponents.second || 0) / 3600;
+    const endHour = endComponents.hour + endComponents.minute / 60 + (endComponents.second || 0) / 3600;
 
-    // Calculate total days spanned
-    const startDayOfYear = this.#getDayOfYear(startComponents, calendar);
-    const endDayOfYear = this.#getDayOfYear(endComponents, calendar);
-    const yearDiff = endComponents.year - startComponents.year;
+    // Calculate total days between start and end
+    const totalDays = this.#calculateDaysBetween(startComponents, endComponents, calendar);
 
-    // If we're in the same day and year
-    if (yearDiff === 0 && startDayOfYear === endDayOfYear) {
+    // If we're in the same day
+    if (totalDays === 0) {
       // Check thresholds within the same day
       const dayThresholds = this.#getThresholdsForDay(endComponents, calendar);
 
@@ -139,12 +137,11 @@ export default class TimeTracker {
         }
       }
     } else {
-      // We crossed at least one day boundary - need to check multiple days
-      // This is more complex, so we'll iterate through each day
+      // We crossed at least one day boundary
+      const dayThresholds = this.#getThresholdsForDay(startComponents, calendar);
 
-      // First, complete the starting day
-      const startDayThresholds = this.#getThresholdsForDay(startComponents, calendar);
-      for (const [name, hour] of Object.entries(startDayThresholds)) {
+      // First, complete thresholds remaining in the starting day
+      for (const [name, hour] of Object.entries(dayThresholds)) {
         if (hour !== null && startHour < hour) {
           thresholds.push({
             name,
@@ -153,11 +150,21 @@ export default class TimeTracker {
         }
       }
 
-      // Then, for each complete day in between (if any), add all thresholds
-      // This is simplified - in practice, we'd iterate through each day
-      // For now, we'll just handle the end day
+      // For each complete day in between, add all 4 thresholds
+      // (totalDays - 1 because we handle start and end days separately)
+      const intermediateDays = totalDays - 1;
+      for (let day = 0; day < intermediateDays; day++) {
+        for (const [name, hour] of Object.entries(dayThresholds)) {
+          if (hour !== null) {
+            thresholds.push({
+              name,
+              data: this.#createThresholdData(endComponents, calendar)
+            });
+          }
+        }
+      }
 
-      // Finally, check thresholds in the ending day
+      // Finally, check thresholds in the ending day up to current hour
       const endDayThresholds = this.#getThresholdsForDay(endComponents, calendar);
       for (const [name, hour] of Object.entries(endDayThresholds)) {
         if (hour !== null && endHour >= hour) {
@@ -169,11 +176,46 @@ export default class TimeTracker {
       }
     }
 
-    // Sort thresholds chronologically
-    const order = { midnight: 0, sunrise: 1, midday: 2, sunset: 3 };
-    thresholds.sort((a, b) => (order[a.name] || 999) - (order[b.name] || 999));
-
     return thresholds;
+  }
+
+  /**
+   * Calculate the number of day boundaries crossed between two time points.
+   *
+   * @param {Object} startComponents - Starting time components
+   * @param {Object} endComponents - Ending time components
+   * @param {Object} calendar - The active calendar
+   * @returns {number} Number of day boundaries crossed
+   * @private
+   */
+  static #calculateDaysBetween(startComponents, endComponents, calendar) {
+    const startDayOfYear = this.#getDayOfYear(startComponents, calendar);
+    const endDayOfYear = this.#getDayOfYear(endComponents, calendar);
+    const yearDiff = endComponents.year - startComponents.year;
+
+    if (yearDiff === 0) {
+      return endDayOfYear - startDayOfYear;
+    }
+
+    // Calculate days remaining in start year + days in end year
+    const daysInYear = this.#getDaysInYear(calendar);
+    return (daysInYear - startDayOfYear) + endDayOfYear + ((yearDiff - 1) * daysInYear);
+  }
+
+  /**
+   * Get total days in a year for the calendar.
+   *
+   * @param {Object} calendar - The active calendar
+   * @returns {number} Total days in year
+   * @private
+   */
+  static #getDaysInYear(calendar) {
+    let total = 0;
+    const months = calendar.months?.values || calendar.months || [];
+    for (const month of months) {
+      total += month?.days || 30;
+    }
+    return total || 365;
   }
 
   /**

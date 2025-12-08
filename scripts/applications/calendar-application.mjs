@@ -346,6 +346,9 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
 
       const isToday = this._isToday(currentYear, currentMonth, currentDay);
 
+      // Check if this day has a selected time slot
+      const selectedHour = this._selectedTimeSlot?.year === currentYear && this._selectedTimeSlot?.month === currentMonth && this._selectedTimeSlot?.day === currentDay ? this._selectedTimeSlot.hour : null;
+
       days.push({
         day: currentDay,
         year: currentYear,
@@ -354,6 +357,7 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
         dayName: dayName,
         isToday: isToday,
         currentHour: isToday ? currentHour : null,
+        selectedHour: selectedHour,
         notes: dayNotes
       });
 
@@ -671,19 +675,27 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     notes.forEach((note) => {
       const start = note.system.startDate;
       const end = note.system.endDate;
+      const allDay = note.system.allDay;
 
       // Find which day this event is on
       const dayMatch = days.find((d) => d.year === start.year && d.month === start.month && d.day === start.day);
       if (!dayMatch) return;
 
-      // Calculate grid row positioning (add 2 for header rows)
-      const startRow = start.hour + 2;
-      const duration = end && end.year === start.year && end.month === start.month && end.day === start.day ? end.hour - start.hour : 1;
-      const endRow = startRow + Math.max(duration, 1);
+      // Calculate hour span for the event
+      const startHour = allDay ? 0 : (start.hour ?? 0);
+      let hourSpan = 1; // Default 1 hour
+
+      if (allDay) {
+        hourSpan = 24;
+      } else if (end && end.year === start.year && end.month === start.month && end.day === start.day) {
+        // Same-day event: calculate span from start to end hour
+        const endHour = end.hour ?? startHour;
+        hourSpan = Math.max(endHour - startHour, 1);
+      }
 
       // Format times
-      const startTime = `${start.hour.toString().padStart(2, '0')}:${start.minute.toString().padStart(2, '0')}`;
-      const endTime = end ? `${end.hour.toString().padStart(2, '0')}:${end.minute.toString().padStart(2, '0')}` : null;
+      const startTime = allDay ? 'All Day' : `${startHour.toString().padStart(2, '0')}:${(start.minute ?? 0).toString().padStart(2, '0')}`;
+      const endTime = end && !allDay ? `${(end.hour ?? 0).toString().padStart(2, '0')}:${(end.minute ?? 0).toString().padStart(2, '0')}` : null;
 
       blocks.push({
         id: note.id,
@@ -694,11 +706,11 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
         day: start.day,
         month: start.month,
         year: start.year,
-        startRow,
-        endRow,
+        startHour,
+        hourSpan,
         startTime,
         endTime,
-        duration
+        allDay
       });
     });
 
@@ -821,6 +833,10 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
       hour = 12;
     }
 
+    // Calculate end time (default 1 hour duration)
+    const endHour = (parseInt(hour) + 1) % 24;
+    const endDay = endHour < parseInt(hour) ? parseInt(day) + 1 : parseInt(day); // Handle day rollover
+
     // Create note using NoteManager (which creates it as a page in the calendar journal)
     const page = await NoteManager.createNote({
       name: 'New Note',
@@ -830,6 +846,13 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
           month: parseInt(month),
           day: parseInt(day),
           hour: parseInt(hour),
+          minute: 0
+        },
+        endDate: {
+          year: parseInt(year),
+          month: parseInt(month),
+          day: endDay,
+          hour: endHour,
           minute: 0
         }
       }
@@ -843,11 +866,16 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
   }
 
   static async _onAddNoteToday(event, target) {
-    // Use selected time slot if available, otherwise use today
+    // Priority: selected time slot > selected date > today
     let day, month, year, hour, minute;
 
     if (this._selectedTimeSlot) {
       ({ day, month, year, hour } = this._selectedTimeSlot);
+      minute = 0;
+    } else if (this._selectedDate) {
+      // Use the selected day in the calendar
+      ({ day, month, year } = this._selectedDate);
+      hour = 12;
       minute = 0;
     } else {
       const today = game.time.components;
@@ -862,6 +890,10 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
       minute = today.minute ?? 0;
     }
 
+    // Calculate end time (default 1 hour duration)
+    const endHour = (parseInt(hour) + 1) % 24;
+    const endDay = endHour < parseInt(hour) ? parseInt(day) + 1 : parseInt(day); // Handle day rollover
+
     // Create note using NoteManager (which creates it as a page in the calendar journal)
     const page = await NoteManager.createNote({
       name: 'New Note',
@@ -871,6 +903,13 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
           month: parseInt(month),
           day: parseInt(day),
           hour: parseInt(hour),
+          minute: parseInt(minute)
+        },
+        endDate: {
+          year: parseInt(year),
+          month: parseInt(month),
+          day: endDay,
+          hour: endHour,
           minute: parseInt(minute)
         }
       }

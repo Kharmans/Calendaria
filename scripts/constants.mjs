@@ -80,7 +80,10 @@ export const SETTINGS = {
   CUSTOM_CATEGORIES: 'customCategories',
 
   /** @type {string} Whether to show moon phases on the calendar UI */
-  SHOW_MOON_PHASES: 'showMoonPhases'
+  SHOW_MOON_PHASES: 'showMoonPhases',
+
+  /** @type {string} Whether to advance time during short/long rests (dnd5e only) */
+  ADVANCE_TIME_ON_REST: 'advanceTimeOnRest'
 };
 
 /**
@@ -239,7 +242,16 @@ export const HOOKS = {
   MIDNIGHT: 'calendaria.midnight',
 
   /** @type {string} Fired when midday passes */
-  MIDDAY: 'calendaria.midday'
+  MIDDAY: 'calendaria.midday',
+
+  /** @type {string} Fired when real-time clock state changes */
+  CLOCK_UPDATE: 'calendaria.clockUpdate',
+
+  /** @type {string} Fired when an event/note triggers (time reached its start date) */
+  EVENT_TRIGGERED: 'calendaria.eventTriggered',
+
+  /** @type {string} Fired when a multi-day event starts a new day */
+  EVENT_DAY_CHANGED: 'calendaria.eventDayChanged'
 };
 
 /**

@@ -19,7 +19,7 @@
 
         <!-- Hour grid cells for this day -->
         {{#each ../calendarData.timeSlots}}
-          <div class="week-time-cell {{#if (and ../isToday (eq hour ../currentHour))}}current-hour{{/if}}"
+          <div class="week-time-cell {{#if (and ../isToday (eq hour ../currentHour))}}current-hour{{/if}}{{#if (eq hour ../selectedHour)}} selected{{/if}}"
                data-day="{{../day}}"
                data-month="{{../month}}"
                data-year="{{../year}}"
@@ -27,21 +27,20 @@
                data-action="selectTimeSlot">
             <!-- Event blocks positioned within cells -->
             {{#each ../eventBlocks}}
-              {{#if (eq hour ../../startHour)}}
-                <div class="week-event-block"
-                     style="grid-column: span {{hourSpan}}; background-color: {{color}};"
+              {{#if (eq ../hour startHour)}}
+                <div class="week-event-block {{#if allDay}}all-day{{/if}} {{#if (eq hourSpan 1)}}compact{{/if}}"
+                     style="--hour-span: {{hourSpan}}; background-color: {{color}};"
                      data-tooltip="{{name}}: {{startTime}}{{#if endTime}} - {{endTime}}{{/if}}"
                      data-action="editNote"
                      data-note-id="{{id}}">
-                  <div class="event-time">{{startTime}}</div>
-                  <div class="event-name">
+                  <div class="event-icon">
                     {{#if (eq iconType "fontawesome")}}
-                      <i class="{{icon}}" style="margin-right: 4px;"></i>
+                      <i class="{{icon}}"></i>
                     {{else if icon}}
-                      <img src="{{icon}}" alt="{{name}}" style="width: 12px; height: 12px; margin-right: 4px;" />
+                      <img src="{{icon}}" alt="{{name}}" />
                     {{/if}}
-                    {{name}}
                   </div>
+                  <div class="event-name">{{name}}</div>
                 </div>
               {{/if}}
             {{/each}}

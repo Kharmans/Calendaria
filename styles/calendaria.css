@@ -598,7 +598,8 @@
   background: var(--calendaria-border-light);
   border: 1px solid var(--calendaria-border);
   border-radius: 4px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .week-corner-header {
@@ -660,6 +661,7 @@
   cursor: pointer;
   transition: background 0.15s ease;
   position: relative;
+  overflow: visible;
 
   &:hover {
     background: var(--calendaria-bg-hover);
@@ -670,11 +672,22 @@
     border-top: 3px solid var(--calendaria-today);
     box-shadow: inset 0 0 10px rgb(255 100 0 / 15%);
   }
+
+  &.selected {
+    background: var(--calendaria-primary-hover);
+    border: 2px solid var(--calendaria-primary);
+    box-shadow: inset 0 0 10px rgb(0 100 255 / 15%);
+  }
 }
 
 .week-event-block {
+  --hour-span: 1;
+
   position: absolute;
-  inset: 2px;
+  top: 2px;
+  left: 2px;
+  bottom: 2px;
+  width: calc(var(--hour-span) * 100% + (var(--hour-span) - 1) * 1px - 4px);
   padding: 4px 6px;
   border-radius: 4px;
   border-top: 3px solid rgb(0 0 0 / 30%);
@@ -703,12 +716,21 @@
     transform: translateY(-2px);
   }
 
-  .event-time {
-    font-weight: 700;
-    font-size: 9px;
-    opacity: 0.95;
-    letter-spacing: 0.3px;
+  .event-icon {
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    i {
+      font-size: 12px;
+    }
+
+    img {
+      width: 14px;
+      height: 14px;
+      object-fit: contain;
+    }
   }
 
   .event-name {
@@ -717,6 +739,33 @@
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.3;
+    min-width: 0;
+  }
+
+  /* Compact layout for 1-hour events */
+  &.compact {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 2px 4px;
+    gap: 2px;
+
+    .event-icon {
+      i {
+        font-size: 14px;
+      }
+
+      img {
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    .event-name {
+      font-size: 9px;
+      max-width: 100%;
+    }
   }
 }
 
@@ -924,11 +973,29 @@
   }
 
   .time-fieldset {
-    .time-controls {
+    .time-inputs {
       display: flex;
-      flex-direction: row;
+      flex-direction: column;
+    }
+
+    .time-row {
+      display: flex;
       align-items: center;
       gap: 0.5rem;
+
+      > label {
+        font-size: 0.9em;
+        font-weight: 600;
+        min-width: 3rem;
+        flex-shrink: 0;
+      }
+
+      input[type="time"] {
+        width: 6rem;
+        height: 22px;
+        padding: 4px 0;
+        flex-shrink: 0;
+      }
     }
 
     .all-day-label {
@@ -936,6 +1003,9 @@
       align-items: center;
       gap: 0.25rem;
       white-space: nowrap;
+      margin-left: auto;
+      font-size: 0.9em;
+      font-weight: normal;
     }
   }
 

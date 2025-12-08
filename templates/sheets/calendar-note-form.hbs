@@ -22,11 +22,15 @@
       </div>
     </fieldset>
 
-    <fieldset class="gm-only-fieldset">
+    <fieldset class="visibility-fieldset">
       <legend>Visibility</legend>
-      <label class="gm-only-control">
+      <label class="visibility-control">
         <input type="checkbox" name="system.gmOnly" {{checked system.gmOnly}} data-tooltip="CALENDARIA.UI.GmOnlyTooltip" />
         GM Only
+      </label>
+      <label class="visibility-control">
+        <input type="checkbox" name="system.silent" {{checked system.silent}} data-tooltip="CALENDARIA.UI.SilentTooltip" />
+        Don't Announce
       </label>
     </fieldset>
   </div>
@@ -62,15 +66,24 @@
 
     <fieldset class="time-fieldset">
       <legend>Time</legend>
-      <div class="time-controls">
-        <input type="time" name="system.startDate.time" value="{{timeValue}}" {{#if system.allDay}}disabled{{/if}} data-tooltip="CALENDARIA.UI.TimeTooltip" />
-        <label class="all-day-label">
-          <input type="checkbox" name="system.allDay" {{checked system.allDay}} data-tooltip="CALENDARIA.UI.AllDayTooltip" />
-          All Day
-        </label>
+      <div class="time-inputs">
+        <div class="time-row">
+          <label>Start</label>
+          <input type="time" name="system.startDate.time" value="{{startTimeValue}}" {{#if system.allDay}}disabled{{/if}} data-tooltip="CALENDARIA.UI.StartTimeTooltip" />
+          <input type="hidden" name="system.startDate.hour" value="{{system.startDate.hour}}" />
+          <input type="hidden" name="system.startDate.minute" value="{{system.startDate.minute}}" />
+          <label class="all-day-label">
+            <input type="checkbox" name="system.allDay" {{checked system.allDay}} data-tooltip="CALENDARIA.UI.AllDayTooltip" />
+            All Day
+          </label>
+        </div>
+        <div class="time-row">
+          <label>End</label>
+          <input type="time" name="system.endDate.time" value="{{endTimeValue}}" {{#if system.allDay}}disabled{{/if}} data-tooltip="CALENDARIA.UI.EndTimeTooltip" />
+          <input type="hidden" name="system.endDate.hour" value="{{system.endDate.hour}}" />
+          <input type="hidden" name="system.endDate.minute" value="{{system.endDate.minute}}" />
+        </div>
       </div>
-      <input type="hidden" name="system.startDate.hour" value="{{system.startDate.hour}}" />
-      <input type="hidden" name="system.startDate.minute" value="{{system.startDate.minute}}" />
     </fieldset>
 
     <fieldset class="repeat-fieldset">
