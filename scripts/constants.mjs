@@ -187,24 +187,73 @@ export const SYSTEM = {
  * Custom Calendaria hook names fired by the module.
  * Other modules and macros can listen for these hooks to respond to Calendaria events.
  *
- * @typedef {Object} HookNames
- * @property {string} CALENDAR_SWITCHED - Fired when the active calendar is switched locally
- * @property {string} REMOTE_CALENDAR_SWITCH - Fired when a remote calendar switch is received
- * @property {string} CALENDAR_ADDED - Fired when a new calendar is added to the registry
- * @property {string} CALENDAR_REMOVED - Fired when a calendar is removed from the registry
- * @property {string} REMOTE_DATE_CHANGE - Fired when a remote date/time change is received
- * @property {string} NOTE_CREATED - Fired when a calendar note is created
- * @property {string} NOTE_UPDATED - Fired when a calendar note is updated
- * @property {string} NOTE_DELETED - Fired when a calendar note is deleted
+ * ## Lifecycle Hooks
+ * - `calendaria.init` - Fired when Calendaria starts initializing
+ * - `calendaria.ready` - Fired when Calendaria is fully initialized and ready
+ *
+ * ## Calendar Hooks
+ * - `calendaria.calendarSwitched` - Fired when the active calendar is switched locally
+ * - `calendaria.remoteCalendarSwitch` - Fired when a remote calendar switch is received
+ * - `calendaria.calendarAdded` - Fired when a new calendar is added
+ * - `calendaria.calendarUpdated` - Fired when an existing calendar is updated
+ * - `calendaria.calendarRemoved` - Fired when a calendar is removed
+ *
+ * ## Time Hooks
+ * - `calendaria.dateTimeChange` - Fired on ANY date/time change (most commonly used)
+ * - `calendaria.dayChange` - Fired when the day changes
+ * - `calendaria.monthChange` - Fired when the month changes
+ * - `calendaria.yearChange` - Fired when the year changes
+ * - `calendaria.seasonChange` - Fired when the season changes
+ * - `calendaria.clockStartStop` - Fired when real-time clock starts or stops
+ *
+ * ## Time-of-Day Hooks
+ * - `calendaria.sunrise` - Fired when sunrise occurs
+ * - `calendaria.sunset` - Fired when sunset occurs
+ * - `calendaria.midnight` - Fired when midnight passes
+ * - `calendaria.midday` - Fired when midday passes
+ *
+ * ## Note Hooks
+ * - `calendaria.noteCreated` - Fired when a calendar note is created
+ * - `calendaria.noteUpdated` - Fired when a calendar note is updated
+ * - `calendaria.noteDeleted` - Fired when a calendar note is deleted
+ * - `calendaria.eventTriggered` - Fired when an event's start time is reached
+ *
+ * @example
+ * // Listen for any date/time change
+ * Hooks.on('calendaria.dateTimeChange', (data) => {
+ *   console.log('Time changed:', data.current, 'Delta:', data.diff);
+ * });
+ *
+ * // Listen for day changes only
+ * Hooks.on('calendaria.dayChange', (data) => {
+ *   console.log('New day:', data.current.dayOfMonth);
+ * });
+ *
+ * // Listen for note creation
+ * Hooks.on('calendaria.noteCreated', (noteStub) => {
+ *   console.log('Note created:', noteStub.name);
+ * });
  */
 
 /**
  * Custom Calendaria hook names.
  * These hooks are fired by the module and can be listened to by other modules and macros.
- *
- * @type {HookNames}
  */
 export const HOOKS = {
+  /* -------------------------------------------- */
+  /*  Lifecycle Hooks                             */
+  /* -------------------------------------------- */
+
+  /** @type {string} Fired when Calendaria starts initializing (before ready) */
+  INIT: 'calendaria.init',
+
+  /** @type {string} Fired when Calendaria is fully initialized and ready to use */
+  READY: 'calendaria.ready',
+
+  /* -------------------------------------------- */
+  /*  Calendar Hooks                              */
+  /* -------------------------------------------- */
+
   /** @type {string} Fired when the active calendar is switched locally */
   CALENDAR_SWITCHED: 'calendaria.calendarSwitched',
 
@@ -220,17 +269,34 @@ export const HOOKS = {
   /** @type {string} Fired when a calendar is removed from the registry */
   CALENDAR_REMOVED: 'calendaria.calendarRemoved',
 
+  /* -------------------------------------------- */
+  /*  Date/Time Change Hooks                      */
+  /* -------------------------------------------- */
+
+  /**
+   * Fired whenever the world time changes. This is the primary hook for tracking time.
+   * Passes: { previous: TimeComponents, current: TimeComponents, diff: number, calendar: Calendar }
+   */
+  DATE_TIME_CHANGE: 'calendaria.dateTimeChange',
+
+  /** @type {string} Fired when the day changes (new day begins) */
+  DAY_CHANGE: 'calendaria.dayChange',
+
+  /** @type {string} Fired when the month changes */
+  MONTH_CHANGE: 'calendaria.monthChange',
+
+  /** @type {string} Fired when the year changes */
+  YEAR_CHANGE: 'calendaria.yearChange',
+
+  /** @type {string} Fired when the season changes */
+  SEASON_CHANGE: 'calendaria.seasonChange',
+
   /** @type {string} Fired when a remote date/time change is received */
   REMOTE_DATE_CHANGE: 'calendaria.remoteDateChange',
 
-  /** @type {string} Fired when a calendar note is created */
-  NOTE_CREATED: 'calendaria.noteCreated',
-
-  /** @type {string} Fired when a calendar note is updated */
-  NOTE_UPDATED: 'calendaria.noteUpdated',
-
-  /** @type {string} Fired when a calendar note is deleted */
-  NOTE_DELETED: 'calendaria.noteDeleted',
+  /* -------------------------------------------- */
+  /*  Time-of-Day Hooks                           */
+  /* -------------------------------------------- */
 
   /** @type {string} Fired when sunrise occurs */
   SUNRISE: 'calendaria.sunrise',
@@ -244,14 +310,44 @@ export const HOOKS = {
   /** @type {string} Fired when midday passes */
   MIDDAY: 'calendaria.midday',
 
-  /** @type {string} Fired when real-time clock state changes */
+  /* -------------------------------------------- */
+  /*  Clock Hooks                                 */
+  /* -------------------------------------------- */
+
+  /** @type {string} Fired when real-time clock state changes (running/stopped) */
+  CLOCK_START_STOP: 'calendaria.clockStartStop',
+
+  /** @type {string} Fired on each real-time clock tick (if clock is running) */
   CLOCK_UPDATE: 'calendaria.clockUpdate',
+
+  /* -------------------------------------------- */
+  /*  Note/Event Hooks                            */
+  /* -------------------------------------------- */
+
+  /** @type {string} Fired when a calendar note is created */
+  NOTE_CREATED: 'calendaria.noteCreated',
+
+  /** @type {string} Fired when a calendar note is updated */
+  NOTE_UPDATED: 'calendaria.noteUpdated',
+
+  /** @type {string} Fired when a calendar note is deleted */
+  NOTE_DELETED: 'calendaria.noteDeleted',
 
   /** @type {string} Fired when an event/note triggers (time reached its start date) */
   EVENT_TRIGGERED: 'calendaria.eventTriggered',
 
   /** @type {string} Fired when a multi-day event starts a new day */
-  EVENT_DAY_CHANGED: 'calendaria.eventDayChanged'
+  EVENT_DAY_CHANGED: 'calendaria.eventDayChanged',
+
+  /* -------------------------------------------- */
+  /*  UI Hooks                                    */
+  /* -------------------------------------------- */
+
+  /** @type {string} Fired before the calendar UI renders */
+  PRE_RENDER_CALENDAR: 'calendaria.preRenderCalendar',
+
+  /** @type {string} Fired after the calendar UI renders */
+  RENDER_CALENDAR: 'calendaria.renderCalendar'
 };
 
 /**

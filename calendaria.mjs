@@ -5,13 +5,13 @@
  * @author Tyler
  */
 
-import { registerSettings } from './scripts/settings.mjs';
+import { registerSettings, registerReadySettings } from './scripts/settings.mjs';
 import { registerHooks } from './scripts/hooks.mjs';
 import { initializeLogger, log } from './scripts/utils/logger.mjs';
 import { registerKeybindings, toggleCalendarVisibility } from './scripts/utils/keybinds.mjs';
 import { CalendariaSocket } from './scripts/utils/socket.mjs';
 import { CalendariaHUD } from './scripts/applications/calendaria-hud.mjs';
-import { TEMPLATES, JOURNAL_TYPES, SHEET_IDS } from './scripts/constants.mjs';
+import { TEMPLATES, JOURNAL_TYPES, SHEET_IDS, HOOKS } from './scripts/constants.mjs';
 import CalendarManager from './scripts/calendar/calendar-manager.mjs';
 import CalendariaCalendar from './scripts/calendar/data/calendaria-calendar.mjs';
 import NoteManager from './scripts/notes/note-manager.mjs';
@@ -27,6 +27,8 @@ import { CalendarEditor } from './scripts/applications/calendar-editor.mjs';
 import { injectDefaultMoons } from './scripts/calendar/data/default-moons.mjs';
 
 Hooks.once('init', async () => {
+  // Fire calendaria.init hook for other modules to prepare
+  Hooks.callAll(HOOKS.INIT);
   registerSettings();
   initializeLogger();
   registerKeybindings();
@@ -119,6 +121,9 @@ Hooks.once('dnd5e.setupCalendar', () => {
 });
 
 Hooks.once('ready', async () => {
+  // Register settings that require game.users
+  registerReadySettings();
+
   // Initialize calendar system
   await CalendarManager.initialize();
 
@@ -139,6 +144,13 @@ Hooks.once('ready', async () => {
     const worldTime = game.time.calendar.componentsToTime(RENESCARA_DEFAULT_DATE);
     await game.time.advance(worldTime);
   }
+
+  // Fire calendaria.ready hook - module is fully initialized
+  Hooks.callAll(HOOKS.READY, {
+    api: CalendariaAPI,
+    calendar: CalendarManager.getActiveCalendar(),
+    version: game.modules.get('calendaria')?.version
+  });
 
   log(3, 'Calendaria ready.');
 });

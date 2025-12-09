@@ -1,7 +1,8 @@
 /**
  * Time Tracker
  * Monitors world time changes and fires hooks when specific time thresholds are crossed.
- * Thresholds include sunrise, sunset, midnight, and midday.
+ * Fires hooks for: dateTimeChange, dayChange, monthChange, yearChange, seasonChange,
+ * and time-of-day thresholds (sunrise, sunset, midnight, midday).
  *
  * @module Time/TimeTracker
  * @author Tyler
@@ -21,6 +22,9 @@ export default class TimeTracker {
   /** @type {Object|null} Last checked time components */
   static #lastComponents = null;
 
+  /** @type {number|null} Last known season index */
+  static #lastSeason = null;
+
   /**
    * Initialize the time tracker.
    * Called during module initialization.
@@ -30,7 +34,8 @@ export default class TimeTracker {
 
     // Store current time as baseline
     this.#lastWorldTime = game.time.worldTime;
-    this.#lastComponents = game.time.components;
+    this.#lastComponents = foundry.utils.deepClone(game.time.components);
+    this.#lastSeason = game.time.components?.season ?? null;
 
     log(3, 'Time Tracker initialized');
   }
@@ -38,6 +43,7 @@ export default class TimeTracker {
   /**
    * Handle world time updates.
    * Called by the updateWorldTime hook.
+   * Fires dateTimeChange hook and checks for period/threshold crossings.
    *
    * @param {number} worldTime - The new world time in seconds
    * @param {number} delta - The time delta in seconds
@@ -50,19 +56,117 @@ export default class TimeTracker {
       return;
     }
 
+    const currentComponents = game.time.components;
+
     // If this is the first update, just store the time
-    if (this.#lastWorldTime === null) {
+    if (this.#lastWorldTime === null || this.#lastComponents === null) {
       this.#lastWorldTime = worldTime;
-      this.#lastComponents = game.time.components;
+      this.#lastComponents = foundry.utils.deepClone(currentComponents);
+      this.#lastSeason = currentComponents?.season ?? null;
       return;
     }
 
-    // Check for threshold crossings
+    // Always fire dateTimeChange hook for any time update
+    this.#fireDateTimeChangeHook(this.#lastComponents, currentComponents, delta, calendar);
+
+    // Check for period changes (day, month, year, season)
+    this.#checkPeriodChanges(this.#lastComponents, currentComponents, calendar);
+
+    // Check for threshold crossings (sunrise, sunset, midnight, midday)
     this.#checkThresholds(this.#lastWorldTime, worldTime, calendar);
 
     // Update last known time
     this.#lastWorldTime = worldTime;
-    this.#lastComponents = game.time.components;
+    this.#lastComponents = foundry.utils.deepClone(currentComponents);
+    this.#lastSeason = currentComponents?.season ?? null;
+  }
+
+  /**
+   * Fire the dateTimeChange hook with comprehensive time change data.
+   * This is the primary hook other modules should listen to for time changes.
+   *
+   * @param {Object} previousComponents - Previous time components
+   * @param {Object} currentComponents - Current time components
+   * @param {number} delta - Time delta in seconds
+   * @param {Object} calendar - Active calendar
+   * @private
+   */
+  static #fireDateTimeChangeHook(previousComponents, currentComponents, delta, calendar) {
+    const yearZero = calendar?.years?.yearZero ?? 0;
+
+    const hookData = {
+      previous: {
+        ...previousComponents,
+        year: previousComponents.year + yearZero
+      },
+      current: {
+        ...currentComponents,
+        year: currentComponents.year + yearZero
+      },
+      diff: delta,
+      calendar: calendar,
+      worldTime: game.time.worldTime
+    };
+
+    Hooks.callAll(HOOKS.DATE_TIME_CHANGE, hookData);
+  }
+
+  /**
+   * Check for and fire period change hooks (day, month, year, season).
+   *
+   * @param {Object} previousComponents - Previous time components
+   * @param {Object} currentComponents - Current time components
+   * @param {Object} calendar - Active calendar
+   * @private
+   */
+  static #checkPeriodChanges(previousComponents, currentComponents, calendar) {
+    const yearZero = calendar?.years?.yearZero ?? 0;
+
+    // Create hook data with display years
+    const hookData = {
+      previous: {
+        ...previousComponents,
+        year: previousComponents.year + yearZero
+      },
+      current: {
+        ...currentComponents,
+        year: currentComponents.year + yearZero
+      },
+      calendar: calendar
+    };
+
+    // Check for year change
+    if (previousComponents.year !== currentComponents.year) {
+      log(3, `Year changed: ${previousComponents.year + yearZero} -> ${currentComponents.year + yearZero}`);
+      Hooks.callAll(HOOKS.YEAR_CHANGE, hookData);
+    }
+
+    // Check for month change
+    if (previousComponents.month !== currentComponents.month) {
+      log(3, `Month changed: ${previousComponents.month} -> ${currentComponents.month}`);
+      Hooks.callAll(HOOKS.MONTH_CHANGE, hookData);
+    }
+
+    // Check for day change
+    if (previousComponents.dayOfMonth !== currentComponents.dayOfMonth ||
+        previousComponents.month !== currentComponents.month ||
+        previousComponents.year !== currentComponents.year) {
+      log(3, `Day changed`);
+      Hooks.callAll(HOOKS.DAY_CHANGE, hookData);
+    }
+
+    // Check for season change
+    const previousSeason = previousComponents.season ?? this.#lastSeason;
+    const currentSeason = currentComponents.season;
+    if (previousSeason !== null && currentSeason !== null && previousSeason !== currentSeason) {
+      const seasonData = {
+        ...hookData,
+        previousSeason: calendar.seasons?.values?.[previousSeason] ?? null,
+        currentSeason: calendar.seasons?.values?.[currentSeason] ?? null
+      };
+      log(3, `Season changed: ${previousSeason} -> ${currentSeason}`);
+      Hooks.callAll(HOOKS.SEASON_CHANGE, seasonData);
+    }
   }
 
   /**

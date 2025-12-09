@@ -10,7 +10,9 @@
 
 import CalendarManager from './calendar/calendar-manager.mjs';
 import NoteManager from './notes/note-manager.mjs';
+import { CalendariaSocket } from './utils/socket.mjs';
 import { log } from './utils/logger.mjs';
+import { HOOKS } from './constants.mjs';
 
 /**
  * Public API for Calendaria module.
@@ -502,5 +504,498 @@ export const CalendariaAPI = {
    */
   async deleteAllNotes() {
     return await NoteManager.deleteAllNotes();
+  },
+
+  /* -------------------------------------------- */
+  /*  Note Creation & Management                  */
+  /* -------------------------------------------- */
+
+  /**
+   * Create a new calendar note.
+   * @param {object} options - Note creation options
+   * @param {string} options.name - Note title
+   * @param {string} [options.content=''] - Note content (HTML)
+   * @param {object} options.startDate - Start date {year, month, day, hour?, minute?}
+   * @param {object} [options.endDate] - End date {year, month, day, hour?, minute?}
+   * @param {boolean} [options.allDay=true] - Whether this is an all-day event
+   * @param {string} [options.repeat='never'] - Repeat pattern: 'never', 'daily', 'weekly', 'monthly', 'yearly'
+   * @param {string[]} [options.categories=[]] - Category IDs
+   * @param {string} [options.icon] - Icon path or class
+   * @param {string} [options.color] - Event color (hex)
+   * @param {boolean} [options.gmOnly=false] - Whether note is GM-only
+   * @returns {Promise<JournalEntryPage>} Created note page
+   * @example
+   * const note = await CALENDARIA.api.createNote({
+   *   name: 'Festival of the Moon',
+   *   startDate: { year: 1492, month: 0, day: 15 },
+   *   allDay: true,
+   *   categories: ['holiday']
+   * });
+   */
+  async createNote({ name, content = '', startDate, endDate, allDay = true, repeat = 'never', categories = [], icon, color, gmOnly = false }) {
+    if (!game.user.isGM) {
+      log(1, 'Only GMs can create notes');
+      ui.notifications.error('Only GMs can create notes');
+      return null;
+    }
+
+    // Convert display year to internal year
+    const calendar = CalendarManager.getActiveCalendar();
+    const yearZero = calendar?.years?.yearZero ?? 0;
+
+    const noteData = {
+      startDate: {
+        year: startDate.year - yearZero,
+        month: startDate.month,
+        day: startDate.day,
+        hour: startDate.hour ?? 0,
+        minute: startDate.minute ?? 0
+      },
+      endDate: endDate
+        ? {
+            year: endDate.year - yearZero,
+            month: endDate.month,
+            day: endDate.day,
+            hour: endDate.hour ?? 23,
+            minute: endDate.minute ?? 59
+          }
+        : null,
+      allDay,
+      repeat,
+      categories,
+      icon: icon || 'fas fa-calendar-day',
+      color: color || '#4a90e2',
+      gmOnly
+    };
+
+    return await NoteManager.createNote({ name, content, noteData });
+  },
+
+  /**
+   * Update an existing calendar note.
+   * @param {string} pageId - Journal entry page ID
+   * @param {object} updates - Updates to apply
+   * @param {string} [updates.name] - New name
+   * @param {object} [updates.startDate] - New start date
+   * @param {object} [updates.endDate] - New end date
+   * @param {boolean} [updates.allDay] - New all-day setting
+   * @param {string} [updates.repeat] - New repeat pattern
+   * @param {string[]} [updates.categories] - New categories
+   * @returns {Promise<JournalEntryPage>} Updated note page
+   * @example
+   * await CALENDARIA.api.updateNote('abc123', { name: 'Updated Title' });
+   */
+  async updateNote(pageId, updates) {
+    if (!game.user.isGM) {
+      log(1, 'Only GMs can update notes');
+      ui.notifications.error('Only GMs can update notes');
+      return null;
+    }
+
+    // Convert display year to internal year if dates are provided
+    const calendar = CalendarManager.getActiveCalendar();
+    const yearZero = calendar?.years?.yearZero ?? 0;
+
+    const noteData = {};
+    if (updates.startDate) {
+      noteData.startDate = {
+        ...updates.startDate,
+        year: updates.startDate.year - yearZero
+      };
+    }
+    if (updates.endDate) {
+      noteData.endDate = {
+        ...updates.endDate,
+        year: updates.endDate.year - yearZero
+      };
+    }
+    if (updates.allDay !== undefined) noteData.allDay = updates.allDay;
+    if (updates.repeat !== undefined) noteData.repeat = updates.repeat;
+    if (updates.categories !== undefined) noteData.categories = updates.categories;
+    if (updates.icon !== undefined) noteData.icon = updates.icon;
+    if (updates.color !== undefined) noteData.color = updates.color;
+    if (updates.gmOnly !== undefined) noteData.gmOnly = updates.gmOnly;
+
+    return await NoteManager.updateNote(pageId, {
+      name: updates.name,
+      noteData: Object.keys(noteData).length > 0 ? noteData : undefined
+    });
+  },
+
+  /**
+   * Open a note in the UI.
+   * @param {string} pageId - Journal entry page ID
+   * @param {object} [options] - Render options
+   * @param {string} [options.mode='view'] - 'view' or 'edit'
+   * @returns {Promise<void>}
+   * @example
+   * await CALENDARIA.api.openNote('abc123');
+   */
+  async openNote(pageId, options = {}) {
+    const page = NoteManager.getFullNote(pageId);
+    if (!page) {
+      log(2, `Note not found: ${pageId}`);
+      ui.notifications.warn('Note not found');
+      return;
+    }
+
+    page.sheet.render(true, { mode: options.mode ?? 'view' });
+  },
+
+  /* -------------------------------------------- */
+  /*  Note Queries                                */
+  /* -------------------------------------------- */
+
+  /**
+   * Get all notes for a specific date.
+   * @param {number} year - Year (display year, not internal)
+   * @param {number} month - Month (0-indexed)
+   * @param {number} day - Day of month
+   * @returns {object[]} Array of note stubs
+   * @example
+   * const notes = CALENDARIA.api.getNotesForDate(1492, 0, 15);
+   * notes.forEach(note => console.log(note.name));
+   */
+  getNotesForDate(year, month, day) {
+    const calendar = CalendarManager.getActiveCalendar();
+    const yearZero = calendar?.years?.yearZero ?? 0;
+    return NoteManager.getNotesForDate(year - yearZero, month, day);
+  },
+
+  /**
+   * Get all notes for a specific month.
+   * @param {number} year - Year (display year)
+   * @param {number} month - Month (0-indexed)
+   * @returns {object[]} Array of note stubs
+   * @example
+   * const notes = CALENDARIA.api.getNotesForMonth(1492, 0);
+   */
+  getNotesForMonth(year, month) {
+    const calendar = CalendarManager.getActiveCalendar();
+    const yearZero = calendar?.years?.yearZero ?? 0;
+    const internalYear = year - yearZero;
+
+    // Get the number of days in this month
+    const monthData = calendar?.months?.values?.[month];
+    const daysInMonth = monthData?.days ?? 30;
+
+    return NoteManager.getNotesInRange({ year: internalYear, month, day: 0 }, { year: internalYear, month, day: daysInMonth - 1 });
+  },
+
+  /**
+   * Get all notes within a date range.
+   * @param {object} startDate - Start date {year, month, day}
+   * @param {object} endDate - End date {year, month, day}
+   * @returns {object[]} Array of note stubs
+   * @example
+   * const notes = CALENDARIA.api.getNotesInRange(
+   *   { year: 1492, month: 0, day: 1 },
+   *   { year: 1492, month: 0, day: 31 }
+   * );
+   */
+  getNotesInRange(startDate, endDate) {
+    const calendar = CalendarManager.getActiveCalendar();
+    const yearZero = calendar?.years?.yearZero ?? 0;
+
+    return NoteManager.getNotesInRange({ ...startDate, year: startDate.year - yearZero }, { ...endDate, year: endDate.year - yearZero });
+  },
+
+  /**
+   * Search notes by text in title or content.
+   * @param {string} searchTerm - Text to search for
+   * @param {object} [options] - Search options
+   * @param {boolean} [options.caseSensitive=false] - Case-sensitive search
+   * @param {string[]} [options.categories] - Filter by categories
+   * @returns {object[]} Array of matching note stubs
+   * @example
+   * const results = CALENDARIA.api.searchNotes('festival');
+   */
+  searchNotes(searchTerm, options = {}) {
+    const allNotes = NoteManager.getAllNotes();
+    const term = options.caseSensitive ? searchTerm : searchTerm.toLowerCase();
+
+    return allNotes.filter((note) => {
+      // Check categories filter
+      if (options.categories?.length > 0) {
+        const noteCategories = note.flagData?.categories ?? [];
+        if (!options.categories.some((cat) => noteCategories.includes(cat))) return false;
+      }
+
+      // Check name
+      const name = options.caseSensitive ? note.name : note.name.toLowerCase();
+      if (name.includes(term)) return true;
+
+      // Check content (if available in stub)
+      if (note.content) {
+        const content = options.caseSensitive ? note.content : note.content.toLowerCase();
+        if (content.includes(term)) return true;
+      }
+
+      return false;
+    });
+  },
+
+  /**
+   * Get notes by category.
+   * @param {string} categoryId - Category ID
+   * @returns {object[]} Array of note stubs
+   * @example
+   * const holidays = CALENDARIA.api.getNotesByCategory('holiday');
+   */
+  getNotesByCategory(categoryId) {
+    return NoteManager.getNotesByCategory(categoryId);
+  },
+
+  /**
+   * Get all category definitions.
+   * @returns {object[]} Array of category definitions
+   * @example
+   * const categories = CALENDARIA.api.getCategories();
+   */
+  getCategories() {
+    return NoteManager.getCategoryDefinitions();
+  },
+
+  /* -------------------------------------------- */
+  /*  UI & Application                            */
+  /* -------------------------------------------- */
+
+  /**
+   * Open the main calendar application.
+   * @param {object} [options] - Open options
+   * @param {object} [options.date] - Date to display {year, month, day}
+   * @param {string} [options.view] - View mode: 'month', 'week', 'year'
+   * @returns {Promise<Application>} The calendar application
+   * @example
+   * await CALENDARIA.api.openCalendar();
+   * await CALENDARIA.api.openCalendar({ date: { year: 1492, month: 5, day: 1 } });
+   */
+  async openCalendar(options = {}) {
+    const { CalendarApplication } = await import('./applications/calendar-application.mjs');
+    const app = new CalendarApplication();
+    return app.render(true, options);
+  },
+
+  /**
+   * Open the calendar editor for creating/editing custom calendars.
+   * @param {string} [calendarId] - Calendar ID to edit (omit for new calendar)
+   * @returns {Promise<Application>} The editor application
+   * @example
+   * await CALENDARIA.api.openCalendarEditor(); // New calendar
+   * await CALENDARIA.api.openCalendarEditor('custom-mycalendar'); // Edit existing
+   */
+  async openCalendarEditor(calendarId) {
+    if (!game.user.isGM) {
+      log(1, 'Only GMs can edit calendars');
+      ui.notifications.error('Only GMs can edit calendars');
+      return null;
+    }
+
+    const { CalendarEditor } = await import('./applications/calendar-editor.mjs');
+    const app = new CalendarEditor({ calendarId });
+    return app.render(true);
+  },
+
+  /* -------------------------------------------- */
+  /*  Date/Time Conversion                        */
+  /* -------------------------------------------- */
+
+  /**
+   * Convert a timestamp (world time in seconds) to date components.
+   * @param {number} timestamp - World time in seconds
+   * @returns {object} Date components {year, month, dayOfMonth, hour, minute, second}
+   * @example
+   * const date = CALENDARIA.api.timestampToDate(game.time.worldTime);
+   */
+  timestampToDate(timestamp) {
+    const calendar = CalendarManager.getActiveCalendar();
+    if (!calendar) return null;
+
+    const components = calendar.timeToComponents(timestamp);
+    const yearZero = calendar.years?.yearZero ?? 0;
+
+    return {
+      ...components,
+      year: components.year + yearZero
+    };
+  },
+
+  /**
+   * Convert date components to a timestamp (world time in seconds).
+   * @param {object} date - Date components {year, month, day, hour?, minute?, second?}
+   * @returns {number} World time in seconds
+   * @example
+   * const timestamp = CALENDARIA.api.dateToTimestamp({ year: 1492, month: 0, day: 15 });
+   */
+  dateToTimestamp(date) {
+    const calendar = CalendarManager.getActiveCalendar();
+    if (!calendar) return 0;
+
+    const yearZero = calendar.years?.yearZero ?? 0;
+
+    return calendar.componentsToTime({
+      year: date.year - yearZero,
+      month: date.month,
+      dayOfMonth: date.day ?? date.dayOfMonth ?? 0,
+      hour: date.hour ?? 0,
+      minute: date.minute ?? 0,
+      second: date.second ?? 0
+    });
+  },
+
+  /**
+   * Generate a random date within a range.
+   * @param {object} [startDate] - Start date (defaults to current date)
+   * @param {object} [endDate] - End date (defaults to 1 year from start)
+   * @returns {object} Random date components
+   * @example
+   * const randomDate = CALENDARIA.api.chooseRandomDate(
+   *   { year: 1492, month: 0, day: 1 },
+   *   { year: 1492, month: 11, day: 30 }
+   * );
+   */
+  chooseRandomDate(startDate, endDate) {
+    const current = this.getCurrentDateTime();
+
+    // Default start to current date
+    if (!startDate) startDate = { year: current.year, month: current.month, day: current.dayOfMonth };
+
+    // Default end to 1 year from start
+    if (!endDate) endDate = { year: startDate.year + 1, month: startDate.month, day: startDate.day };
+
+    const startTimestamp = this.dateToTimestamp(startDate);
+    const endTimestamp = this.dateToTimestamp(endDate);
+
+    const randomTimestamp = startTimestamp + Math.floor(Math.random() * (endTimestamp - startTimestamp));
+
+    return this.timestampToDate(randomTimestamp);
+  },
+
+  /* -------------------------------------------- */
+  /*  Time-of-Day Utilities                       */
+  /* -------------------------------------------- */
+
+  /**
+   * Check if it's currently daytime.
+   * @returns {boolean} True if between sunrise and sunset
+   * @example
+   * if (CALENDARIA.api.isDaytime()) {
+   *   console.log('The sun is up!');
+   * }
+   */
+  isDaytime() {
+    const sunrise = this.getSunrise();
+    const sunset = this.getSunset();
+    if (sunrise === null || sunset === null) return true;
+
+    const components = game.time.components;
+    const currentHour = components.hour + components.minute / 60;
+
+    return currentHour >= sunrise && currentHour < sunset;
+  },
+
+  /**
+   * Check if it's currently nighttime.
+   * @returns {boolean} True if before sunrise or after sunset
+   * @example
+   * if (CALENDARIA.api.isNighttime()) {
+   *   console.log('The stars are out!');
+   * }
+   */
+  isNighttime() {
+    return !this.isDaytime();
+  },
+
+  /**
+   * Advance time to the next occurrence of a preset time.
+   * @param {string} preset - Time preset: 'sunrise', 'midday', 'sunset', 'midnight'
+   * @returns {Promise<number>} New world time
+   * @example
+   * await CALENDARIA.api.advanceTimeToPreset('sunrise');
+   */
+  async advanceTimeToPreset(preset) {
+    if (!game.user.isGM) {
+      log(1, 'Only GMs can advance time');
+      ui.notifications.error('Only GMs can advance time');
+      return game.time.worldTime;
+    }
+
+    const components = game.time.components;
+    const currentHour = components.hour + components.minute / 60 + components.second / 3600;
+
+    let targetHour;
+    switch (preset.toLowerCase()) {
+      case 'sunrise':
+        targetHour = this.getSunrise() ?? 6;
+        break;
+      case 'midday':
+      case 'noon':
+        targetHour = 12;
+        break;
+      case 'sunset':
+        targetHour = this.getSunset() ?? 18;
+        break;
+      case 'midnight':
+        targetHour = 0;
+        break;
+      default:
+        log(2, `Unknown preset: ${preset}`);
+        return game.time.worldTime;
+    }
+
+    // Calculate hours until target
+    let hoursUntil = targetHour - currentHour;
+    if (hoursUntil <= 0) hoursUntil += 24; // Next day
+
+    const secondsUntil = Math.floor(hoursUntil * 3600);
+    return await game.time.advance(secondsUntil);
+  },
+
+  /* -------------------------------------------- */
+  /*  Multiplayer & Permissions                   */
+  /* -------------------------------------------- */
+
+  /**
+   * Check if the current user is the primary GM.
+   * The primary GM is responsible for time saves and sync operations.
+   * @returns {boolean} True if current user is primary GM
+   * @example
+   * if (CALENDARIA.api.isPrimaryGM()) {
+   *   // Perform GM-only sync operation
+   * }
+   */
+  isPrimaryGM() {
+    return CalendariaSocket.isPrimaryGM();
+  },
+
+  /**
+   * Check if the current user can modify time.
+   * @returns {boolean} True if user can advance/set time
+   */
+  canModifyTime() {
+    return game.user.isGM;
+  },
+
+  /**
+   * Check if the current user can create/edit notes.
+   * @returns {boolean} True if user can manage notes
+   */
+  canManageNotes() {
+    return game.user.isGM;
+  },
+
+  /* -------------------------------------------- */
+  /*  Hook Constants                              */
+  /* -------------------------------------------- */
+
+  /**
+   * Get all available Calendaria hook names.
+   * @returns {object} Object containing all hook name constants
+   * @example
+   * const hooks = CALENDARIA.api.hooks;
+   * Hooks.on(hooks.DATE_TIME_CHANGE, (data) => console.log('Time changed!'));
+   */
+  get hooks() {
+    return { ...HOOKS };
   }
 };

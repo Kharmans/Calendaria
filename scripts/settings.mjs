@@ -101,16 +101,7 @@ export function registerSettings() {
   //  Sync & Multiplayer                     //
   // ========================================//
 
-  /** Primary GM user ID override for sync operations */
-  game.settings.register(MODULE.ID, SETTINGS.PRIMARY_GM, {
-    name: 'CALENDARIA.Settings.PrimaryGM.Name',
-    hint: 'CALENDARIA.Settings.PrimaryGM.Hint',
-    scope: 'world',
-    config: true,
-    type: String,
-    default: null,
-    requiresReload: false
-  });
+  // Primary GM setting registered in registerReadySettings() when users are available
 
   // ========================================//
   //  Technical                              //
@@ -157,4 +148,35 @@ export function registerSettings() {
   });
 
   log(3, 'Module settings registered.');
+}
+
+/**
+ * Register settings that require game.users to be available.
+ * Called during the ready hook.
+ * @returns {void}
+ */
+export function registerReadySettings() {
+  // Build GM user choices dropdown
+  const gmChoices = game.users
+    .filter((user) => user.isGM)
+    .reduce(
+      (acc, user) => {
+        acc[user.id] = user.name;
+        return acc;
+      },
+      { '': game.i18n.localize('CALENDARIA.Settings.PrimaryGM.Auto') }
+    );
+
+  /** Primary GM user ID override for sync operations */
+  game.settings.register(MODULE.ID, SETTINGS.PRIMARY_GM, {
+    name: 'CALENDARIA.Settings.PrimaryGM.Name',
+    hint: 'CALENDARIA.Settings.PrimaryGM.Hint',
+    scope: 'world',
+    config: true,
+    type: String,
+    default: '',
+    choices: gmChoices
+  });
+
+  log(3, 'Ready settings registered.');
 }
