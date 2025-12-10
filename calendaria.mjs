@@ -20,6 +20,7 @@ import TimeKeeper from './scripts/time/time-keeper.mjs';
 import EventScheduler from './scripts/time/event-scheduler.mjs';
 import { TimeKeeperHUD } from './scripts/applications/time-keeper-hud.mjs';
 import { CalendarApplication } from './scripts/applications/calendar-application.mjs';
+import { CompactCalendar } from './scripts/applications/compact-calendar.mjs';
 import { CalendarNoteDataModel } from './scripts/sheets/calendar-note-data-model.mjs';
 import { CalendarNoteSheet } from './scripts/sheets/calendar-note-sheet.mjs';
 import { CalendariaAPI } from './scripts/api.mjs';
@@ -160,6 +161,11 @@ Hooks.once('ready', async () => {
     TimeKeeperHUD.show();
   }
 
+  // Show Compact Calendar if it was open previously
+  if (game.settings.get(MODULE.ID, SETTINGS.COMPACT_CALENDAR_OPEN)) {
+    CompactCalendar.show();
+  }
+
   // Fire calendaria.ready hook - module is fully initialized
   Hooks.callAll(HOOKS.READY, {
     api: CalendariaAPI,
@@ -198,6 +204,7 @@ globalThis['CALENDARIA'] = {
   NoteManager,
   CalendarApplication,
   CalendarEditor,
+  CompactCalendar,
   ThemeEditor,
   TimeKeeper,
   TimeKeeperHUD,

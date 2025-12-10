@@ -796,6 +796,37 @@ export const CalendariaAPI = {
     return app.render(true);
   },
 
+  /**
+   * Show the compact calendar widget.
+   * @returns {Promise<Application>} The compact calendar application
+   * @example
+   * CALENDARIA.api.showCompactCalendar();
+   */
+  async showCompactCalendar() {
+    const { CompactCalendar } = await import('./applications/compact-calendar.mjs');
+    return CompactCalendar.show();
+  },
+
+  /**
+   * Hide the compact calendar widget.
+   * @example
+   * CALENDARIA.api.hideCompactCalendar();
+   */
+  async hideCompactCalendar() {
+    const { CompactCalendar } = await import('./applications/compact-calendar.mjs');
+    CompactCalendar.hide();
+  },
+
+  /**
+   * Toggle the compact calendar widget visibility.
+   * @example
+   * CALENDARIA.api.toggleCompactCalendar();
+   */
+  async toggleCompactCalendar() {
+    const { CompactCalendar } = await import('./applications/compact-calendar.mjs');
+    CompactCalendar.toggle();
+  },
+
   /* -------------------------------------------- */
   /*  Date/Time Conversion                        */
   /* -------------------------------------------- */

@@ -92,7 +92,16 @@ export const SETTINGS = {
   SHOW_TIME_KEEPER: 'showTimeKeeper',
 
   /** @type {string} Whether to advance time when combat rounds change */
-  ADVANCE_TIME_ON_COMBAT: 'advanceTimeOnCombat'
+  ADVANCE_TIME_ON_COMBAT: 'advanceTimeOnCombat',
+
+  /** @type {string} Saved position of the compact calendar */
+  COMPACT_CALENDAR_POSITION: 'compactCalendarPosition',
+
+  /** @type {string} Whether the compact calendar is open */
+  COMPACT_CALENDAR_OPEN: 'compactCalendarOpen',
+
+  /** @type {string} Delay in seconds before auto-hiding compact calendar controls */
+  COMPACT_CONTROLS_DELAY: 'compactControlsDelay'
 };
 
 /**
@@ -139,6 +148,9 @@ export const TEMPLATES = {
 
   /** @type {string} TimeKeeper HUD template */
   TIME_KEEPER_HUD: `modules/${MODULE.ID}/templates/time-keeper-hud.hbs`,
+
+  /** @type {string} Compact calendar template */
+  COMPACT_CALENDAR: `modules/${MODULE.ID}/templates/compact-calendar.hbs`,
 
   SHEETS: {
     /** @type {string} Calendar sheet header template */

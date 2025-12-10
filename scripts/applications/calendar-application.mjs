@@ -11,6 +11,7 @@ import CalendarManager from '../calendar/calendar-manager.mjs';
 import NoteManager from '../notes/note-manager.mjs';
 import { dayOfWeek } from '../notes/utils/date-utils.mjs';
 import { MODULE, SETTINGS } from '../constants.mjs';
+import * as ViewUtils from './calendar-view-utils.mjs';
 
 const { HandlebarsApplicationMixin, ApplicationV2 } = foundry.applications.api;
 
@@ -801,8 +802,14 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     // Set initial size based on view mode
     this._adjustSizeForView();
 
-    // Add context menu for notes (right-click to delete)
-    this.element.addEventListener('contextmenu', this._onNoteContextMenu.bind(this));
+    // Set up context menu for day cells
+    ViewUtils.setupDayContextMenu(this.element, '.calendar-day:not(.empty)', this.calendar, {
+      onSetDate: () => {
+        this._selectedDate = null;
+        this.render();
+      },
+      onCreateNote: () => this.render()
+    });
 
     // Set up hook to re-render when journal entries are updated, created, or deleted
     this._hooks = [];
@@ -1074,6 +1081,16 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
   }
 
   static async _onSelectDay(event, target) {
+    // Check for double-click first (manual detection since re-render breaks native dblclick)
+    const wasDoubleClick = await ViewUtils.handleDayClick(event, this.calendar, {
+      onSetDate: () => {
+        this._selectedDate = null;
+        this.render();
+      },
+      onCreateNote: () => this.render()
+    });
+    if (wasDoubleClick) return;
+
     const day = parseInt(target.dataset.day);
     const month = parseInt(target.dataset.month);
     const year = parseInt(target.dataset.year);
@@ -1139,65 +1156,4 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     await this.render();
   }
 
-  /**
-   * Handle right-click context menu on notes
-   * @param {MouseEvent} event - The contextmenu event
-   */
-  async _onNoteContextMenu(event) {
-    // Check if clicked on a note indicator or event bar
-    const noteElement = event.target.closest('[data-note-id]');
-    if (!noteElement) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    let pageId = noteElement.dataset.noteId;
-
-    // Handle segmented event IDs (e.g., "abc123-week-1" -> "abc123")
-    if (pageId.includes('-week-')) pageId = pageId.split('-week-')[0];
-
-    const page = game.journal.find((j) => j.pages.get(pageId))?.pages.get(pageId);
-    if (!page || !page.isOwner) return;
-
-    // Use DialogV2 for context menu actions
-    const action = await foundry.applications.api.DialogV2.wait({
-      window: { title: page.name },
-      content: '',
-      buttons: [
-        {
-          action: 'edit',
-          icon: 'fas fa-edit',
-          label: 'Edit'
-        },
-        {
-          action: 'delete',
-          icon: 'fas fa-trash',
-          label: 'Delete'
-        }
-      ],
-      rejectClose: false,
-      position: {
-        width: 200,
-        left: event.clientX,
-        top: event.clientY
-      }
-    });
-
-    if (action === 'edit') {
-      page.sheet.render(true, { mode: 'edit' });
-    } else if (action === 'delete') {
-      const confirmed = await foundry.applications.api.DialogV2.confirm({
-        window: { title: 'Delete Note' },
-        content: `<p>Delete note "${page.name}"?</p>`,
-        rejectClose: false,
-        modal: true
-      });
-
-      if (confirmed) {
-        const journal = page.parent;
-        if (journal.pages.size === 1) await journal.delete();
-        else await page.delete();
-      }
-    }
-  }
 }

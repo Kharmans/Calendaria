@@ -38,6 +38,35 @@ export function registerSettings() {
     default: false
   });
 
+  /** Saved position for the compact calendar */
+  game.settings.register(MODULE.ID, SETTINGS.COMPACT_CALENDAR_POSITION, {
+    name: 'Compact Calendar Position',
+    scope: 'client',
+    config: false,
+    type: Object,
+    default: null
+  });
+
+  /** Whether the compact calendar is open */
+  game.settings.register(MODULE.ID, SETTINGS.COMPACT_CALENDAR_OPEN, {
+    name: 'Compact Calendar Open',
+    scope: 'client',
+    config: false,
+    type: Boolean,
+    default: false
+  });
+
+  /** Delay before auto-hiding compact calendar controls */
+  game.settings.register(MODULE.ID, SETTINGS.COMPACT_CONTROLS_DELAY, {
+    name: 'CALENDARIA.Settings.CompactControlsDelay.Name',
+    hint: 'CALENDARIA.Settings.CompactControlsDelay.Hint',
+    scope: 'client',
+    config: true,
+    type: Number,
+    default: 3,
+    range: { min: 1, max: 10, step: 1 }
+  });
+
   /** Default setting for syncing scene darkness with sun position */
   game.settings.register(MODULE.ID, SETTINGS.DARKNESS_SYNC, {
     name: 'CALENDARIA.Settings.DarknessSync.Name',
