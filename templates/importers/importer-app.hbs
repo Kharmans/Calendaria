@@ -1,0 +1,165 @@
+{{!-- Importer Application Template --}}
+<div class="importer-content">
+  {{!-- No Importers Available --}}
+  {{#unless hasImporters}}
+  <div class="no-importers">
+    <i class="fas fa-exclamation-triangle"></i>
+    <p>{{localize "CALENDARIA.Importer.NoImportersAvailable"}}</p>
+  </div>
+  {{else}}
+
+  {{!-- Source Selection --}}
+  <div class="form-group">
+    <label>{{localize "CALENDARIA.Importer.SelectSource"}}</label>
+    <div class="form-fields">
+      <select name="importerId" data-action="selectSource">
+        <option value="">{{localize "CALENDARIA.Importer.ChooseSource"}}</option>
+        {{#each importers}}
+        <option value="{{this.value}}" {{#if (eq this.value ../selectedImporterId)}}selected{{/if}}>
+          {{localize this.label}}{{#if this.detected}} ({{localize "CALENDARIA.Importer.Detected"}}){{/if}}
+        </option>
+        {{/each}}
+      </select>
+    </div>
+  </div>
+
+  {{#if selectedImporter}}
+  {{!-- Import Source Description --}}
+  {{#if selectedImporter.description}}
+  <p class="importer-description hint">{{localize selectedImporter.description}}</p>
+  {{/if}}
+
+  {{!-- File Upload Zone --}}
+  {{#if canUpload}}
+  <div class="form-group">
+    <label>{{localize "CALENDARIA.Importer.LoadData"}}</label>
+    <div class="file-upload-zone" data-action="uploadFile">
+      <i class="fas fa-cloud-upload-alt"></i>
+      <p>{{localize "CALENDARIA.Importer.DropFileHere"}}</p>
+      <p class="hint">{{localize "CALENDARIA.Importer.OrClickToBrowse"}}</p>
+      <input type="file" accept="{{fileExtensions}}" style="display: none;" />
+    </div>
+  </div>
+  {{/if}}
+
+  {{!-- Import From Module Button --}}
+  {{#if canImportFromModule}}
+  <div class="form-group">
+    <button type="button" class="import-from-module" data-action="importFromModule">
+      <i class="fas fa-plug"></i>
+      {{localize "CALENDARIA.Importer.ImportFromModule"}}
+    </button>
+  </div>
+  {{/if}}
+
+  {{!-- Error Message --}}
+  {{#if errorMessage}}
+  <div class="import-error">
+    <i class="fas fa-exclamation-circle"></i>
+    <span>{{errorMessage}}</span>
+  </div>
+  {{/if}}
+
+  {{!-- Preview Section --}}
+  {{#if hasData}}
+  <fieldset class="preview-section">
+    <legend>
+      <i class="fas fa-eye"></i>
+      {{localize "CALENDARIA.Importer.Preview.Title"}}
+      <button type="button" class="clear-data" data-action="clearData" data-tooltip="{{localize 'CALENDARIA.Importer.Preview.ClearData'}}">
+        <i class="fas fa-times"></i>
+      </button>
+    </legend>
+
+    <div class="preview-grid">
+      <div class="preview-item">
+        <span class="preview-label">{{localize "CALENDARIA.Importer.Preview.Name"}}</span>
+        <span class="preview-value">{{previewData.name}}</span>
+      </div>
+      <div class="preview-item">
+        <span class="preview-label">{{localize "CALENDARIA.Importer.Preview.Months"}}</span>
+        <span class="preview-value">{{previewData.monthCount}}</span>
+      </div>
+      <div class="preview-item">
+        <span class="preview-label">{{localize "CALENDARIA.Importer.Preview.Weekdays"}}</span>
+        <span class="preview-value">{{previewData.weekdayCount}}</span>
+      </div>
+      <div class="preview-item">
+        <span class="preview-label">{{localize "CALENDARIA.Importer.Preview.DaysPerYear"}}</span>
+        <span class="preview-value">{{previewData.daysPerYear}}</span>
+      </div>
+      {{#if previewData.moonCount}}
+      <div class="preview-item">
+        <span class="preview-label">{{localize "CALENDARIA.Importer.Preview.Moons"}}</span>
+        <span class="preview-value">{{previewData.moonCount}}</span>
+      </div>
+      {{/if}}
+      {{#if previewData.seasonCount}}
+      <div class="preview-item">
+        <span class="preview-label">{{localize "CALENDARIA.Importer.Preview.Seasons"}}</span>
+        <span class="preview-value">{{previewData.seasonCount}}</span>
+      </div>
+      {{/if}}
+      {{#if previewData.festivalCount}}
+      <div class="preview-item">
+        <span class="preview-label">{{localize "CALENDARIA.Importer.Preview.Festivals"}}</span>
+        <span class="preview-value">{{previewData.festivalCount}}</span>
+      </div>
+      {{/if}}
+      {{#if previewData.noteCount}}
+      <div class="preview-item">
+        <span class="preview-label">{{localize "CALENDARIA.Importer.Preview.Notes"}}</span>
+        <span class="preview-value">{{previewData.noteCount}}</span>
+      </div>
+      {{/if}}
+    </div>
+  </fieldset>
+
+  {{!-- Import Options --}}
+  <fieldset class="import-options">
+    <legend>
+      <i class="fas fa-cog"></i>
+      {{localize "CALENDARIA.Importer.Options.Title"}}
+    </legend>
+
+    <div class="form-group">
+      <label>{{localize "CALENDARIA.Importer.Options.CalendarId"}}</label>
+      <div class="form-fields">
+        <span class="id-prefix">custom-</span>
+        <input type="text" name="calendarId" value="{{suggestedId}}" placeholder="{{suggestedId}}" />
+      </div>
+      <p class="hint">{{localize "CALENDARIA.Importer.Options.CalendarIdHint"}}</p>
+    </div>
+
+    <div class="form-group">
+      <label>{{localize "CALENDARIA.Importer.Options.CalendarName"}}</label>
+      <div class="form-fields">
+        <input type="text" name="calendarName" value="{{previewData.name}}" placeholder="{{previewData.name}}" />
+      </div>
+    </div>
+
+    {{#if previewData.noteCount}}
+    <div class="form-group">
+      <label class="checkbox">
+        <input type="checkbox" name="importNotes" checked />
+        {{localize "CALENDARIA.Importer.Options.ImportNotes"}}
+        <span class="hint">({{previewData.noteCount}} {{localize "CALENDARIA.Importer.Preview.Notes"}})</span>
+      </label>
+    </div>
+    {{/if}}
+  </fieldset>
+
+  {{!-- Import Button --}}
+  <footer class="form-footer flexrow">
+    {{#each buttons}}
+    <button type="{{this.type}}" {{#if this.action}}data-action="{{this.action}}"{{/if}} {{#if this.disabled}}disabled{{/if}}>
+      {{#if this.icon}}<i class="{{this.icon}}"></i>{{/if}}
+      {{localize this.label}}
+    </button>
+    {{/each}}
+  </footer>
+  {{/if}}
+
+  {{/if}}
+  {{/unless}}
+</div>

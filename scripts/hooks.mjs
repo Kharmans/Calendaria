@@ -14,6 +14,7 @@ import TimeTracker from './time/time-tracker.mjs';
 import EventScheduler from './time/event-scheduler.mjs';
 import { CalendarApplication } from './applications/calendar-application.mjs';
 import { registerRestTimeHooks } from './integrations/rest-time.mjs';
+import { initializeImporters } from './importers/index.mjs';
 
 /**
  * Register all hooks for the Calendaria module.
@@ -53,6 +54,9 @@ export function registerHooks() {
 
   // Combat time advancement
   Hooks.on('updateCombat', onUpdateCombat);
+
+  // Initialize importer registry
+  initializeImporters();
 
   log(3, 'Hooks registered');
 }

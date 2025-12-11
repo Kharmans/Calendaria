@@ -10,6 +10,7 @@ import { ResetPositionDialog } from './applications/settings/reset-position.mjs'
 import { ThemeEditor } from './applications/settings/theme-editor.mjs';
 import { CalendarEditor } from './applications/calendar-editor.mjs';
 import { TimeKeeperHUD } from './applications/time-keeper-hud.mjs';
+import { ImporterApp } from './applications/importer-app.mjs';
 
 /**
  * Register all module settings with Foundry VTT.
@@ -238,6 +239,16 @@ export function registerSettings() {
     label: 'CALENDARIA.Settings.TimeKeeper.Label',
     icon: 'fas fa-clock',
     type: TimeKeeperHUD,
+    restricted: true
+  });
+
+  /** Settings menu button to open calendar importer */
+  game.settings.registerMenu(MODULE.ID, 'importer', {
+    name: 'CALENDARIA.Settings.Importer.Name',
+    hint: 'CALENDARIA.Settings.Importer.Hint',
+    label: 'CALENDARIA.Settings.Importer.Label',
+    icon: 'fas fa-file-import',
+    type: ImporterApp,
     restricted: true
   });
 

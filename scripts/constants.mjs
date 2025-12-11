@@ -187,6 +187,11 @@ export const TEMPLATES = {
     TAB_MOONS: `modules/${MODULE.ID}/templates/editor/tab-moons.hbs`,
     /** @type {string} Calendar editor festivals tab */
     TAB_FESTIVALS: `modules/${MODULE.ID}/templates/editor/tab-festivals.hbs`
+  },
+
+  IMPORTER: {
+    /** @type {string} Main importer application template */
+    APP: `modules/${MODULE.ID}/templates/importers/importer-app.hbs`
   }
 };
 
@@ -378,7 +383,20 @@ export const HOOKS = {
   PRE_RENDER_CALENDAR: 'calendaria.preRenderCalendar',
 
   /** @type {string} Fired after the calendar UI renders */
-  RENDER_CALENDAR: 'calendaria.renderCalendar'
+  RENDER_CALENDAR: 'calendaria.renderCalendar',
+
+  /* -------------------------------------------- */
+  /*  Importer Hooks                              */
+  /* -------------------------------------------- */
+
+  /** @type {string} Fired when an import operation starts */
+  IMPORT_STARTED: 'calendaria.importStarted',
+
+  /** @type {string} Fired when an import operation completes successfully */
+  IMPORT_COMPLETE: 'calendaria.importComplete',
+
+  /** @type {string} Fired when an import operation fails */
+  IMPORT_FAILED: 'calendaria.importFailed'
 };
 
 /**
