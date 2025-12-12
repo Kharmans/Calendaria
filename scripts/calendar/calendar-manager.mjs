@@ -79,16 +79,8 @@ export default class CalendarManager {
 
           // Add to dnd5e calendar list if applicable
           if (SYSTEM.isDnd5e && CONFIG.DND5E?.calendar?.calendars) {
-            // Check if not already in list
             const exists = CONFIG.DND5E.calendar.calendars.some((c) => c.value === id);
-            if (!exists) {
-              CONFIG.DND5E.calendar.calendars.push({
-                value: id,
-                label: data.name || id,
-                config: calendar,
-                class: CalendariaCalendar
-              });
-            }
+            if (!exists) CONFIG.DND5E.calendar.calendars.push({ value: id, label: data.name || id, config: calendar, class: CalendariaCalendar });
           }
 
           log(3, `Loaded custom calendar: ${id}`);
@@ -534,11 +526,18 @@ export default class CalendarManager {
     // Ensure ID is prefixed
     const calendarId = id.startsWith('custom-') ? id : `custom-${id}`;
 
-    // Check if already exists
-    if (CalendarRegistry.has(calendarId)) {
+    // Check if already exists in settings (authoritative source)
+    const customCalendars = game.settings.get(MODULE.ID, SETTINGS.CUSTOM_CALENDARS) || {};
+    if (customCalendars[calendarId]) {
       log(2, `Cannot create calendar: ${calendarId} already exists`);
       ui.notifications.error(`Calendar "${calendarId}" already exists`);
       return null;
+    }
+
+    // Clean up stale registry entry if present
+    if (CalendarRegistry.has(calendarId)) {
+      log(3, `Cleaning up stale registry entry for: ${calendarId}`);
+      CalendarRegistry.unregister(calendarId);
     }
 
     try {
@@ -551,8 +550,7 @@ export default class CalendarManager {
       // Create calendar instance
       const calendar = new CalendariaCalendar(definition);
 
-      // Save to custom calendars setting
-      const customCalendars = game.settings.get(MODULE.ID, SETTINGS.CUSTOM_CALENDARS) || {};
+      // Save to custom calendars setting (reuse customCalendars from above)
       customCalendars[calendarId] = calendar.toObject();
       await game.settings.set(MODULE.ID, SETTINGS.CUSTOM_CALENDARS, customCalendars);
 
@@ -561,12 +559,7 @@ export default class CalendarManager {
 
       // Add to dnd5e calendar list if applicable
       if (SYSTEM.isDnd5e && CONFIG.DND5E?.calendar?.calendars) {
-        CONFIG.DND5E.calendar.calendars.push({
-          value: calendarId,
-          label: definition.name || calendarId,
-          config: calendar,
-          class: CalendariaCalendar
-        });
+        CONFIG.DND5E.calendar.calendars.push({ value: calendarId, label: definition.name || calendarId, config: calendar, class: CalendariaCalendar });
       }
 
       Hooks.callAll(HOOKS.CALENDAR_ADDED, calendarId, calendar);
@@ -706,12 +699,7 @@ export default class CalendarManager {
 
     // Add all registered calendars as templates
     for (const [id, calendar] of CalendarRegistry.getAll()) {
-      templates.push({
-        id,
-        name: calendar.name || id,
-        description: calendar.metadata?.description || '',
-        isCustom: calendar.metadata?.isCustom || false
-      });
+      templates.push({ id, name: calendar.name || id, description: calendar.metadata?.description || '', isCustom: calendar.metadata?.isCustom || false });
     }
 
     return templates;

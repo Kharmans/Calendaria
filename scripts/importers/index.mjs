@@ -8,6 +8,7 @@
 
 import { log } from '../utils/logger.mjs';
 import BaseImporter from './base-importer.mjs';
+import SimpleCalendarImporter from './simple-calendar-importer.mjs';
 
 /**
  * Registry of all available importers.
@@ -21,9 +22,7 @@ const IMPORTERS = new Map();
  * @throws {Error} If importer is invalid or already registered
  */
 export function registerImporter(ImporterClass) {
-  if (!ImporterClass?.id) {
-    throw new Error('Importer class must have a static id property');
-  }
+  if (!ImporterClass?.id) throw new Error('Importer class must have a static id property');
 
   if (IMPORTERS.has(ImporterClass.id)) {
     log(2, `Importer ${ImporterClass.id} is already registered, skipping`);
@@ -96,10 +95,8 @@ export function createImporter(id) {
 export function initializeImporters() {
   log(3, 'Initializing importer registry...');
 
-  // Future importers will be registered here:
-  // registerImporter(SimpleCalendarImporter);
-  // registerImporter(FantasyCalendarImporter);
-  // etc.
+  // Register built-in importers
+  registerImporter(SimpleCalendarImporter);
 
   log(3, `Importer registry initialized with ${IMPORTERS.size} importers`);
 }

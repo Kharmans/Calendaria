@@ -13,14 +13,22 @@ import NoteManager from '../notes/note-manager.mjs';
 const ContextMenu = foundry.applications.ux.ContextMenu.implementation;
 
 /**
- * Get all calendar note pages from journal entries.
+ * Get all calendar note pages from journal entries for the active calendar.
  * @returns {JournalEntryPage[]}
  */
 export function getCalendarNotes() {
   const notes = [];
+  const activeCalendarId = CalendarManager.getActiveCalendar()?.metadata?.id;
+
   for (const journal of game.journal) {
     for (const page of journal.pages) {
-      if (page.type === 'calendaria.calendarnote') notes.push(page);
+      if (page.type !== 'calendaria.calendarnote') continue;
+
+      // Filter by calendar ID - check page flags first, then parent journal
+      const noteCalendarId = page.getFlag(MODULE.ID, 'calendarId') || page.parent?.getFlag(MODULE.ID, 'calendarId');
+      if (activeCalendarId && noteCalendarId !== activeCalendarId) continue;
+
+      notes.push(page);
     }
   }
   return notes;

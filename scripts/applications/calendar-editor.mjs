@@ -107,9 +107,17 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
   /* -------------------------------------------- */
 
   /**
+   * Whether to set this calendar as active after saving
+   * @type {boolean}
+   */
+  #setActiveOnSave = false;
+
+  /**
    * Create a new CalendarEditor.
    * @param {object} [options] - Application options
    * @param {string} [options.calendarId] - ID of calendar to edit (null for new)
+   * @param {object} [options.initialData] - Pre-loaded calendar data (e.g., from importer)
+   * @param {string} [options.suggestedId] - Suggested ID for new calendar
    */
   constructor(options = {}) {
     super(options);
@@ -118,6 +126,8 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       this.#calendarId = options.calendarId;
       this.#isEditing = true;
       this.#loadExistingCalendar(options.calendarId);
+    } else if (options.initialData) {
+      this.#loadInitialData(options.initialData, options.suggestedId);
     } else {
       this.#initializeBlankCalendar();
     }
@@ -184,7 +194,6 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     const calendar = CalendarManager.getCalendar(calendarId);
     if (calendar) {
       this.#calendarData = calendar.toObject();
-      // Ensure all required structures exist
       if (!this.#calendarData.seasons) this.#calendarData.seasons = { values: [] };
       if (!this.#calendarData.eras) this.#calendarData.eras = [];
       if (!this.#calendarData.festivals) this.#calendarData.festivals = [];
@@ -194,6 +203,31 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       log(2, `Calendar ${calendarId} not found, initializing blank`);
       this.#initializeBlankCalendar();
     }
+  }
+
+  /**
+   * Load initial data from an external source (e.g., importer).
+   * @param {object} data - Calendar data to load
+   * @param {string} [suggestedId] - Suggested ID for the calendar
+   * @private
+   */
+  #loadInitialData(data, suggestedId) {
+    this.#calendarData = foundry.utils.deepClone(data);
+
+    // Ensure all required structures exist
+    if (!this.#calendarData.seasons) this.#calendarData.seasons = { values: [] };
+    if (!this.#calendarData.eras) this.#calendarData.eras = [];
+    if (!this.#calendarData.festivals) this.#calendarData.festivals = [];
+    if (!this.#calendarData.moons) this.#calendarData.moons = [];
+    if (!this.#calendarData.metadata) this.#calendarData.metadata = {};
+
+    // Store suggested ID for later use
+    if (suggestedId) this.#calendarData.metadata.suggestedId = suggestedId;
+
+    // Pre-localize strings (imported data may have literal strings)
+    this.#prelocalizeCalendarData();
+
+    log(3, `Loaded initial data for calendar: ${this.#calendarData.name}`);
   }
 
   /* -------------------------------------------- */
@@ -244,13 +278,24 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       label: month.name
     }));
 
+    // Prepare starting weekday options from weekdays (for per-month fixed weekday start)
+    const startingWeekdayOptions = this.#calendarData.days.values.map((day, idx) => ({
+      value: idx,
+      label: day.name
+    }));
+
     // Prepare months with navigation flags for up/down buttons
     const monthCount = this.#calendarData.months.values.length;
     context.monthsWithNav = this.#calendarData.months.values.map((month, idx) => ({
       ...month,
       index: idx,
       isFirst: idx === 0,
-      isLast: idx === monthCount - 1
+      isLast: idx === monthCount - 1,
+      hasStartingWeekday: month.startingWeekday != null,
+      startingWeekdayOptions: startingWeekdayOptions.map((opt) => ({
+        ...opt,
+        selected: opt.value === month.startingWeekday
+      }))
     }));
 
     // Prepare festivals with month options
@@ -371,32 +416,34 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     }));
     context.formatOptions = formatOptions;
 
+    // Prepare solstice month/day values from day-of-year
+    const daylight = this.#calendarData.daylight || {};
+    const winterSolstice = this.#dayOfYearToMonthDay(daylight.winterSolstice ?? 0);
+    const summerSolstice = this.#dayOfYearToMonthDay(daylight.summerSolstice ?? Math.floor(context.calculatedDaysPerYear / 2));
+
+    context.winterSolsticeMonth = winterSolstice.month;
+    context.winterSolsticeDay = winterSolstice.day;
+    context.summerSolsticeMonth = summerSolstice.month;
+    context.summerSolsticeDay = summerSolstice.day;
+
+    // Month options for solstice dropdowns (1-indexed)
+    context.winterSolsticeMonthOptions = context.monthOptions.map((opt) => ({
+      ...opt,
+      selected: opt.value === winterSolstice.month
+    }));
+    context.summerSolsticeMonthOptions = context.monthOptions.map((opt) => ({
+      ...opt,
+      selected: opt.value === summerSolstice.month
+    }));
+
     // Footer buttons
     context.buttons = [
-      {
-        type: 'button',
-        action: 'saveCalendar',
-        icon: 'fas fa-save',
-        label: 'CALENDARIA.Editor.Button.Save'
-      },
-      {
-        type: 'button',
-        action: 'resetCalendar',
-        icon: 'fas fa-undo',
-        label: 'CALENDARIA.Editor.Button.Reset'
-      }
+      { type: 'button', action: 'saveCalendar', icon: 'fas fa-save', label: 'CALENDARIA.Editor.Button.Save' },
+      { type: 'button', action: 'resetCalendar', icon: 'fas fa-undo', label: 'CALENDARIA.Editor.Button.Reset' }
     ];
 
     // Add delete button if editing an existing calendar
-    if (this.#calendarId) {
-      context.buttons.push({
-        type: 'button',
-        action: 'deleteCalendar',
-        icon: 'fas fa-trash',
-        label: 'CALENDARIA.Editor.Button.Delete',
-        cssClass: 'delete-button'
-      });
-    }
+    if (this.#calendarId) context.buttons.push({ type: 'button', action: 'deleteCalendar', icon: 'fas fa-trash', label: 'CALENDARIA.Editor.Button.Delete', cssClass: 'delete-button' });
 
     return context;
   }
@@ -455,6 +502,28 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     return { month: lastMonth, day: lastDay };
   }
 
+  /**
+   * Convert month and day to day-of-year (0-indexed).
+   * @param {number} month - Month (1-indexed)
+   * @param {number} day - Day of month (1-indexed)
+   * @returns {number} Day of year (0-indexed)
+   * @private
+   */
+  #monthDayToDayOfYear(month, day) {
+    const months = this.#calendarData.months.values;
+    let dayOfYear = 0;
+
+    // Sum days of all months before the target month
+    for (let i = 0; i < month - 1 && i < months.length; i++) {
+      dayOfYear += months[i].days || 0;
+    }
+
+    // Add the day within the month (convert to 0-indexed)
+    dayOfYear += (day || 1) - 1;
+
+    return dayOfYear;
+  }
+
   /* -------------------------------------------- */
   /*  Form Handling                               */
   /* -------------------------------------------- */
@@ -501,8 +570,23 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#calendarData.days.minutesPerHour = parseInt(data['days.minutesPerHour']) || 60;
     this.#calendarData.days.secondsPerMinute = parseInt(data['days.secondsPerMinute']) || 60;
 
+    // Daylight settings
+    if (!this.#calendarData.daylight) this.#calendarData.daylight = {};
+    this.#calendarData.daylight.enabled = data['daylight.enabled'] ?? false;
+    this.#calendarData.daylight.shortestDay = parseFloat(data['daylight.shortestDay']) || 8;
+    this.#calendarData.daylight.longestDay = parseFloat(data['daylight.longestDay']) || 16;
+
+    // Convert solstice month/day to day-of-year
+    const winterMonth = parseInt(data['daylight.winterSolsticeMonth']) || 1;
+    const winterDay = parseInt(data['daylight.winterSolsticeDay']) || 1;
+    this.#calendarData.daylight.winterSolstice = this.#monthDayToDayOfYear(winterMonth, winterDay);
+
+    const summerMonth = parseInt(data['daylight.summerSolsticeMonth']) || 1;
+    const summerDay = parseInt(data['daylight.summerSolsticeDay']) || 1;
+    this.#calendarData.daylight.summerSolstice = this.#monthDayToDayOfYear(summerMonth, summerDay);
+
     // Process months array
-    this.#updateArrayFromFormData(data, 'months', this.#calendarData.months.values, ['name', 'abbreviation', 'days', 'leapDays', 'type']);
+    this.#updateArrayFromFormData(data, 'months', this.#calendarData.months.values, ['name', 'abbreviation', 'days', 'leapDays', 'startingWeekday']);
 
     // Process weekdays array
     this.#updateArrayFromFormData(data, 'weekdays', this.#calendarData.days.values, ['name', 'abbreviation', 'isRestDay']);
@@ -546,17 +630,10 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       for (const field of fields) {
         const key = `${prefix}.${idx}.${field}`;
         if (data[key] !== undefined) {
-          if (field === 'leapDays') {
-            // leapDays should stay null/undefined when empty, not become 0
-            const parsed = parseInt(data[key]);
-            if (!isNaN(parsed)) item[field] = parsed;
-          } else if (field === 'days' || field === 'day' || field === 'month' || field === 'dayStart' || field === 'dayEnd') {
-            item[field] = parseInt(data[key]) || 0;
-          } else if (field === 'isRestDay') {
-            item[field] = !!data[key];
-          } else {
-            item[field] = data[key];
-          }
+          if (field === 'leapDays' || field === 'startingWeekday') item[field] = isNaN(parseInt(data[key])) ? null : parseInt(data[key]);
+          else if (field === 'days' || field === 'day' || field === 'month' || field === 'dayStart' || field === 'dayEnd') item[field] = parseInt(data[key]) || 0;
+          else if (field === 'isRestDay') item[field] = !!data[key];
+          else item[field] = data[key];
         }
       }
       targetArray.push(item);
@@ -1004,27 +1081,9 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     // Build dialog buttons
     const buttons = [];
 
-    if (isCustom) {
-      buttons.push({
-        action: 'edit',
-        label: game.i18n.localize('CALENDARIA.Editor.EditCalendar'),
-        icon: 'fas fa-edit',
-        default: true
-      });
-    }
-
-    buttons.push({
-      action: 'template',
-      label: game.i18n.localize('CALENDARIA.Editor.UseAsTemplate'),
-      icon: 'fas fa-copy',
-      default: !isCustom
-    });
-
-    buttons.push({
-      action: 'cancel',
-      label: game.i18n.localize('CALENDARIA.UI.Cancel'),
-      icon: 'fas fa-times'
-    });
+    if (isCustom) buttons.push({ action: 'edit', label: game.i18n.localize('CALENDARIA.Editor.EditCalendar'), icon: 'fas fa-edit', default: true });
+    buttons.push({ action: 'template', label: game.i18n.localize('CALENDARIA.Editor.UseAsTemplate'), icon: 'fas fa-copy', default: !isCustom });
+    buttons.push({ action: 'cancel', label: game.i18n.localize('CALENDARIA.UI.Cancel'), icon: 'fas fa-times' });
 
     const result = await foundry.applications.api.DialogV2.wait({
       window: { title: game.i18n.localize('CALENDARIA.Editor.LoadCalendar') },
@@ -1130,34 +1189,93 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       return;
     }
 
+    // Show save dialog with "Set as active" option
+    const setActive = await this.#showSaveDialog();
+    if (setActive === null) return; // Cancelled
+
     // Calculate daysPerYear from months
     this.#calendarData.days.daysPerYear = this.#calculateDaysPerYear();
 
     try {
       let calendar;
+      let calendarId;
+
       if (this.#isEditing && this.#calendarId) {
         // Update existing
         calendar = await CalendarManager.updateCustomCalendar(this.#calendarId, this.#calendarData);
+        calendarId = this.#calendarId;
       } else {
-        // Create new
-        const id = this.#calendarData.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '-')
-          .replace(/-+/g, '-');
+        // Create new - use suggested ID from importer if available
+        const id =
+          this.#calendarData.metadata?.suggestedId ||
+          this.#calendarData.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, '-')
+            .replace(/-+/g, '-');
         calendar = await CalendarManager.createCustomCalendar(id, this.#calendarData);
         if (calendar) {
-          this.#calendarId = calendar.metadata?.id;
+          calendarId = calendar.metadata?.id;
+          this.#calendarId = calendarId;
           this.#isEditing = true;
         }
       }
 
       if (calendar) {
         ui.notifications.info(game.i18n.format('CALENDARIA.Editor.SaveSuccess', { name: this.#calendarData.name }));
+
+        // Set as active calendar if requested
+        if (setActive && calendarId) {
+          await CalendarManager.switchCalendar(calendarId);
+          // Reload the world to fully apply the new calendar
+          foundry.utils.debouncedReload();
+        }
       }
     } catch (error) {
       log(2, 'Error saving calendar:', error);
       ui.notifications.error(game.i18n.format('CALENDARIA.Editor.SaveError', { error: error.message }));
     }
+  }
+
+  /**
+   * Show save dialog with "Set as active calendar" option.
+   * @returns {Promise<boolean|null>} True if set active, false if not, null if cancelled
+   * @private
+   */
+  async #showSaveDialog() {
+    const isGM = game.user.isGM;
+    const content = `
+      <p>${game.i18n.localize('CALENDARIA.Editor.ConfirmSave')}</p>
+      ${
+        isGM
+          ? `<div class="form-group">
+        <label class="checkbox">
+          <input type="checkbox" name="setActive" ${this.#setActiveOnSave ? 'checked' : ''}>
+          ${game.i18n.localize('CALENDARIA.Editor.SetAsActive')}
+        </label>
+        <p class="hint">${game.i18n.localize('CALENDARIA.Editor.SetAsActiveHint')}</p>
+      </div>`
+          : ''
+      }
+    `;
+
+    return new Promise((resolve) => {
+      foundry.applications.api.DialogV2.prompt({
+        window: { title: game.i18n.localize('CALENDARIA.Editor.Button.Save') },
+        content,
+        ok: {
+          label: game.i18n.localize('CALENDARIA.Editor.Button.Save'),
+          icon: 'fas fa-save',
+          callback: (event, button, dialog) => {
+            const setActive = isGM ? button.form.elements.setActive?.checked ?? false : false;
+            this.#setActiveOnSave = setActive; // Remember for next save
+            resolve(setActive);
+          }
+        },
+        rejectClose: false
+      }).then((result) => {
+        if (result === undefined) resolve(null); // Dialog was closed
+      });
+    });
   }
 
   /**
@@ -1231,5 +1349,16 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static edit(calendarId) {
     return new CalendarEditor({ calendarId }).render(true);
+  }
+
+  /**
+   * Open the calendar builder with pre-loaded data (e.g., from importer).
+   * @param {object} data - Calendar data to load
+   * @param {object} [options] - Additional options
+   * @param {string} [options.suggestedId] - Suggested ID for the calendar
+   * @returns {CalendarEditor}
+   */
+  static createFromData(data, options = {}) {
+    return new CalendarEditor({ initialData: data, suggestedId: options.suggestedId }).render(true);
   }
 }

@@ -103,6 +103,7 @@ export function monthsBetween(startDate, endDate) {
 
 /**
  * Get day of week for a date (0 = first day of week).
+ * Respects month's startingWeekday if set.
  * @param {object} date  Date to check
  * @returns {number}  Day of week index
  */
@@ -111,8 +112,15 @@ export function dayOfWeek(date) {
   if (!calendar) return 0;
 
   try {
-    const components = { year: date.year, month: date.month, day: date.day, hour: 0, minute: 0, second: 0 };
+    // Check if the month has a fixed startingWeekday
+    const monthData = calendar.months?.values?.[date.month];
+    if (monthData?.startingWeekday != null) {
+      const daysInWeek = calendar.days?.values?.length || 7;
+      const dayIndex = (date.day ?? 1) - 1;
+      return (monthData.startingWeekday + dayIndex) % daysInWeek;
+    }
 
+    const components = { year: date.year, month: date.month, day: date.day, hour: 0, minute: 0, second: 0 };
     const time = calendar.componentsToTime(components);
     const timeComponents = calendar.timeToComponents(time);
 

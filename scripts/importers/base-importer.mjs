@@ -125,15 +125,9 @@ export default class BaseImporter {
 
     // Time validation
     if (data.days) {
-      if (!data.days.hoursPerDay || data.days.hoursPerDay < 1) {
-        errors.push('Invalid hours per day');
-      }
-      if (!data.days.minutesPerHour || data.days.minutesPerHour < 1) {
-        errors.push('Invalid minutes per hour');
-      }
-      if (!data.days.secondsPerMinute || data.days.secondsPerMinute < 1) {
-        errors.push('Invalid seconds per minute');
-      }
+      if (!data.days.hoursPerDay || data.days.hoursPerDay < 1) errors.push('Invalid hours per day');
+      if (!data.days.minutesPerHour || data.days.minutesPerHour < 1) errors.push('Invalid minutes per hour');
+      if (!data.days.secondsPerMinute || data.days.secondsPerMinute < 1) errors.push('Invalid seconds per minute');
     }
 
     // Month validation
@@ -177,9 +171,11 @@ export default class BaseImporter {
       const calendar = await CalendarManager.createCustomCalendar(calendarId, data);
 
       if (calendar) {
-        log(3, `Successfully imported calendar: ${calendarId}`);
-        Hooks.callAll(HOOKS.IMPORT_COMPLETE, { importerId: this.constructor.id, calendarId, calendar });
-        return { success: true, calendar, calendarId };
+        // Get the actual calendar ID (with custom- prefix) from metadata
+        const actualCalendarId = calendar.metadata?.id || `custom-${calendarId}`;
+        log(3, `Successfully imported calendar: ${actualCalendarId}`);
+        Hooks.callAll(HOOKS.IMPORT_COMPLETE, { importerId: this.constructor.id, calendarId: actualCalendarId, calendar });
+        return { success: true, calendar, calendarId: actualCalendarId };
       } else {
         throw new Error('Calendar creation returned null');
       }
@@ -199,7 +195,18 @@ export default class BaseImporter {
    * @returns {Promise<{success: boolean, count: number, errors: string[]}>}
    */
   async importNotes(notes, options = {}) {
-    // Base implementation - override in subclasses
+    return { success: true, count: 0, errors: [] };
+  }
+
+  /**
+   * Import festivals (fixed calendar events) from source data.
+   * Override in subclasses that support festival import.
+   * @param {object[]} festivals - Extracted festival data
+   * @param {object} options - Import options
+   * @param {string} options.calendarId - Target calendar ID
+   * @returns {Promise<{success: boolean, count: number, errors: string[]}>}
+   */
+  async importFestivals(festivals, options = {}) {
     return { success: true, count: 0, errors: [] };
   }
 
@@ -219,7 +226,7 @@ export default class BaseImporter {
     return {
       name: transformedData.name || 'Unknown',
       monthCount: transformedData.months?.values?.length ?? 0,
-      weekdayCount: transformedData.weekdays?.values?.length ?? 0,
+      weekdayCount: transformedData.days?.values?.length ?? 0,
       moonCount: transformedData.moons?.length ?? 0,
       seasonCount: transformedData.seasons?.values?.length ?? 0,
       eraCount: transformedData.eras?.length ?? 0,

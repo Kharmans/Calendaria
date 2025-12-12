@@ -9,6 +9,7 @@
 import { MODULE, TEMPLATES } from '../constants.mjs';
 import { log } from '../utils/logger.mjs';
 import { getImporterOptions, createImporter } from '../importers/index.mjs';
+import { CalendarEditor } from './calendar-editor.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -36,10 +37,10 @@ export class ImporterApp extends HandlebarsApplicationMixin(ApplicationV2) {
       closeOnSubmit: false
     },
     actions: {
-      selectSource: ImporterApp.#onSelectSource,
       uploadFile: ImporterApp.#onUploadFile,
       importFromModule: ImporterApp.#onImportFromModule,
-      clearData: ImporterApp.#onClearData
+      clearData: ImporterApp.#onClearData,
+      setAllNoteTypes: ImporterApp.#onSetAllNoteTypes
     }
   };
 
@@ -73,6 +74,9 @@ export class ImporterApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @type {boolean} Whether import is in progress */
   #importing = false;
 
+  /** @type {object[]|null} Extracted notes for selection UI */
+  #extractedNotes = null;
+
   /* -------------------------------------------- */
   /*  Rendering                                   */
   /* -------------------------------------------- */
@@ -94,6 +98,7 @@ export class ImporterApp extends HandlebarsApplicationMixin(ApplicationV2) {
     context.suggestedId = this.#suggestedId;
     context.errorMessage = this.#errorMessage;
     context.importing = this.#importing;
+    context.extractedNotes = this.#extractedNotes || [];
 
     // Determine available actions
     if (context.selectedImporter) {
@@ -112,6 +117,10 @@ export class ImporterApp extends HandlebarsApplicationMixin(ApplicationV2) {
   _onRender(context, options) {
     super._onRender?.(context, options);
 
+    // Source select change handler (data-action doesn't work with change events)
+    const sourceSelect = this.element.querySelector('select[name="importerId"]');
+    if (sourceSelect) sourceSelect.addEventListener('change', this.#onSourceChange.bind(this));
+
     // Set up drag and drop for file upload
     const dropZone = this.element.querySelector('.file-upload-zone');
     if (dropZone) {
@@ -122,9 +131,7 @@ export class ImporterApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // File input change handler
     const fileInput = this.element.querySelector('input[type="file"]');
-    if (fileInput) {
-      fileInput.addEventListener('change', this.#onFileSelected.bind(this));
-    }
+    if (fileInput) fileInput.addEventListener('change', this.#onFileSelected.bind(this));
   }
 
   /* -------------------------------------------- */
@@ -169,6 +176,9 @@ export class ImporterApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.#previewData = importer.getPreviewData(this.#rawData, this.#transformedData);
       this.#suggestedId = this.#generateId(this.#transformedData.name);
 
+      // Extract notes for selection UI
+      this.#extractedNotes = await importer.extractNotes(this.#rawData);
+
       log(3, 'Data processed successfully:', this.#previewData);
     } catch (error) {
       log(2, 'Error processing import data:', error);
@@ -203,11 +213,25 @@ export class ImporterApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#previewData = null;
     this.#suggestedId = null;
     this.#errorMessage = null;
+    this.#extractedNotes = null;
   }
 
   /* -------------------------------------------- */
-  /*  Drag & Drop Handlers                        */
+  /*  Event Handlers                              */
   /* -------------------------------------------- */
+
+  /**
+   * Handle source selection change.
+   * @param {Event} event
+   */
+  #onSourceChange(event) {
+    const importerId = event.target.value;
+    if (importerId !== this.#selectedImporterId) {
+      this.#selectedImporterId = importerId || null;
+      this.#clearData();
+      this.render();
+    }
+  }
 
   /**
    * Handle dragover event on drop zone.
@@ -273,22 +297,6 @@ export class ImporterApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /* -------------------------------------------- */
 
   /**
-   * Handle source selection change.
-   * @param {Event} event
-   * @param {HTMLElement} target
-   */
-  static async #onSelectSource(event, target) {
-    const select = this.element.querySelector('select[name="importerId"]');
-    const importerId = select?.value;
-
-    if (importerId !== this.#selectedImporterId) {
-      this.#selectedImporterId = importerId || null;
-      this.#clearData();
-      this.render();
-    }
-  }
-
-  /**
    * Handle upload file button click.
    * @param {Event} event
    * @param {HTMLElement} target
@@ -328,7 +336,19 @@ export class ImporterApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Handle set all note types button click.
+   * @param {Event} event
+   * @param {HTMLElement} target
+   */
+  static #onSetAllNoteTypes(event, target) {
+    const type = target.dataset.type;
+    const selects = this.element.querySelectorAll('.note-type-select');
+    selects.forEach((select) => (select.value = type));
+  }
+
+  /**
    * Handle form submission (import).
+   * Opens the Calendar Editor with the imported data for polishing before saving.
    * @param {Event} event
    * @param {HTMLFormElement} form
    * @param {FormDataExtended} formData
@@ -341,43 +361,62 @@ export class ImporterApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const data = formData.object;
     const calendarId = data.calendarId || this.#suggestedId;
-    const importNotes = data.importNotes ?? true;
+    const calendarName = data.calendarName || this.#transformedData.name;
 
-    this.#importing = true;
-    this.render();
+    // Parse note type selections from form data
+    const noteTypes = {};
+    for (const [key, value] of Object.entries(data)) {
+      const match = key.match(/^noteType\[(\d+)\]$/);
+      if (match) noteTypes[parseInt(match[1])] = value;
+    }
 
-    try {
-      const importer = this.#getSelectedImporter();
-      const result = await importer.importCalendar(this.#transformedData, {
-        id: calendarId,
-        name: data.calendarName || this.#transformedData.name
+    // Process festivals to add to calendar data
+    if (this.#extractedNotes?.length > 0) {
+      const festivals = [];
+      this.#extractedNotes.forEach((note, index) => {
+        const noteType = noteTypes[index] || note.suggestedType;
+        if (noteType === 'festival') {
+          // Convert to festival format (month is 1-indexed, day is 1-indexed)
+          festivals.push({
+            name: note.name,
+            month: (note.startDate?.month ?? 0) + 1,
+            day: (note.startDate?.day ?? 0) + 1
+          });
+        }
       });
 
-      if (result.success) {
-        // Import notes if requested
-        if (importNotes && this.#rawData) {
-          const notes = await importer.extractNotes(this.#rawData);
-          if (notes.length > 0) {
-            const noteResult = await importer.importNotes(notes, { calendarId: result.calendarId });
-            if (noteResult.count > 0) {
-              ui.notifications.info(game.i18n.format('CALENDARIA.Importer.NotesImported', { count: noteResult.count }));
-            }
-          }
-        }
-
-        ui.notifications.info(game.i18n.format('CALENDARIA.Importer.Success', { name: this.#transformedData.name }));
-        this.close();
-      } else {
-        this.#errorMessage = result.error;
-        this.render();
+      // Merge festivals into transformed data
+      if (festivals.length > 0) {
+        if (!this.#transformedData.festivals) this.#transformedData.festivals = [];
+        this.#transformedData.festivals.push(...festivals);
+        log(3, `Added ${festivals.length} festivals to calendar data`);
       }
-    } catch (error) {
-      log(2, 'Import error:', error);
-      this.#errorMessage = error.message;
-    } finally {
-      this.#importing = false;
-      this.render();
     }
+
+    // Apply name override
+    this.#transformedData.name = calendarName;
+
+    // Store pending notes for later import (after calendar is saved)
+    const pendingNotes = [];
+    if (this.#extractedNotes?.length > 0) {
+      this.#extractedNotes.forEach((note, index) => {
+        const noteType = noteTypes[index] || note.suggestedType;
+        if (noteType === 'note') pendingNotes.push(note);
+      });
+    }
+
+    // Store pending notes in metadata for the editor to handle after save
+    if (pendingNotes.length > 0) {
+      if (!this.#transformedData.metadata) this.#transformedData.metadata = {};
+      this.#transformedData.metadata.pendingNotes = pendingNotes;
+      this.#transformedData.metadata.importerId = this.#selectedImporterId;
+    }
+
+    // Close importer and open Calendar Editor with the transformed data
+    await this.close();
+    CalendarEditor.createFromData(this.#transformedData, { suggestedId: calendarId });
+
+    ui.notifications.info(game.i18n.localize('CALENDARIA.Importer.OpeningEditor'));
   }
 
   /* -------------------------------------------- */

@@ -182,6 +182,15 @@ export function registerSettings() {
   //  Technical                              //
   // ========================================//
 
+  /** Dev mode - allows deletion of calendar note journals */
+  game.settings.register(MODULE.ID, SETTINGS.DEV_MODE, {
+    name: 'Dev Mode',
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false
+  });
+
   /** Logging level configuration for debug output */
   game.settings.register(MODULE.ID, SETTINGS.LOGGING_LEVEL, {
     name: 'CALENDARIA.Settings.Logger.Name',

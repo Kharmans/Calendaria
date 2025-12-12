@@ -76,18 +76,26 @@
 
     <div class="form-group">
       <label>{{localize "CALENDARIA.Editor.Field.WinterSolstice"}}</label>
-      <div class="form-fields">
-        <input type="number" name="daylight.winterSolstice" value="{{calendar.daylight.winterSolstice}}" min="0" max="{{daysPerYear}}" step="1">
-        <span class="units">{{localize "CALENDARIA.Editor.Units.DayOfYear"}}</span>
+      <div class="form-fields solstice-fields">
+        <select name="daylight.winterSolsticeMonth">
+          {{#each winterSolsticeMonthOptions}}
+          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+        <input type="number" name="daylight.winterSolsticeDay" value="{{winterSolsticeDay}}" min="1" max="31" step="1">
       </div>
       <p class="hint">{{localize "CALENDARIA.Editor.Hint.WinterSolstice"}}</p>
     </div>
 
     <div class="form-group">
       <label>{{localize "CALENDARIA.Editor.Field.SummerSolstice"}}</label>
-      <div class="form-fields">
-        <input type="number" name="daylight.summerSolstice" value="{{calendar.daylight.summerSolstice}}" min="0" max="{{daysPerYear}}" step="1">
-        <span class="units">{{localize "CALENDARIA.Editor.Units.DayOfYear"}}</span>
+      <div class="form-fields solstice-fields">
+        <select name="daylight.summerSolsticeMonth">
+          {{#each summerSolsticeMonthOptions}}
+          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+        <input type="number" name="daylight.summerSolsticeDay" value="{{summerSolsticeDay}}" min="1" max="31" step="1">
       </div>
       <p class="hint">{{localize "CALENDARIA.Editor.Hint.SummerSolstice"}}</p>
     </div>

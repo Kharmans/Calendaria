@@ -21,8 +21,8 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     this._viewedDate = null;
     this._calendarId = options.calendarId || null;
     this._displayMode = 'month';
-    this._selectedDate = null; // Track clicked/selected date
-    this._selectedTimeSlot = null; // Track selected time slot for week view
+    this._selectedDate = null;
+    this._selectedTimeSlot = null;
   }
 
   static DEFAULT_OPTIONS = {
@@ -46,10 +46,7 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
       setAsCurrentDate: CalendarApplication._onSetAsCurrentDate,
       selectTimeSlot: CalendarApplication._onSelectTimeSlot
     },
-    position: {
-      width: 'auto',
-      height: 'auto'
-    }
+    position: { width: 'auto', height: 'auto' }
   };
 
   static PARTS = {
@@ -78,7 +75,6 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
 
     // Use current game time
     const components = game.time.components;
-
     const calendar = this.calendar;
 
     // Adjust year for display (add yearZero offset)
@@ -98,15 +94,6 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     this._viewedDate = date;
   }
 
-  /**
-   * Get all calendar note pages
-   * @returns {JournalEntryPage[]}
-   */
-  _getCalendarNotes() {
-    const notes = [];
-    for (const journal of game.journal) for (const page of journal.pages) if (page.type === 'calendaria.calendarnote') notes.push(page);
-    return notes;
-  }
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
@@ -133,10 +120,10 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     if (this._selectedDate) context.isToday = this._selectedDate.year === todayYear && this._selectedDate.month === todayMonth && this._selectedDate.day === todayDay;
     else context.isToday = viewedDate.year === todayYear && viewedDate.month === todayMonth && viewedDate.day === todayDay;
 
-    // Get notes from journal pages
-    const allNotes = this._getCalendarNotes();
+    // Get notes from journal pages (filtered by active calendar)
+    const allNotes = ViewUtils.getCalendarNotes();
     context.notes = allNotes;
-    context.visibleNotes = allNotes.filter((page) => !page.system.gmOnly || game.user.isGM);
+    context.visibleNotes = ViewUtils.getVisibleNotes(allNotes);
 
     // Generate calendar data based on display mode
     if (calendar) {
@@ -205,10 +192,9 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     const showMoons = game.settings.get(MODULE.ID, SETTINGS.SHOW_MOON_PHASES) && calendar.moons?.length;
 
     // Calculate starting day of week for the first day of the month
-    // For fantasy calendars (like Harptos with 10-day weeks), months always start on first day of week
-    // TODO: Make this configurable via calendar metadata when building calendar configuration UI
-    const useFixedMonthStart = daysInWeek === 10 || calendar.years?.firstWeekday === 0;
-    const startDayOfWeek = useFixedMonthStart ? 0 : dayOfWeek({ year, month, day: 1 });
+    // If month has startingWeekday set, use that; otherwise calculate normally
+    const hasFixedStart = monthData?.startingWeekday != null;
+    const startDayOfWeek = hasFixedStart ? monthData.startingWeekday : dayOfWeek({ year, month, day: 1 });
 
     // Add empty cells for days before month starts
     for (let i = 0; i < startDayOfWeek; i++) currentWeek.push({ empty: true });
@@ -435,11 +421,8 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
    */
   _generateYearData(calendar, date) {
     const { year } = date;
-
-    // Create a 3x3 grid of years
-    // Current year should be at position [1][1] (center of grid)
     const yearGrid = [];
-    const startYear = year - 4; // 4 years before current
+    const startYear = year - 4;
 
     for (let row = 0; row < 3; row++) {
       const yearRow = [];
@@ -1155,5 +1138,4 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
 
     await this.render();
   }
-
 }

@@ -153,10 +153,14 @@ export function createNoteStub(page) {
   const flagData = page.system;
   if (!flagData) return null;
 
+  // Get calendarId from page flags first, then fall back to parent journal flags
+  const calendarId = page.getFlag(MODULE.ID, 'calendarId') || page.parent?.getFlag(MODULE.ID, 'calendarId') || null;
+
   return {
     id: page.id,
     name: page.name,
     flagData: flagData,
+    calendarId,
     visible: page.testUserPermission(game.user, 'OBSERVER'),
     journalId: page.parent?.id || null,
     ownership: page.ownership

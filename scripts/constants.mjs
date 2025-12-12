@@ -104,7 +104,10 @@ export const SETTINGS = {
   COMPACT_CONTROLS_DELAY: 'compactControlsDelay',
 
   /** @type {string} Sticky states for compact calendar (time controls, sidebar, position) */
-  COMPACT_STICKY_STATES: 'compactStickyStates'
+  COMPACT_STICKY_STATES: 'compactStickyStates',
+
+  /** @type {string} Dev mode - allows deletion of calendar note journals */
+  DEV_MODE: 'devMode'
 };
 
 /**

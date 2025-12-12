@@ -7,7 +7,7 @@
  * @author Tyler
  */
 
-import { MODULE, SYSTEM, HOOKS } from '../constants.mjs';
+import { MODULE, SETTINGS, SYSTEM, HOOKS } from '../constants.mjs';
 import { log } from '../utils/logger.mjs';
 import CalendarManager from '../calendar/calendar-manager.mjs';
 import { getDefaultNoteData, validateNoteData, sanitizeNoteData, createNoteStub, getPredefinedCategories, getCategoryDefinition } from './note-data.mjs';
@@ -68,10 +68,7 @@ export default class NoteManager {
 
       // Get or create calendar journal
       const journal = await this.getCalendarJournal(calendarId, activeCalendar);
-
-      if (journal) {
-        log(3, `Initialized calendar journal for: ${calendarId}`);
-      }
+      if (journal) log(3, `Initialized calendar journal for: ${calendarId}`);
     } catch (error) {
       log(2, 'Error initializing active calendar journal:', error);
     }
@@ -185,6 +182,9 @@ export default class NoteManager {
    * @internal
    */
   static onPreDeleteJournalEntry(journal, options, userId) {
+    // Allow deletion in dev mode
+    if (game.settings.get(MODULE.ID, SETTINGS.DEV_MODE)) return;
+
     const isCalendarJournal = journal.getFlag(MODULE.ID, 'isCalendarJournal');
 
     if (isCalendarJournal) {
@@ -203,6 +203,9 @@ export default class NoteManager {
    * @internal
    */
   static onPreDeleteFolder(folder, options, userId) {
+    // Allow deletion in dev mode
+    if (game.settings.get(MODULE.ID, SETTINGS.DEV_MODE)) return;
+
     const isCalendarNotesFolder = folder.getFlag(MODULE.ID, 'isCalendarNotesFolder');
 
     if (isCalendarNotesFolder) {
@@ -285,6 +288,7 @@ export default class NoteManager {
           name,
           type: 'calendaria.calendarnote',
           system: sanitized,
+          text: { content },
           title: { level: 2, show: true },
           flags: {
             [MODULE.ID]: {
@@ -465,14 +469,22 @@ export default class NoteManager {
    * @param {number} year  Year
    * @param {number} month  Month (0-indexed)
    * @param {number} day  Day of month
+   * @param {string} [calendarId]  Optional calendar ID filter (defaults to active calendar)
    * @returns {object[]}  Array of note stubs
    */
-  static getNotesForDate(year, month, day) {
+  static getNotesForDate(year, month, day, calendarId = null) {
     const targetDate = { year, month, day };
     const matchingNotes = [];
 
+    // Default to active calendar
+    const targetCalendarId = calendarId || CalendarManager.getActiveCalendar()?.metadata?.id;
+
     for (const stub of this.#noteIndex.values()) {
       if (!stub.visible) continue;
+
+      // Filter by calendar ID - only include notes belonging to target calendar
+      // Notes without a calendarId are excluded when filtering is active
+      if (targetCalendarId && stub.calendarId !== targetCalendarId) continue;
 
       if (this.#matchesDate(stub, targetDate)) matchingNotes.push(stub);
     }
@@ -491,13 +503,21 @@ export default class NoteManager {
    * Get all notes within a date range.
    * @param {object} startDate  Range start date
    * @param {object} endDate  Range end date
+   * @param {string} [calendarId]  Optional calendar ID filter (defaults to active calendar)
    * @returns {object[]}  Array of note stubs
    */
-  static getNotesInRange(startDate, endDate) {
+  static getNotesInRange(startDate, endDate, calendarId = null) {
     const matchingNotes = [];
+
+    // Default to active calendar
+    const targetCalendarId = calendarId || CalendarManager.getActiveCalendar()?.metadata?.id;
 
     for (const stub of this.#noteIndex.values()) {
       if (!stub.visible) continue;
+
+      // Filter by calendar ID - only include notes belonging to target calendar
+      // Notes without a calendarId are excluded when filtering is active
+      if (targetCalendarId && stub.calendarId !== targetCalendarId) continue;
 
       // Check if note's start or end date falls within range
       const noteStart = stub.flagData.startDate;

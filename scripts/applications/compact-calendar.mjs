@@ -107,11 +107,7 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   };
 
   /** @override */
-  static PARTS = {
-    main: {
-      template: TEMPLATES.COMPACT_CALENDAR
-    }
-  };
+  static PARTS = { main: { template: TEMPLATES.COMPACT_CALENDAR } };
 
   /* -------------------------------------------- */
   /*  Properties                                  */
@@ -156,14 +152,12 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     // Time increment dropdown
     context.increments = Object.entries(getTimeIncrements()).map(([key, seconds]) => ({
       key,
-      label: this.#formatIncrement(key),
+      label: this._formatIncrement(key),
       seconds,
       selected: key === TimeKeeper.incrementKey
     }));
 
-    if (calendar) {
-      context.calendarData = this._generateMiniCalendarData(calendar, viewedDate);
-    }
+    if (calendar) context.calendarData = this._generateMiniCalendarData(calendar, viewedDate);
 
     // Show "Set Current Date" button if selected date differs from today (GM only)
     context.showSetCurrentDate = false;
@@ -223,13 +217,12 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     const visibleNotes = ViewUtils.getVisibleNotes(allNotes);
 
     // Calculate starting day of week
-    const useFixedMonthStart = daysInWeek === 10 || calendar.years?.firstWeekday === 0;
-    const startDayOfWeek = useFixedMonthStart ? 0 : dayOfWeek({ year, month, day: 1 });
+    // If month has startingWeekday set, use that; otherwise calculate normally
+    const hasFixedStart = monthData?.startingWeekday != null;
+    const startDayOfWeek = hasFixedStart ? monthData.startingWeekday : dayOfWeek({ year, month, day: 1 });
 
     // Add empty cells before month starts
-    for (let i = 0; i < startDayOfWeek; i++) {
-      currentWeek.push({ empty: true });
-    }
+    for (let i = 0; i < startDayOfWeek; i++) currentWeek.push({ empty: true });
 
     // Add days
     for (let day = 1; day <= daysInMonth; day++) {
@@ -260,17 +253,14 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     // Fill remaining empty cells
-    while (currentWeek.length > 0 && currentWeek.length < daysInWeek) {
-      currentWeek.push({ empty: true });
-    }
+    while (currentWeek.length > 0 && currentWeek.length < daysInWeek) currentWeek.push({ empty: true });
+
     if (currentWeek.length > 0) weeks.push(currentWeek);
 
     // Get current season
     let season = null;
     const currentSeason = calendar.getCurrentSeason?.();
-    if (currentSeason) {
-      season = game.i18n.localize(currentSeason.name);
-    }
+    if (currentSeason) season = game.i18n.localize(currentSeason.name);
 
     return {
       year,
@@ -427,9 +417,7 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     });
 
     // Set up time update hook
-    if (!this.#timeHookId) {
-      this.#timeHookId = Hooks.on('updateWorldTime', this.#onUpdateWorldTime.bind(this));
-    }
+    if (!this.#timeHookId) this.#timeHookId = Hooks.on('updateWorldTime', this.#onUpdateWorldTime.bind(this));
 
     // Clock state hook
     Hooks.on(HOOKS.CLOCK_START_STOP, this.#onClockStateChange.bind(this));
@@ -591,11 +579,7 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * Save sticky states to settings.
    */
   async #saveStickyStates() {
-    await game.settings.set(MODULE.ID, SETTINGS.COMPACT_STICKY_STATES, {
-      timeControls: this.#stickyTimeControls,
-      sidebar: this.#stickySidebar,
-      position: this.#stickyPosition
-    });
+    await game.settings.set(MODULE.ID, SETTINGS.COMPACT_STICKY_STATES, { timeControls: this.#stickyTimeControls, sidebar: this.#stickySidebar, position: this.#stickyPosition });
   }
 
   /**
@@ -653,10 +637,7 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       window.removeEventListener(...drag.handlers.dragUp);
 
       // Save position from internal state
-      await game.settings.set(MODULE.ID, SETTINGS.COMPACT_CALENDAR_POSITION, {
-        left: this.position.left,
-        top: this.position.top
-      });
+      await game.settings.set(MODULE.ID, SETTINGS.COMPACT_CALENDAR_POSITION, { left: this.position.left, top: this.position.top });
     };
   }
 
@@ -751,11 +732,8 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     const year = parseInt(target.dataset.year);
 
     // Toggle selection
-    if (this._selectedDate?.year === year && this._selectedDate?.month === month && this._selectedDate?.day === day) {
-      this._selectedDate = null;
-    } else {
-      this._selectedDate = { year, month, day };
-    }
+    if (this._selectedDate?.year === year && this._selectedDate?.month === month && this._selectedDate?.day === day) this._selectedDate = null;
+    else this._selectedDate = { year, month, day };
 
     await this.render();
   }
@@ -778,20 +756,8 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     const page = await NoteManager.createNote({
       name: 'New Note',
       noteData: {
-        startDate: {
-          year: parseInt(year),
-          month: parseInt(month),
-          day: parseInt(day),
-          hour: 12,
-          minute: 0
-        },
-        endDate: {
-          year: parseInt(year),
-          month: parseInt(month),
-          day: parseInt(day),
-          hour: 13,
-          minute: 0
-        }
+        startDate: { year: parseInt(year), month: parseInt(month), day: parseInt(day), hour: 12, minute: 0 },
+        endDate: { year: parseInt(year), month: parseInt(month), day: parseInt(day), hour: 13, minute: 0 }
       }
     });
 
@@ -1062,11 +1028,8 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       const targetHour = calendar.solarMidnight();
       const hoursPerDay = game.time.calendar?.days?.hoursPerDay ?? 24;
       // Solar midnight may exceed hoursPerDay, meaning it's technically tomorrow
-      if (targetHour >= hoursPerDay) {
-        await this.#advanceToHour(targetHour - hoursPerDay, true);
-      } else {
-        await this.#advanceToHour(targetHour);
-      }
+      if (targetHour >= hoursPerDay) await this.#advanceToHour(targetHour - hoursPerDay, true);
+      else await this.#advanceToHour(targetHour);
     } else {
       // Fallback: midnight = 0:00 next day
       await this.#advanceToHour(0, true);
@@ -1103,9 +1066,7 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     const secondsToAdvance = Math.round(hoursUntil * secondsPerHour);
-    if (secondsToAdvance > 0) {
-      await game.time.advance(secondsToAdvance);
-    }
+    if (secondsToAdvance > 0) await game.time.advance(secondsToAdvance);
   }
 
   /* -------------------------------------------- */
@@ -1117,7 +1078,7 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {string} key - Increment key
    * @returns {string} Formatted label
    */
-  #formatIncrement(key) {
+  _formatIncrement(key) {
     const labels = {
       second: game.i18n.localize('CALENDARIA.TimeKeeper.Second'),
       round: game.i18n.localize('CALENDARIA.TimeKeeper.Round'),
@@ -1141,9 +1102,7 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {CompactCalendar}
    */
   static show() {
-    if (!this._instance) {
-      this._instance = new CompactCalendar();
-    }
+    if (!this._instance) this._instance = new CompactCalendar();
     this._instance.render(true);
     game.settings.set(MODULE.ID, SETTINGS.COMPACT_CALENDAR_OPEN, true);
     return this._instance;
@@ -1160,11 +1119,8 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * Toggle the compact calendar visibility.
    */
   static toggle() {
-    if (this._instance?.rendered) {
-      this.hide();
-    } else {
-      this.show();
-    }
+    if (this._instance?.rendered) this.hide();
+    else this.show();
   }
 
   /**

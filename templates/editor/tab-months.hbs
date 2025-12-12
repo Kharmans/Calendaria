@@ -9,8 +9,8 @@
         data-tooltip="{{localize 'CALENDARIA.Editor.Tooltip.MonthDays'}}">{{localize "CALENDARIA.Editor.Column.Days"}}</span>
       <span class="col-leap"
         data-tooltip="{{localize 'CALENDARIA.Editor.Tooltip.MonthLeap'}}">{{localize "CALENDARIA.Editor.Column.Leap"}}</span>
-      <span class="col-type"
-        data-tooltip="{{localize 'CALENDARIA.Editor.Tooltip.MonthType'}}">{{localize "CALENDARIA.Editor.Column.Type"}}</span>
+      <span class="col-start-weekday"
+        data-tooltip="{{localize 'CALENDARIA.Editor.Tooltip.StartingWeekday'}}">{{localize "CALENDARIA.Editor.Column.StartWeekday"}}</span>
       <span class="col-controls"></span>
     </div>
 
@@ -20,12 +20,13 @@
         <input type="text" name="months.{{this.index}}.abbreviation" value="{{this.abbreviation}}" class="col-abbr">
         <input type="number" name="months.{{this.index}}.days" value="{{this.days}}" min="1" class="col-days">
         <input type="number" name="months.{{this.index}}.leapDays" value="{{this.leapDays}}" min="0" class="col-leap">
-        <select name="months.{{this.index}}.type" class="col-type">
-          <option value="" {{#unless this.type}}selected{{/unless}}>{{localize "CALENDARIA.Editor.MonthType.Standard"}}
+        <select name="months.{{this.index}}.startingWeekday" class="col-start-weekday">
+          <option value="" {{#unless this.hasStartingWeekday}}selected{{/unless}}>
+            {{localize "CALENDARIA.Editor.StartingWeekday.Auto"}}
           </option>
-          <option value="intercalary" {{#if (eq this.type "intercalary")}}selected{{/if}}>
-            {{localize "CALENDARIA.Editor.MonthType.Intercalary"}}
-          </option>
+          {{#each this.startingWeekdayOptions}}
+            <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+          {{/each}}
         </select>
 
         <div class="item-controls col-controls">
