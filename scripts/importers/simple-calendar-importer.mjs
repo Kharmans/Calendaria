@@ -109,8 +109,11 @@ export default class SimpleCalendarImporter extends BaseImporter {
         values: months
       },
 
-      // Years and leap year
+      // Years and leap year (Foundry format)
       years: this.#transformYears(calendar.year, calendar.leapYear),
+
+      // Advanced leap year config (Calendaria format)
+      leapYearConfig: this.#transformLeapYearConfig(calendar.leapYear),
 
       // Seasons (needs months to calculate day of year)
       seasons: {
@@ -204,27 +207,56 @@ export default class SimpleCalendarImporter extends BaseImporter {
   }
 
   /**
-   * Transform SC year and leap year config.
+   * Transform SC year and leap year config to Foundry format.
    * @param {object} year - SC year config
    * @param {object} leapYear - SC leap year config
-   * @returns {object} Calendaria years config
+   * @returns {object} Calendaria years config (Foundry format)
    */
   #transformYears(year = {}, leapYear = {}) {
     const result = {
       yearZero: year.yearZero ?? 0,
-      firstWeekday: year.firstWeekday ?? 0
+      firstWeekday: year.firstWeekday ?? 0,
+      leapYear: null // Default to no leap year
     };
 
-    // Transform leap year rule
+    // Transform leap year rule to Foundry format (leapStart, leapInterval)
     if (leapYear.rule === 'gregorian') {
-      result.leapYearRule = 'gregorian';
+      // Gregorian approximation: every 4 years
+      result.leapYear = {
+        leapStart: 0,
+        leapInterval: 4
+      };
     } else if (leapYear.rule === 'custom' && leapYear.customMod > 0) {
-      result.leapYearRule = 'custom';
-      result.leapYearMod = leapYear.customMod;
+      result.leapYear = {
+        leapStart: 0,
+        leapInterval: leapYear.customMod
+      };
     }
-    // 'none' means no leap year rule
+    // 'none' means no leap year rule (leapYear stays null)
 
     return result;
+  }
+
+  /**
+   * Transform SC leap year config to Calendaria advanced format.
+   * @param {object} leapYear - SC leap year config
+   * @returns {object|null} Calendaria leapYearConfig
+   */
+  #transformLeapYearConfig(leapYear = {}) {
+    if (leapYear.rule === 'gregorian') {
+      return {
+        rule: 'gregorian',
+        start: 0
+      };
+    } else if (leapYear.rule === 'custom' && leapYear.customMod > 0) {
+      return {
+        rule: 'simple',
+        interval: leapYear.customMod,
+        start: 0
+      };
+    }
+    // 'none' means no leap year config
+    return null;
   }
 
   /**
@@ -495,14 +527,23 @@ export default class SimpleCalendarImporter extends BaseImporter {
 
     log(3, `Starting note import: ${notes.length} notes to calendar ${calendarId}`);
 
+    // Get calendar's yearZero to convert SC internal years to display years
+    const calendar = CalendarManager.getCalendar(calendarId);
+    const yearZero = calendar?.years?.yearZero ?? 0;
+    log(3, `Calendar yearZero: ${yearZero}`);
+
     for (const note of notes) {
       try {
         log(3, `Importing note: ${note.name}`, note);
 
-        // Build note data for NoteManager
+        // Convert SC internal years to display years (add yearZero)
+        // SC internal 795 + yearZero 1970 = display 2765
+        const startDate = { ...note.startDate, year: note.startDate.year + yearZero };
+        const endDate = note.endDate ? { ...note.endDate, year: note.endDate.year + yearZero } : null;
+
         const noteData = {
-          startDate: note.startDate,
-          endDate: note.endDate,
+          startDate,
+          endDate,
           allDay: note.allDay,
           repeat: note.repeat,
           categories: note.categories

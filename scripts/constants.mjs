@@ -189,7 +189,9 @@ export const TEMPLATES = {
     /** @type {string} Calendar editor moons tab */
     TAB_MOONS: `modules/${MODULE.ID}/templates/editor/tab-moons.hbs`,
     /** @type {string} Calendar editor festivals tab */
-    TAB_FESTIVALS: `modules/${MODULE.ID}/templates/editor/tab-festivals.hbs`
+    TAB_FESTIVALS: `modules/${MODULE.ID}/templates/editor/tab-festivals.hbs`,
+    /** @type {string} Calendar editor cycles tab */
+    TAB_CYCLES: `modules/${MODULE.ID}/templates/editor/tab-cycles.hbs`
   },
 
   IMPORTER: {

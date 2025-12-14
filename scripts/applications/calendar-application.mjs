@@ -10,6 +10,7 @@
 import CalendarManager from '../calendar/calendar-manager.mjs';
 import NoteManager from '../notes/note-manager.mjs';
 import { dayOfWeek } from '../notes/utils/date-utils.mjs';
+import { isRecurringMatch } from '../notes/utils/recurrence.mjs';
 import { MODULE, SETTINGS } from '../constants.mjs';
 import * as ViewUtils from './calendar-view-utils.mjs';
 
@@ -146,6 +147,22 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     // Moon phases setting for use in calendar data generation
     context.showMoonPhases = game.settings.get(MODULE.ID, SETTINGS.SHOW_MOON_PHASES);
 
+    // Get cycle values for display in header (based on viewed date, not world time)
+    if (calendar.cycles?.length) {
+      const yearZeroOffset = calendar.years?.yearZero ?? 0;
+      const viewedComponents = {
+        year: viewedDate.year - yearZeroOffset,
+        month: viewedDate.month,
+        dayOfMonth: (viewedDate.day ?? 1) - 1,
+        hour: 12,
+        minute: 0,
+        second: 0
+      };
+      const cycleResult = calendar.getCycleValues(viewedComponents);
+      context.cycleText = cycleResult.text;
+      context.cycleValues = cycleResult.values;
+    }
+
     return context;
   }
 
@@ -234,7 +251,8 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
             return {
               moonName: game.i18n.localize(moon.name),
               phaseName: game.i18n.localize(phase.name),
-              icon: phase.icon
+              icon: phase.icon,
+              color: moon.color || null
             };
           })
           .filter(Boolean);
@@ -508,24 +526,35 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
    * @returns {Array}
    */
   _getNotesForDay(notePages, year, month, day) {
+    const targetDate = { year, month, day };
     return notePages.filter((page) => {
       const start = page.system.startDate;
       const end = page.system.endDate;
 
-      // Only include events that start on this day
-      if (start.year !== year || start.month !== month || start.day !== day) return false;
-
       // Check if end date has valid values (not null/undefined)
       const hasValidEndDate = end && end.year != null && end.month != null && end.day != null;
 
-      // If no valid end date, treat as single-day event - include it
-      if (!hasValidEndDate) return true;
-
       // Exclude multi-day events (they're shown as event bars instead)
-      if (end.year !== start.year || end.month !== start.month || end.day !== start.day) return false;
+      if (hasValidEndDate && (end.year !== start.year || end.month !== start.month || end.day !== start.day)) {
+        return false;
+      }
 
-      // Include single-day events (start and end on same day)
-      return true;
+      // Build noteData for recurrence check
+      const noteData = {
+        startDate: start,
+        endDate: end,
+        repeat: page.system.repeat,
+        repeatInterval: page.system.repeatInterval,
+        repeatEndDate: page.system.repeatEndDate,
+        maxOccurrences: page.system.maxOccurrences,
+        moonConditions: page.system.moonConditions,
+        randomConfig: page.system.randomConfig,
+        cachedRandomOccurrences: page.flags?.[MODULE.ID]?.randomOccurrences,
+        linkedEvent: page.system.linkedEvent
+      };
+
+      // Check if this event occurs on this day (handles recurring events)
+      return isRecurringMatch(noteData, targetDate);
     });
   }
 
@@ -539,7 +568,25 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
   _getNotesForMonth(notePages, year, month) {
     return notePages.filter((page) => {
       const start = page.system.startDate;
-      return start.year === year && start.month === month;
+      const repeat = page.system.repeat;
+
+      // Non-repeating notes: only include if they start in this month
+      if (!repeat || repeat === 'never') {
+        return start.year === year && start.month === month;
+      }
+
+      // Recurring notes: include if they could occur in this month
+      // (start date is before or during this month, and no end date or end date is after this month)
+      const startBeforeOrInMonth = start.year < year || (start.year === year && start.month <= month);
+      if (!startBeforeOrInMonth) return false;
+
+      const repeatEndDate = page.system.repeatEndDate;
+      if (repeatEndDate) {
+        const endAfterOrInMonth = repeatEndDate.year > year || (repeatEndDate.year === year && repeatEndDate.month >= month);
+        if (!endAfterOrInMonth) return false;
+      }
+
+      return true;
     });
   }
 
@@ -1137,5 +1184,27 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     else this._selectedTimeSlot = { year, month, day, hour };
 
     await this.render();
+  }
+
+  /**
+   * Convert hex color to hue angle for CSS filter.
+   * @param {string} hex - Hex color (e.g., '#ff0000')
+   * @returns {number} Hue angle in degrees (0-360)
+   */
+  #hexToHue(hex) {
+    if (!hex) return 0;
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    if (d === 0) return 0;
+    let h;
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h = Math.round(h * 60);
+    return h < 0 ? h + 360 : h;
   }
 }

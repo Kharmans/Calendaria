@@ -29,6 +29,8 @@ export function getDefaultNoteData() {
     repeat: 'never',
     repeatInterval: 1,
     repeatEndDate: null,
+    moonConditions: [], // Array of { moonIndex, phaseStart, phaseEnd } (0-1 values)
+    linkedEvent: null, // { noteId: string, offset: number } - occurs X days from linked event
     categories: [],
     color: '#4a9eff',
     icon: 'fas fa-calendar',
@@ -68,7 +70,7 @@ export function validateNoteData(noteData) {
   if (noteData.allDay !== undefined && typeof noteData.allDay !== 'boolean') errors.push('allDay must be a boolean');
 
   // Validate repeat
-  const validRepeatValues = ['never', 'daily', 'weekly', 'monthly', 'yearly'];
+  const validRepeatValues = ['never', 'daily', 'weekly', 'monthly', 'yearly', 'moon'];
   if (noteData.repeat && !validRepeatValues.includes(noteData.repeat)) errors.push(`repeat must be one of: ${validRepeatValues.join(', ')}`);
 
   // Validate repeat interval
@@ -76,6 +78,37 @@ export function validateNoteData(noteData) {
 
   // Validate repeat end date if present
   if (noteData.repeatEndDate && !isValidDate(noteData.repeatEndDate)) errors.push('Repeat end date is invalid');
+
+  // Validate moon conditions
+  if (noteData.moonConditions !== undefined) {
+    if (!Array.isArray(noteData.moonConditions)) errors.push('moonConditions must be an array');
+    else {
+      for (let i = 0; i < noteData.moonConditions.length; i++) {
+        const cond = noteData.moonConditions[i];
+        if (typeof cond !== 'object' || cond === null) {
+          errors.push(`moonConditions[${i}] must be an object`);
+          continue;
+        }
+        if (typeof cond.moonIndex !== 'number' || cond.moonIndex < 0) errors.push(`moonConditions[${i}].moonIndex must be a non-negative number`);
+        if (typeof cond.phaseStart !== 'number' || cond.phaseStart < 0 || cond.phaseStart > 1) errors.push(`moonConditions[${i}].phaseStart must be 0-1`);
+        if (typeof cond.phaseEnd !== 'number' || cond.phaseEnd < 0 || cond.phaseEnd > 1) errors.push(`moonConditions[${i}].phaseEnd must be 0-1`);
+      }
+    }
+  }
+
+  // Validate linked event
+  if (noteData.linkedEvent !== undefined && noteData.linkedEvent !== null) {
+    if (typeof noteData.linkedEvent !== 'object') {
+      errors.push('linkedEvent must be an object or null');
+    } else {
+      if (typeof noteData.linkedEvent.noteId !== 'string' || !noteData.linkedEvent.noteId) {
+        errors.push('linkedEvent.noteId must be a non-empty string');
+      }
+      if (typeof noteData.linkedEvent.offset !== 'number') {
+        errors.push('linkedEvent.offset must be a number');
+      }
+    }
+  }
 
   // Validate categories
   if (noteData.categories !== undefined) {
@@ -128,6 +161,8 @@ export function sanitizeNoteData(noteData) {
     repeat: noteData.repeat || defaults.repeat,
     repeatInterval: noteData.repeatInterval ?? defaults.repeatInterval,
     repeatEndDate: noteData.repeatEndDate || null,
+    moonConditions: Array.isArray(noteData.moonConditions) ? noteData.moonConditions : defaults.moonConditions,
+    linkedEvent: noteData.linkedEvent || null,
     categories: Array.isArray(noteData.categories) ? noteData.categories : defaults.categories,
     color: noteData.color || defaults.color,
     icon: noteData.icon || defaults.icon,
@@ -156,10 +191,16 @@ export function createNoteStub(page) {
   // Get calendarId from page flags first, then fall back to parent journal flags
   const calendarId = page.getFlag(MODULE.ID, 'calendarId') || page.parent?.getFlag(MODULE.ID, 'calendarId') || null;
 
+  // Include cached random occurrences if present (for random repeat type)
+  const randomOccurrences = page.getFlag(MODULE.ID, 'randomOccurrences');
+  const enrichedFlagData = randomOccurrences?.occurrences
+    ? { ...flagData, cachedRandomOccurrences: randomOccurrences.occurrences }
+    : flagData;
+
   return {
     id: page.id,
     name: page.name,
-    flagData: flagData,
+    flagData: enrichedFlagData,
     calendarId,
     visible: page.testUserPermission(game.user, 'OBSERVER'),
     journalId: page.parent?.id || null,

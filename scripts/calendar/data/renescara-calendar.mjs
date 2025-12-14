@@ -49,7 +49,7 @@ export const RENESCARA_CALENDAR = {
     firstWeekday: 0, // Week starts on Solday (index 0)
     yearNames: [], // No named years/eras by default
     yearRounds: [], // No special year cycles
-    leapYear: { leapStart: 0, leapInterval: 0 }
+    leapYear: null // No leap years in Renescara calendar
   },
 
   // Month structure

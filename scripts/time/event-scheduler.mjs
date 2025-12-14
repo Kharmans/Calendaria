@@ -32,6 +32,7 @@ import { log } from '../utils/logger.mjs';
 import CalendarManager from '../calendar/calendar-manager.mjs';
 import NoteManager from '../notes/note-manager.mjs';
 import { compareDates, getCurrentDate } from '../notes/utils/date-utils.mjs';
+import { generateRandomOccurrences, needsRandomRegeneration } from '../notes/utils/recurrence.mjs';
 
 /**
  * Event Scheduler class that monitors time changes and triggers event notifications.
@@ -101,6 +102,9 @@ export default class EventScheduler {
 
       // Update multi-day event progress
       this.#updateMultiDayEventProgress(currentDate);
+
+      // Check if random events need regeneration (approaching year end)
+      this.#checkRandomEventRegeneration(currentDate);
     }
 
     // Throttle trigger checks to every 30 game minutes
@@ -402,6 +406,61 @@ export default class EventScheduler {
     if (flagData.allDay) result += ' (All Day)';
 
     return result;
+  }
+
+  /* -------------------------------------------- */
+  /*  Random Event Regeneration                   */
+  /* -------------------------------------------- */
+
+  /**
+   * Check and regenerate random event occurrences when approaching year end.
+   * Regenerates occurrences for next year during the last week of the last month.
+   *
+   * @param {Object} currentDate - Current date components
+   * @private
+   */
+  static async #checkRandomEventRegeneration(currentDate) {
+    const calendar = CalendarManager.getActiveCalendar();
+    if (!calendar?.months?.values) return;
+
+    const allNotes = NoteManager.getAllNotes();
+
+    for (const note of allNotes) {
+      // Only process random repeat events
+      if (note.flagData.repeat !== 'random') continue;
+
+      // Get full note document to check/update flags
+      const fullNote = NoteManager.getFullNote(note.id);
+      if (!fullNote) continue;
+
+      // Check if regeneration is needed
+      const cachedData = fullNote.getFlag(MODULE.ID, 'randomOccurrences');
+      if (!needsRandomRegeneration(cachedData)) continue;
+
+      // Calculate target year (current or next)
+      const yearZero = calendar?.years?.yearZero ?? 0;
+      const currentYear = currentDate.year;
+      const targetYear = cachedData?.year >= currentYear ? currentYear + 1 : currentYear;
+
+      // Build note data for generation
+      const noteData = {
+        startDate: fullNote.system.startDate,
+        randomConfig: fullNote.system.randomConfig,
+        repeatEndDate: fullNote.system.repeatEndDate
+      };
+
+      // Generate occurrences
+      const occurrences = generateRandomOccurrences(noteData, targetYear);
+
+      // Store in flag
+      await fullNote.setFlag(MODULE.ID, 'randomOccurrences', {
+        year: targetYear,
+        generatedAt: Date.now(),
+        occurrences
+      });
+
+      log(2, `Auto-regenerated ${occurrences.length} random occurrences for ${fullNote.name} until year ${targetYear}`);
+    }
   }
 
   /* -------------------------------------------- */

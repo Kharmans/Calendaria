@@ -20,7 +20,7 @@
     </button>
   </div>
 
-  {{#if (or calendarData.currentSeason calendarData.currentEra)}}
+  {{#if (or calendarData.currentSeason calendarData.currentEra cycleText)}}
     <div class="calendar-indicators">
       {{#if calendarData.currentSeason}}
         <span class="season-indicator" data-tooltip="{{localize 'CALENDARIA.UI.CurrentSeason'}}">
@@ -31,6 +31,11 @@
         <span class="era-indicator" data-tooltip="{{localize 'CALENDARIA.UI.CurrentEra'}}">
           <i class="fas fa-hourglass-half"></i>
           {{localize calendarData.currentEra.name}}
+        </span>
+      {{/if}} {{#if cycleText}}
+        <span class="cycle-indicator" data-tooltip="{{localize 'CALENDARIA.UI.CurrentCycle'}}">
+          <i class="fas fa-redo"></i>
+          {{{cycleText}}}
         </span>
       {{/if}}
     </div>

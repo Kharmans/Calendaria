@@ -132,3 +132,28 @@ export function formatMonthDayYear(calendar, components, options = {}) {
     yyyy: year
   });
 }
+
+/**
+ * Format era template string with variable substitution.
+ * Replaces {{variable}} patterns with corresponding values from context.
+ * Supports aliases: {{era}} = {{name}}, {{short}} = {{abbreviation}}
+ *
+ * @param {string} template - Template string (e.g., "{{year}} {{short}}")
+ * @param {object} context - Variable values to substitute
+ * @param {number} context.year - Display year
+ * @param {string} context.abbreviation - Era abbreviation (also {{short}})
+ * @param {string} context.era - Full era name (also {{name}})
+ * @param {number} context.yearInEra - Year within the era (1-based)
+ * @returns {string} Formatted string with variables replaced
+ */
+export function formatEraTemplate(template, context) {
+  // Add aliases
+  const ctx = {
+    ...context,
+    era: context.era ?? context.name,
+    name: context.era ?? context.name,
+    short: context.short ?? context.abbreviation,
+    abbreviation: context.short ?? context.abbreviation
+  };
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => ctx[key] ?? match);
+}

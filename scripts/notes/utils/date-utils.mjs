@@ -42,6 +42,19 @@ export function isSameDay(date1, date2) {
 }
 
 /**
+ * Compare two dates by day only (ignoring time).
+ * @param {object} date1  First date
+ * @param {object} date2  Second date
+ * @returns {number}  -1 if date1 < date2, 0 if same day, 1 if date1 > date2
+ */
+export function compareDays(date1, date2) {
+  if (date1.year !== date2.year) return date1.year < date2.year ? -1 : 1;
+  if (date1.month !== date2.month) return date1.month < date2.month ? -1 : 1;
+  if (date1.day !== date2.day) return date1.day < date2.day ? -1 : 1;
+  return 0;
+}
+
+/**
  * Calculate days between two dates using calendar's time system.
  * @param {object} startDate  Start date
  * @param {object} endDate  End date
@@ -52,13 +65,13 @@ export function daysBetween(startDate, endDate) {
   if (!calendar) return 0;
 
   try {
-    // Convert dates to time components
+    // Convert dates to time components - normalize to midnight for day comparison
     const startComponents = {
       year: startDate.year,
       month: startDate.month,
       day: startDate.day,
-      hour: startDate.hour ?? 0,
-      minute: startDate.minute ?? 0,
+      hour: 0,
+      minute: 0,
       second: 0
     };
 
@@ -66,8 +79,8 @@ export function daysBetween(startDate, endDate) {
       year: endDate.year,
       month: endDate.month,
       day: endDate.day,
-      hour: endDate.hour ?? 0,
-      minute: endDate.minute ?? 0,
+      hour: 0,
+      minute: 0,
       second: 0
     };
 
@@ -142,22 +155,36 @@ export function addDays(date, days) {
   if (!calendar) return date;
 
   try {
+    // Convert day-of-month to day-of-year (componentsToTime expects day-of-year)
+    let dayOfYear = date.day - 1; // Convert 1-indexed to 0-indexed
+    const monthDays = calendar.months?.values || [];
+    for (let i = 0; i < date.month && i < monthDays.length; i++) {
+      dayOfYear += monthDays[i]?.days || 30;
+    }
+
     const components = {
       year: date.year,
-      month: date.month,
-      day: date.day,
+      day: dayOfYear,
       hour: date.hour ?? 0,
       minute: date.minute ?? 0,
       second: 0
     };
 
     const time = calendar.componentsToTime(components);
-    const hoursPerDay = calendar.hours ?? 24;
-    const secondsPerDay = hoursPerDay * 60 * 60;
+    const hoursPerDay = calendar.days?.hoursPerDay ?? 24;
+    const minutesPerHour = calendar.days?.minutesPerHour ?? 60;
+    const secondsPerMinute = calendar.days?.secondsPerMinute ?? 60;
+    const secondsPerDay = hoursPerDay * minutesPerHour * secondsPerMinute;
     const newTime = time + days * secondsPerDay;
     const newComponents = calendar.timeToComponents(newTime);
 
-    return { year: newComponents.year, month: newComponents.month, day: newComponents.dayOfMonth, hour: newComponents.hour, minute: newComponents.minute };
+    return {
+      year: newComponents.year,
+      month: newComponents.month,
+      day: newComponents.dayOfMonth + 1, // Convert 0-indexed to 1-indexed
+      hour: newComponents.hour,
+      minute: newComponents.minute
+    };
   } catch (error) {
     console.warn('Error adding days to date:', error);
     return date;
@@ -177,7 +204,7 @@ export function addMonths(date, months) {
   let newYear = date.year;
   let newMonth = date.month + months;
 
-  const monthsPerYear = calendar.months.length;
+  const monthsPerYear = calendar.months?.values?.length || 12;
 
   // Handle month overflow/underflow
   while (newMonth >= monthsPerYear) {
@@ -191,7 +218,7 @@ export function addMonths(date, months) {
   }
 
   // Clamp day to valid range for new month
-  const monthData = calendar.months[newMonth];
+  const monthData = calendar.months?.values?.[newMonth];
   const maxDays = monthData?.days ?? 30;
   const newDay = Math.min(date.day, maxDays);
 
@@ -211,7 +238,7 @@ export function addYears(date, years) {
   const newYear = date.year + years;
 
   // Clamp day to valid range (handles Feb 29 in leap years)
-  const monthData = calendar.months[date.month];
+  const monthData = calendar.months?.values?.[date.month];
   const maxDays = monthData?.days ?? 30;
   const newDay = Math.min(date.day, maxDays);
 

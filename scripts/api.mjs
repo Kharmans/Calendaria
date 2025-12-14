@@ -226,6 +226,21 @@ export const CalendariaAPI = {
   },
 
   /**
+   * Get the current values for all cycles (zodiac signs, elemental weeks, etc).
+   * @returns {{text: string, values: Array<{cycleName: string, entryName: string, index: number}>}|null}
+   * @example
+   * const cycles = CALENDARIA.api.getCycleValues();
+   * console.log(cycles.text); // Formatted display text
+   * cycles.values.forEach(v => console.log(v.cycleName, v.entryName));
+   */
+  getCycleValues() {
+    const calendar = CalendarManager.getActiveCalendar();
+    if (!calendar || typeof calendar.getCycleValues !== 'function') return null;
+
+    return calendar.getCycleValues();
+  },
+
+  /**
    * Get the sunrise time in hours for the current day.
    * @returns {number|null} Sunrise time in hours (e.g., 6.5 = 6:30 AM)
    * @example

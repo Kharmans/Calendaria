@@ -9,8 +9,31 @@
 import { MODULE, SETTINGS } from '../constants.mjs';
 import CalendarManager from '../calendar/calendar-manager.mjs';
 import NoteManager from '../notes/note-manager.mjs';
+import { isRecurringMatch } from '../notes/utils/recurrence.mjs';
 
 const ContextMenu = foundry.applications.ux.ContextMenu.implementation;
+
+/**
+ * Convert hex color to hue angle for CSS filter.
+ * @param {string} hex - Hex color (e.g., '#ff0000')
+ * @returns {number} Hue angle in degrees (0-360)
+ */
+function hexToHue(hex) {
+  if (!hex) return 0;
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  if (d === 0) return 0;
+  let h;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h = Math.round(h * 60);
+  return h < 0 ? h + 360 : h;
+}
 
 /**
  * Get all calendar note pages from journal entries for the active calendar.
@@ -87,22 +110,22 @@ export function getCurrentViewedDate(calendar = null) {
  * @returns {boolean}
  */
 export function hasNotesOnDay(notes, year, month, day) {
+  const targetDate = { year, month, day };
   return notes.some((page) => {
-    const start = page.system.startDate;
-    const end = page.system.endDate;
-
-    // Check if this day is the start date
-    if (start.year === year && start.month === month && start.day === day) return true;
-
-    // Check multi-day events
-    if (end?.year != null && end?.month != null && end?.day != null) {
-      const startDate = new Date(start.year, start.month, start.day);
-      const endDate = new Date(end.year, end.month, end.day);
-      const checkDate = new Date(year, month, day);
-      if (checkDate >= startDate && checkDate <= endDate) return true;
-    }
-
-    return false;
+    // Build noteData from page.system for recurrence check
+    const noteData = {
+      startDate: page.system.startDate,
+      endDate: page.system.endDate,
+      repeat: page.system.repeat,
+      repeatInterval: page.system.repeatInterval,
+      repeatEndDate: page.system.repeatEndDate,
+      maxOccurrences: page.system.maxOccurrences,
+      moonConditions: page.system.moonConditions,
+      randomConfig: page.system.randomConfig,
+      cachedRandomOccurrences: page.flags?.[MODULE.ID]?.randomOccurrences,
+      linkedEvent: page.system.linkedEvent
+    };
+    return isRecurringMatch(noteData, targetDate);
   });
 }
 
@@ -167,8 +190,11 @@ export function getFirstMoonPhase(calendar, year, month, day) {
 
   if (!phase) return null;
 
+  const color = calendar.moons[0].color || null;
   return {
     icon: phase.icon,
+    color,
+    hue: color ? hexToHue(color) : null,
     tooltip: `${game.i18n.localize(calendar.moons[0].name)}: ${game.i18n.localize(phase.name)}`
   };
 }
@@ -206,10 +232,13 @@ export function getAllMoonPhases(calendar, year, month, day) {
     .map((moon, index) => {
       const phase = calendar.getMoonPhase(index, dayWorldTime);
       if (!phase) return null;
+      const color = moon.color || null;
       return {
         moonName: game.i18n.localize(moon.name),
         phaseName: game.i18n.localize(phase.name),
-        icon: phase.icon
+        icon: phase.icon,
+        color,
+        hue: color ? hexToHue(color) : null
       };
     })
     .filter(Boolean);

@@ -9,6 +9,8 @@
 import { MODULE, SETTINGS, TEMPLATES } from '../constants.mjs';
 import { log } from '../utils/logger.mjs';
 import CalendarManager from '../calendar/calendar-manager.mjs';
+import { createImporter } from '../importers/index.mjs';
+import { formatEraTemplate } from '../calendar/calendar-utils.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -47,7 +49,13 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       removeFestival: CalendarEditor.#onRemoveFestival,
       addMoon: CalendarEditor.#onAddMoon,
       removeMoon: CalendarEditor.#onRemoveMoon,
+      addMoonPhase: CalendarEditor.#onAddMoonPhase,
+      removeMoonPhase: CalendarEditor.#onRemoveMoonPhase,
       pickMoonPhaseIcon: CalendarEditor.#onPickMoonPhaseIcon,
+      addCycle: CalendarEditor.#onAddCycle,
+      removeCycle: CalendarEditor.#onRemoveCycle,
+      addCycleEntry: CalendarEditor.#onAddCycleEntry,
+      removeCycleEntry: CalendarEditor.#onRemoveCycleEntry,
       loadCalendar: CalendarEditor.#onLoadCalendar,
       saveCalendar: CalendarEditor.#onSaveCalendar,
       resetCalendar: CalendarEditor.#onResetCalendar,
@@ -66,6 +74,7 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     eras: { template: TEMPLATES.EDITOR.TAB_ERAS, scrollable: [''] },
     festivals: { template: TEMPLATES.EDITOR.TAB_FESTIVALS, scrollable: [''] },
     moons: { template: TEMPLATES.EDITOR.TAB_MOONS, scrollable: [''] },
+    cycles: { template: TEMPLATES.EDITOR.TAB_CYCLES, scrollable: [''] },
     footer: { template: 'templates/generic/form-footer.hbs' }
   };
 
@@ -80,7 +89,8 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
         { id: 'seasons', icon: 'fas fa-sun', label: 'CALENDARIA.Editor.Tab.Seasons' },
         { id: 'eras', icon: 'fas fa-hourglass-half', label: 'CALENDARIA.Editor.Tab.Eras' },
         { id: 'festivals', icon: 'fas fa-star', label: 'CALENDARIA.Editor.Tab.Festivals' },
-        { id: 'moons', icon: 'fas fa-moon', label: 'CALENDARIA.Editor.Tab.Moons' }
+        { id: 'moons', icon: 'fas fa-moon', label: 'CALENDARIA.Editor.Tab.Moons' },
+        { id: 'cycles', icon: 'fas fa-redo', label: 'CALENDARIA.Editor.Tab.Cycles' }
       ],
       initial: 'basic'
     }
@@ -113,6 +123,18 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
   #setActiveOnSave = false;
 
   /**
+   * Pending notes to import after save (stored separately to avoid metadata clearing)
+   * @type {object[]|null}
+   */
+  #pendingNotes = null;
+
+  /**
+   * Importer ID for pending notes
+   * @type {string|null}
+   */
+  #pendingImporterId = null;
+
+  /**
    * Create a new CalendarEditor.
    * @param {object} [options] - Application options
    * @param {string} [options.calendarId] - ID of calendar to edit (null for new)
@@ -142,10 +164,11 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
   #initializeBlankCalendar() {
     this.#calendarData = {
       name: '',
+      leapYearConfig: null, // Advanced leap year config (rule, interval, start, pattern)
       years: {
         yearZero: 0,
         firstWeekday: 0,
-        leapYear: null
+        leapYear: null // Standard Foundry leap year config (leapStart, leapInterval)
       },
       months: {
         values: [
@@ -176,6 +199,8 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       eras: [],
       festivals: [],
       moons: [],
+      cycles: [],
+      cycleFormat: '',
       metadata: {
         id: '',
         description: '',
@@ -198,6 +223,8 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       if (!this.#calendarData.eras) this.#calendarData.eras = [];
       if (!this.#calendarData.festivals) this.#calendarData.festivals = [];
       if (!this.#calendarData.moons) this.#calendarData.moons = [];
+      if (!this.#calendarData.cycles) this.#calendarData.cycles = [];
+      if (!this.#calendarData.cycleFormat) this.#calendarData.cycleFormat = '';
       if (!this.#calendarData.metadata) this.#calendarData.metadata = {};
     } else {
       log(2, `Calendar ${calendarId} not found, initializing blank`);
@@ -219,15 +246,27 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!this.#calendarData.eras) this.#calendarData.eras = [];
     if (!this.#calendarData.festivals) this.#calendarData.festivals = [];
     if (!this.#calendarData.moons) this.#calendarData.moons = [];
+    if (!this.#calendarData.cycles) this.#calendarData.cycles = [];
+    if (!this.#calendarData.cycleFormat) this.#calendarData.cycleFormat = '';
     if (!this.#calendarData.metadata) this.#calendarData.metadata = {};
 
     // Store suggested ID for later use
     if (suggestedId) this.#calendarData.metadata.suggestedId = suggestedId;
 
+    // Extract pending notes to separate instance variables (to avoid metadata clearing issues)
+    if (this.#calendarData.metadata?.pendingNotes?.length > 0) {
+      this.#pendingNotes = this.#calendarData.metadata.pendingNotes;
+      this.#pendingImporterId = this.#calendarData.metadata.importerId;
+      // Clean up metadata
+      delete this.#calendarData.metadata.pendingNotes;
+      delete this.#calendarData.metadata.importerId;
+    }
+
     // Pre-localize strings (imported data may have literal strings)
     this.#prelocalizeCalendarData();
 
     log(3, `Loaded initial data for calendar: ${this.#calendarData.name}`);
+    log(3, `  pendingNotes (instance): ${this.#pendingNotes?.length || 0}, importerId: ${this.#pendingImporterId}`);
   }
 
   /* -------------------------------------------- */
@@ -325,10 +364,34 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       isLast: idx === weekdayCount - 1
     }));
 
-    // Prepare leap year values (-1 = disabled)
-    const leapYear = this.#calendarData.years.leapYear;
-    context.leapInterval = leapYear?.leapInterval ?? -1;
-    context.leapStart = leapYear?.leapStart ?? 0;
+    // Prepare leap year values - check leapYearConfig first, then legacy years.leapYear
+    const leapYearConfig = this.#calendarData.leapYearConfig;
+    const legacyLeapYear = this.#calendarData.years?.leapYear;
+
+    // Determine current rule (handle both new and legacy format)
+    let currentRule = 'none';
+    if (leapYearConfig?.rule && leapYearConfig.rule !== 'none') {
+      currentRule = leapYearConfig.rule;
+    } else if (legacyLeapYear?.leapInterval > 0) {
+      currentRule = 'simple'; // Legacy format
+    }
+
+    context.leapRuleOptions = [
+      { value: 'none', label: 'CALENDARIA.Editor.LeapRule.None', selected: currentRule === 'none' },
+      { value: 'simple', label: 'CALENDARIA.Editor.LeapRule.Simple', selected: currentRule === 'simple' },
+      { value: 'gregorian', label: 'CALENDARIA.Editor.LeapRule.Gregorian', selected: currentRule === 'gregorian' },
+      { value: 'custom', label: 'CALENDARIA.Editor.LeapRule.Custom', selected: currentRule === 'custom' }
+    ];
+
+    // Show/hide appropriate fields
+    context.showLeapSimple = currentRule === 'simple';
+    context.showLeapGregorian = currentRule === 'gregorian';
+    context.showLeapCustom = currentRule === 'custom';
+
+    // Get values (handle both new and legacy format)
+    context.leapInterval = leapYearConfig?.interval ?? legacyLeapYear?.leapInterval ?? 4;
+    context.leapStart = leapYearConfig?.start ?? legacyLeapYear?.leapStart ?? 0;
+    context.leapPattern = leapYearConfig?.pattern ?? '';
 
     // Prepare month options for reference date dropdown (0-indexed for internal use)
     context.monthOptionsZeroIndexed = this.#calendarData.months.values.map((month, idx) => ({
@@ -339,6 +402,7 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     // Prepare moons with month options and expanded phase data
     context.moonsWithNav = this.#calendarData.moons.map((moon, idx) => ({
       ...moon,
+      color: moon.color || '',
       index: idx,
       refMonthOptions: context.monthOptionsZeroIndexed.map((opt) => ({
         ...opt,
@@ -405,16 +469,45 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       { value: 'prefix', label: 'CALENDARIA.Editor.Format.Prefix' }
     ];
 
-    // Prepare eras with format options
+    // Prepare eras with format options and preview
     context.erasWithNav = this.#calendarData.eras.map((era, idx) => ({
       ...era,
       index: idx,
       formatOptions: formatOptions.map((opt) => ({
         ...opt,
         selected: opt.value === (era.format || 'suffix')
-      }))
+      })),
+      preview: this.#generateEraPreview(era)
     }));
     context.formatOptions = formatOptions;
+
+    // Prepare basedOn options for cycles
+    const basedOnOptions = [
+      { value: 'year', label: 'CALENDARIA.Editor.Cycle.BasedOn.Year' },
+      { value: 'eraYear', label: 'CALENDARIA.Editor.Cycle.BasedOn.EraYear' },
+      { value: 'month', label: 'CALENDARIA.Editor.Cycle.BasedOn.Month' },
+      { value: 'monthDay', label: 'CALENDARIA.Editor.Cycle.BasedOn.MonthDay' },
+      { value: 'day', label: 'CALENDARIA.Editor.Cycle.BasedOn.Day' },
+      { value: 'yearDay', label: 'CALENDARIA.Editor.Cycle.BasedOn.YearDay' }
+    ];
+
+    // Prepare cycles with entries and basedOn options
+    context.cyclesWithNav = (this.#calendarData.cycles || []).map((cycle, idx) => ({
+      ...cycle,
+      index: idx,
+      basedOnOptions: basedOnOptions.map((opt) => ({
+        ...opt,
+        selected: opt.value === (cycle.basedOn || 'month')
+      })),
+      entriesWithIndex: (cycle.entries || []).map((entry, eIdx) => ({
+        ...entry,
+        index: eIdx,
+        displayNum: eIdx + 1,
+        cycleIndex: idx
+      }))
+    }));
+    context.cycleFormat = this.#calendarData.cycleFormat || '';
+    context.basedOnOptions = basedOnOptions;
 
     // Prepare solstice month/day values from day-of-year
     const daylight = this.#calendarData.daylight || {};
@@ -463,6 +556,68 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   _onRender(context, options) {
     super._onRender?.(context, options);
+
+    // Add listener for leap rule dropdown
+    const leapRuleSelect = this.element.querySelector('.leap-rule-select');
+    if (leapRuleSelect) {
+      leapRuleSelect.addEventListener('change', (event) => {
+        const rule = event.target.value;
+        const simpleFields = this.element.querySelector('.leap-simple-fields');
+        const customFields = this.element.querySelector('.leap-custom-fields');
+        const gregorianInfo = this.element.querySelector('.leap-gregorian-info');
+
+        if (simpleFields) simpleFields.style.display = rule === 'simple' ? '' : 'none';
+        if (customFields) customFields.style.display = rule === 'custom' ? '' : 'none';
+        if (gregorianInfo) gregorianInfo.style.display = rule === 'gregorian' ? '' : 'none';
+      });
+    }
+
+    // Add listener for moon color preview
+    for (const colorInput of this.element.querySelectorAll('input[name^="moons."][name$=".color"]')) {
+      colorInput.addEventListener('input', (event) => {
+        const preview = event.target.closest('.color-input-wrapper')?.querySelector('.moon-color-preview');
+        if (!preview) return;
+        const color = event.target.value;
+        const isDefault = color.toLowerCase() === '#b8b8b8';
+        preview.style.setProperty('--moon-color', color);
+        preview.classList.toggle('tinted', !isDefault);
+      });
+    }
+
+    // Add listener for era template preview and format dropdown state
+    for (const templateInput of this.element.querySelectorAll('input[name^="eras."][name$=".template"]')) {
+      const updatePreview = (input) => {
+        const eraItem = input.closest('.era-item');
+        if (!eraItem) return;
+
+        const template = input.value.trim();
+        const abbr = eraItem.querySelector('input[name$=".abbreviation"]')?.value || '';
+        const eraName = eraItem.querySelector('input[name$=".name"]')?.value || '';
+        const formatSelect = eraItem.querySelector('select[name$=".format"]');
+        const previewEl = eraItem.querySelector('.era-preview');
+
+        // Disable format dropdown when template is set
+        if (formatSelect) {
+          formatSelect.disabled = !!template;
+          formatSelect.dataset.tooltip = template ? game.i18n.localize('CALENDARIA.Editor.Era.FormatDisabled') : '';
+        }
+
+        if (!previewEl) return;
+
+        const sampleYear = 1492;
+        if (template) {
+          previewEl.textContent = formatEraTemplate(template, { year: sampleYear, abbreviation: abbr, era: eraName, yearInEra: 1 });
+        } else {
+          previewEl.textContent = game.i18n.localize('CALENDARIA.Editor.Era.PreviewEmpty');
+        }
+      };
+
+      // Initial state
+      updatePreview(templateInput);
+
+      // Listen for changes
+      templateInput.addEventListener('input', (event) => updatePreview(event.target));
+    }
   }
 
   /**
@@ -544,24 +699,51 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
    * @private
    */
   #updateFromFormData(data) {
+    // Debug: Check pending notes before form update
+    log(3, `updateFromFormData - before: pendingNotes=${this.#calendarData.metadata?.pendingNotes?.length || 0}, importerId=${this.#calendarData.metadata?.importerId}`);
+
     // Basic info
     this.#calendarData.name = data.name || '';
     this.#calendarData.metadata.description = data['metadata.description'] || '';
     this.#calendarData.metadata.system = data['metadata.system'] || '';
 
+    // Debug: Check pending notes after metadata update
+    log(3, `updateFromFormData - after metadata: pendingNotes=${this.#calendarData.metadata?.pendingNotes?.length || 0}, importerId=${this.#calendarData.metadata?.importerId}`);
+
     // Year settings
     this.#calendarData.years.yearZero = parseInt(data['years.yearZero']) || 0;
     this.#calendarData.years.firstWeekday = parseInt(data['years.firstWeekday']) || 0;
 
-    // Leap year (-1 interval = disabled)
-    const leapInterval = parseInt(data['years.leapYear.leapInterval']);
-    if (leapInterval > 0) {
-      this.#calendarData.years.leapYear = {
-        leapStart: parseInt(data['years.leapYear.leapStart']) || 0,
-        leapInterval: leapInterval
-      };
-    } else {
+    // Leap year rule - store in leapYearConfig (advanced) and sync to years.leapYear (Foundry standard)
+    const leapRule = data['leapYearConfig.rule'] || 'none';
+    if (leapRule === 'none') {
+      this.#calendarData.leapYearConfig = null;
       this.#calendarData.years.leapYear = null;
+    } else {
+      const leapConfig = {
+        rule: leapRule,
+        start: parseInt(data['leapYearConfig.start']) || 0
+      };
+
+      if (leapRule === 'simple') {
+        leapConfig.interval = parseInt(data['leapYearConfig.interval']) || 4;
+        // Also set Foundry standard format for compatibility
+        this.#calendarData.years.leapYear = {
+          leapStart: leapConfig.start,
+          leapInterval: leapConfig.interval
+        };
+      } else if (leapRule === 'custom') {
+        leapConfig.pattern = data['leapYearConfig.pattern'] || '';
+        this.#calendarData.years.leapYear = null; // Complex patterns not supported by Foundry
+      } else if (leapRule === 'gregorian') {
+        // Gregorian uses interval 4 as approximation for Foundry
+        this.#calendarData.years.leapYear = {
+          leapStart: leapConfig.start,
+          leapInterval: 4
+        };
+      }
+
+      this.#calendarData.leapYearConfig = leapConfig;
     }
 
     // Time settings
@@ -602,6 +784,9 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Process moons array
     this.#updateMoonsFromFormData(data);
+
+    // Process cycles array
+    this.#updateCyclesFromFormData(data);
   }
 
   /**
@@ -685,12 +870,14 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#calendarData.eras.length = 0;
 
     for (const idx of sortedIndices) {
+      const templateValue = data[`eras.${idx}.template`]?.trim();
       const era = {
         name: data[`eras.${idx}.name`] || '',
         abbreviation: data[`eras.${idx}.abbreviation`] || '',
         startYear: parseInt(data[`eras.${idx}.startYear`]) || 1,
         endYear: this.#parseOptionalInt(data[`eras.${idx}.endYear`]),
-        format: data[`eras.${idx}.format`] || 'suffix'
+        format: data[`eras.${idx}.format`] || 'suffix',
+        template: templateValue || null
       };
       this.#calendarData.eras.push(era);
     }
@@ -728,9 +915,18 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       const existingMoon = this.#calendarData.moons[moonIdx];
       const existingPhases = existingMoon?.phases || this.#getDefaultMoonPhases();
 
+      // Detect phase indices from form data (supports dynamic phase counts)
+      const phaseIndices = new Set();
+      const phasePattern = new RegExp(`^moons\\.${moonIdx}\\.phases\\.(\\d+)\\.`);
+      for (const key of Object.keys(data)) {
+        const match = key.match(phasePattern);
+        if (match) phaseIndices.add(parseInt(match[1]));
+      }
+      const sortedPhaseIndices = [...phaseIndices].sort((a, b) => a - b);
+
       // Build phases from form data (convert percentages to decimals)
       const phases = [];
-      for (let pIdx = 0; pIdx < 8; pIdx++) {
+      for (const pIdx of sortedPhaseIndices) {
         const phaseName = data[`moons.${moonIdx}.phases.${pIdx}.name`];
         const phaseIcon = data[`moons.${moonIdx}.phases.${pIdx}.icon`];
         const phaseStartPercent = data[`moons.${moonIdx}.phases.${pIdx}.startPercent`];
@@ -745,9 +941,14 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
         });
       }
 
+      // Treat default gray as "no color" (matches natural SVG gray)
+      const rawColor = data[`moons.${moonIdx}.color`] || '';
+      const moonColor = rawColor.toLowerCase() === '#b8b8b8' ? '' : rawColor;
+
       const moon = {
         name: data[`moons.${moonIdx}.name`] || '',
         cycleLength: parseInt(data[`moons.${moonIdx}.cycleLength`]) || 28,
+        color: moonColor,
         phases,
         referenceDate: {
           year: parseInt(data[`moons.${moonIdx}.referenceDate.year`]) || 0,
@@ -768,15 +969,65 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   #getDefaultMoonPhases() {
     return [
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.NewMoon'), icon: '🌑', start: 0, end: 0.125 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaxingCrescent'), icon: '🌒', start: 0.125, end: 0.25 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.FirstQuarter'), icon: '🌓', start: 0.25, end: 0.375 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaxingGibbous'), icon: '🌔', start: 0.375, end: 0.5 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.FullMoon'), icon: '🌕', start: 0.5, end: 0.625 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaningGibbous'), icon: '🌖', start: 0.625, end: 0.75 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.LastQuarter'), icon: '🌗', start: 0.75, end: 0.875 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaningCrescent'), icon: '🌘', start: 0.875, end: 1 }
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.NewMoon'), icon: 'modules/calendaria/assets/moon-phases/01_newmoon.svg', start: 0, end: 0.125 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaxingCrescent'), icon: 'modules/calendaria/assets/moon-phases/02_waxingcrescent.svg', start: 0.125, end: 0.25 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.FirstQuarter'), icon: 'modules/calendaria/assets/moon-phases/03_firstquarter.svg', start: 0.25, end: 0.375 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaxingGibbous'), icon: 'modules/calendaria/assets/moon-phases/04_waxinggibbous.svg', start: 0.375, end: 0.5 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.FullMoon'), icon: 'modules/calendaria/assets/moon-phases/05_fullmoon.svg', start: 0.5, end: 0.625 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaningGibbous'), icon: 'modules/calendaria/assets/moon-phases/06_waninggibbous.svg', start: 0.625, end: 0.75 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.LastQuarter'), icon: 'modules/calendaria/assets/moon-phases/07_lastquarter.svg', start: 0.75, end: 0.875 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaningCrescent'), icon: 'modules/calendaria/assets/moon-phases/08_waningcrescent.svg', start: 0.875, end: 1 }
     ];
+  }
+
+  /**
+   * Update cycles array from form data.
+   * @param {object} data - Form data
+   * @private
+   */
+  #updateCyclesFromFormData(data) {
+    // Update cycle format
+    this.#calendarData.cycleFormat = data.cycleFormat || '';
+
+    // Find all cycle indices
+    const cycleIndices = new Set();
+    for (const key of Object.keys(data)) {
+      const match = key.match(/^cycles\.(\d+)\./);
+      if (match) cycleIndices.add(parseInt(match[1]));
+    }
+
+    const sortedCycleIndices = [...cycleIndices].sort((a, b) => a - b);
+    const newCycles = [];
+
+    for (const cycleIdx of sortedCycleIndices) {
+      // Find all entry indices for this cycle
+      const entryIndices = new Set();
+      const entryPattern = new RegExp(`^cycles\\.${cycleIdx}\\.entries\\.(\\d+)\\.`);
+      for (const key of Object.keys(data)) {
+        const match = key.match(entryPattern);
+        if (match) entryIndices.add(parseInt(match[1]));
+      }
+      const sortedEntryIndices = [...entryIndices].sort((a, b) => a - b);
+
+      // Build entries array
+      const entries = [];
+      for (const eIdx of sortedEntryIndices) {
+        entries.push({
+          name: data[`cycles.${cycleIdx}.entries.${eIdx}.name`] || ''
+        });
+      }
+
+      const cycle = {
+        name: data[`cycles.${cycleIdx}.name`] || '',
+        length: parseInt(data[`cycles.${cycleIdx}.length`]) || 12,
+        offset: parseInt(data[`cycles.${cycleIdx}.offset`]) || 0,
+        basedOn: data[`cycles.${cycleIdx}.basedOn`] || 'month',
+        entries
+      };
+      newCycles.push(cycle);
+    }
+
+    this.#calendarData.cycles = newCycles;
   }
 
   /* -------------------------------------------- */
@@ -959,7 +1210,8 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       abbreviation: game.i18n.format('CALENDARIA.Editor.Default.EraAbbr', { num: totalEras }),
       startYear: 1,
       endYear: null,
-      format: 'suffix'
+      format: 'suffix',
+      template: null
     });
     this.render();
   }
@@ -973,6 +1225,26 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     const idx = parseInt(target.dataset.index);
     this.#calendarData.eras.splice(idx, 1);
     this.render();
+  }
+
+  /**
+   * Generate a preview string for an era template.
+   * @param {object} era - Era object with template, abbreviation, name, format
+   * @returns {string} Preview string or empty placeholder
+   */
+  #generateEraPreview(era) {
+    if (!era.template) return game.i18n.localize('CALENDARIA.Editor.Era.PreviewEmpty');
+
+    const sampleYear = 1492;
+    const abbr = era.abbreviation ? game.i18n.localize(era.abbreviation) : '';
+    const eraName = era.name ? game.i18n.localize(era.name) : '';
+
+    return formatEraTemplate(era.template, {
+      year: sampleYear,
+      abbreviation: abbr,
+      era: eraName,
+      yearInEra: 1
+    });
   }
 
   /**
@@ -1030,6 +1302,64 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Add a new phase to a moon.
+   * @param {Event} event - Click event
+   * @param {HTMLElement} target - Target element
+   */
+  static async #onAddMoonPhase(event, target) {
+    const moonIdx = parseInt(target.dataset.moonIndex);
+    const moon = this.#calendarData.moons[moonIdx];
+    if (!moon) return;
+
+    if (!moon.phases) moon.phases = this.#getDefaultMoonPhases();
+
+    const phaseCount = moon.phases.length;
+    const interval = 1 / (phaseCount + 1);
+
+    // Add new phase at end
+    moon.phases.push({
+      name: game.i18n.format('CALENDARIA.Editor.Default.PhaseName', { num: phaseCount + 1 }),
+      icon: 'modules/calendaria/assets/moon-phases/05_fullmoon.svg',
+      start: phaseCount * interval,
+      end: 1
+    });
+
+    // Redistribute phase ranges evenly
+    const newCount = moon.phases.length;
+    const newInterval = 1 / newCount;
+    for (let i = 0; i < newCount; i++) {
+      moon.phases[i].start = i * newInterval;
+      moon.phases[i].end = (i + 1) * newInterval;
+    }
+
+    this.render();
+  }
+
+  /**
+   * Remove a phase from a moon.
+   * @param {Event} event - Click event
+   * @param {HTMLElement} target - Target element
+   */
+  static async #onRemoveMoonPhase(event, target) {
+    const moonIdx = parseInt(target.dataset.moonIndex);
+    const phaseIdx = parseInt(target.dataset.phaseIndex);
+    const moon = this.#calendarData.moons[moonIdx];
+    if (!moon?.phases || moon.phases.length <= 1) return;
+
+    moon.phases.splice(phaseIdx, 1);
+
+    // Redistribute phase ranges evenly
+    const count = moon.phases.length;
+    const interval = 1 / count;
+    for (let i = 0; i < count; i++) {
+      moon.phases[i].start = i * interval;
+      moon.phases[i].end = (i + 1) * interval;
+    }
+
+    this.render();
+  }
+
+  /**
    * Pick a custom icon for a moon phase.
    * @param {Event} event - Click event
    * @param {HTMLElement} target - Target element
@@ -1053,6 +1383,68 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     });
     picker.render(true);
+  }
+
+  /**
+   * Add a new cycle.
+   * @param {Event} event - Click event
+   * @param {HTMLElement} target - Target element
+   */
+  static async #onAddCycle(event, target) {
+    if (!this.#calendarData.cycles) this.#calendarData.cycles = [];
+    const totalCycles = this.#calendarData.cycles.length + 1;
+    this.#calendarData.cycles.push({
+      name: game.i18n.format('CALENDARIA.Editor.Default.CycleName', { num: totalCycles }),
+      length: 12,
+      offset: 0,
+      basedOn: 'month',
+      entries: [{ name: game.i18n.format('CALENDARIA.Editor.Default.CycleEntry', { num: 1 }) }]
+    });
+    this.render();
+  }
+
+  /**
+   * Remove a cycle.
+   * @param {Event} event - Click event
+   * @param {HTMLElement} target - Target element
+   */
+  static async #onRemoveCycle(event, target) {
+    const idx = parseInt(target.dataset.index);
+    this.#calendarData.cycles.splice(idx, 1);
+    this.render();
+  }
+
+  /**
+   * Add a new entry to a cycle.
+   * @param {Event} event - Click event
+   * @param {HTMLElement} target - Target element
+   */
+  static async #onAddCycleEntry(event, target) {
+    const cycleIdx = parseInt(target.dataset.cycleIndex);
+    const cycle = this.#calendarData.cycles[cycleIdx];
+    if (!cycle) return;
+
+    if (!cycle.entries) cycle.entries = [];
+    const entryCount = cycle.entries.length + 1;
+    cycle.entries.push({
+      name: game.i18n.format('CALENDARIA.Editor.Default.CycleEntry', { num: entryCount })
+    });
+    this.render();
+  }
+
+  /**
+   * Remove an entry from a cycle.
+   * @param {Event} event - Click event
+   * @param {HTMLElement} target - Target element
+   */
+  static async #onRemoveCycleEntry(event, target) {
+    const cycleIdx = parseInt(target.dataset.cycleIndex);
+    const entryIdx = parseInt(target.dataset.entryIndex);
+    const cycle = this.#calendarData.cycles[cycleIdx];
+    if (!cycle?.entries || cycle.entries.length <= 1) return;
+
+    cycle.entries.splice(entryIdx, 1);
+    this.render();
   }
 
   /**
@@ -1175,6 +1567,14 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
         if (moon.phases) for (const phase of moon.phases) if (phase.name) phase.name = game.i18n.localize(phase.name);
       }
     }
+
+    // Localize cycles
+    if (data.cycles) {
+      for (const cycle of data.cycles) {
+        if (cycle.name) cycle.name = game.i18n.localize(cycle.name);
+        if (cycle.entries) for (const entry of cycle.entries) if (entry.name) entry.name = game.i18n.localize(entry.name);
+      }
+    }
   }
 
   /**
@@ -1222,6 +1622,25 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
 
       if (calendar) {
         ui.notifications.info(game.i18n.format('CALENDARIA.Editor.SaveSuccess', { name: this.#calendarData.name }));
+
+        // Import pending notes from importer if any (using instance variables)
+        log(3, `Checking for pending notes: ${this.#pendingNotes?.length || 0}, importerId: ${this.#pendingImporterId}, calendarId: ${calendarId}`);
+        if (this.#pendingNotes?.length > 0 && this.#pendingImporterId && calendarId) {
+          const importer = createImporter(this.#pendingImporterId);
+          if (importer) {
+            log(3, `Importing ${this.#pendingNotes.length} pending notes to calendar ${calendarId}`);
+            const result = await importer.importNotes(this.#pendingNotes, { calendarId });
+            if (result.count > 0) {
+              ui.notifications.info(game.i18n.format('CALENDARIA.Editor.NotesImported', { count: result.count }));
+            }
+            if (result.errors?.length > 0) {
+              log(2, 'Note import errors:', result.errors);
+            }
+            // Clear pending notes after import
+            this.#pendingNotes = null;
+            this.#pendingImporterId = null;
+          }
+        }
 
         // Set as active calendar if requested
         if (setActive && calendarId) {

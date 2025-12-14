@@ -7,11 +7,15 @@
  * - Moon phases
  * - Custom metadata
  * - Utility methods from CalendarData5e (sunrise, sunset, etc.)
+ * - Complex leap year patterns
  *
  * @extends {foundry.data.CalendarData}
  * @module Calendar/Data/CalendariaCalendar
  * @author Tyler
  */
+
+import * as LeapYearUtils from '../leap-year-utils.mjs';
+import { formatEraTemplate } from '../calendar-utils.mjs';
 
 const { ArrayField, BooleanField, NumberField, SchemaField, StringField } = foundry.data.fields;
 
@@ -19,32 +23,42 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
   /** @override */
   static defineSchema() {
     const schema = super.defineSchema();
-
-    // Extend months schema to add startingWeekday
-    const baseMonthsSchema = schema.months;
-    const extendedMonthSchema = new SchemaField({
-      values: new ArrayField(
-        new SchemaField({
-          name: new StringField({ required: true }),
-          abbreviation: new StringField({ required: false }),
-          ordinal: new NumberField({ required: false, integer: true }),
-          days: new NumberField({ required: true, integer: true, min: 1 }),
-          leapDays: new NumberField({ required: false, integer: true, nullable: true }),
-          type: new StringField({ required: false }), // 'intercalary' or null
-          /**
-           * Fixed starting weekday for this month (0-indexed).
-           * If set, this month always starts on this weekday regardless of previous month.
-           * If null, normal weekday progression is used.
-           * @type {number|null}
-           */
-          startingWeekday: new NumberField({ required: false, integer: true, nullable: true, min: 0 })
-        })
-      )
-    });
+    const extendedMonthSchema = new SchemaField(
+      {
+        values: new ArrayField(
+          new SchemaField({
+            name: new StringField({ required: true, blank: false }),
+            abbreviation: new StringField(),
+            ordinal: new NumberField({ required: true, nullable: false, min: 1, integer: true }),
+            days: new NumberField({ required: true, nullable: false }),
+            leapDays: new NumberField({ required: false, nullable: true }),
+            type: new StringField({ required: false }), // 'intercalary' or null
+            startingWeekday: new NumberField({ required: false, integer: true, nullable: true, min: 0 })
+          })
+        )
+      },
+      { required: true, nullable: true, initial: null }
+    );
 
     return {
       ...schema,
       months: extendedMonthSchema,
+
+      /**
+       * Advanced leap year configuration (Fantasy-Calendar compatible).
+       * Supports complex patterns like "400,!100,4" for true Gregorian rules.
+       * When set, this overrides the standard years.leapYear config.
+       * @type {object}
+       */
+      leapYearConfig: new SchemaField(
+        {
+          rule: new StringField({ required: false, initial: 'none' }), // 'none', 'simple', 'gregorian', 'custom'
+          interval: new NumberField({ required: false, integer: true, min: 1 }),
+          start: new NumberField({ required: false, integer: true, initial: 0 }),
+          pattern: new StringField({ required: false }) // For 'custom' rule, e.g., "400,!100,4"
+        },
+        { required: false, nullable: true }
+      ),
 
       /**
        * Festival/intercalary days (days outside normal calendar structure)
@@ -67,6 +81,7 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
           name: new StringField({ required: true }),
           cycleLength: new NumberField({ required: true, nullable: false, min: 1 }),
           cycleDayAdjust: new NumberField({ required: false, nullable: false, initial: 0 }), // Manual day offset
+          color: new StringField({ required: false, initial: '' }), // Hex color for tinting moon icon
           phases: new ArrayField(
             new SchemaField({
               name: new StringField({ required: true }),
@@ -86,7 +101,7 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
       /**
        * Era configurations for this calendar
        * Eras define named periods of time (e.g., "Dale Reckoning", "Common Year")
-       * @type {Array<{name: string, abbreviation: string, startYear: number, endYear: number|null, format: string}>}
+       * @type {Array<{name: string, abbreviation: string, startYear: number, endYear: number|null, format: string, template: string|null}>}
        */
       eras: new ArrayField(
         new SchemaField({
@@ -94,9 +109,38 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
           abbreviation: new StringField({ required: true }),
           startYear: new NumberField({ required: true, integer: true }),
           endYear: new NumberField({ required: false, nullable: true, integer: true }),
-          format: new StringField({ required: false, initial: 'suffix' }) // 'prefix' or 'suffix'
+          format: new StringField({ required: false, initial: 'suffix' }), // 'prefix' or 'suffix' (legacy)
+          template: new StringField({ required: false, nullable: true, initial: null }) // e.g., "{{year}} {{abbreviation}}"
         })
       ),
+
+      /**
+       * Named repeating cycles (e.g., zodiac signs, elemental weeks)
+       * @type {Array<{name: string, length: number, offset: number, basedOn: string, entries: Array<{name: string}>}>}
+       */
+      cycles: new ArrayField(
+        new SchemaField({
+          name: new StringField({ required: true }),
+          length: new NumberField({ required: true, nullable: false, min: 1, initial: 12 }),
+          offset: new NumberField({ required: false, nullable: false, initial: 0 }),
+          basedOn: new StringField({
+            required: true,
+            initial: 'month',
+            choices: ['year', 'eraYear', 'month', 'monthDay', 'day', 'yearDay']
+          }),
+          entries: new ArrayField(
+            new SchemaField({
+              name: new StringField({ required: true })
+            })
+          )
+        })
+      ),
+
+      /**
+       * Template for displaying cycle values (e.g., "{{1}} - Week of {{2}}")
+       * @type {string}
+       */
+      cycleFormat: new StringField({ required: false, initial: '' }),
 
       /**
        * Calendar metadata
@@ -149,6 +193,110 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
     const minutes = components.minute + components.second / calendar.days.secondsPerMinute;
     return components.hour + minutes / calendar.days.minutesPerHour;
   }
+
+  /* -------------------------------------------- */
+  /*  Leap Year Methods                           */
+  /* -------------------------------------------- */
+
+  /**
+   * Check if a given year is a leap year.
+   * Supports complex leap year patterns (e.g., "400,!100,4" for Gregorian).
+   *
+   * @param {number} year - The display year to check (with yearZero applied)
+   * @returns {boolean} True if the year is a leap year
+   */
+  isLeapYear(year) {
+    // Check for advanced leap year config first (Fantasy-Calendar patterns)
+    const advancedConfig = this.leapYearConfig;
+    if (advancedConfig?.rule && advancedConfig.rule !== 'none') {
+      return LeapYearUtils.isLeapYear(advancedConfig, year, true);
+    }
+
+    // Fall back to standard Foundry leap year config
+    const leapConfig = this.years?.leapYear;
+    if (!leapConfig) return false;
+
+    const interval = leapConfig.leapInterval;
+    const start = leapConfig.leapStart ?? 0;
+
+    if (!interval || interval <= 0) return false;
+
+    // Use LeapYearUtils for consistency
+    return LeapYearUtils.isLeapYear(
+      {
+        rule: 'simple',
+        interval,
+        start
+      },
+      year,
+      true
+    );
+  }
+
+  /**
+   * Check if the current year is a leap year.
+   * @param {number|TimeComponents} [time] - Time to check, defaults to current world time
+   * @returns {boolean} True if the year is a leap year
+   */
+  isCurrentYearLeapYear(time = game.time.worldTime) {
+    const components = typeof time === 'number' ? this.timeToComponents(time) : time;
+    const displayYear = components.year + (this.years?.yearZero ?? 0);
+    return this.isLeapYear(displayYear);
+  }
+
+  /**
+   * Get the number of days in a month, accounting for leap years.
+   * @param {number} monthIndex - The 0-indexed month
+   * @param {number} year - The display year
+   * @returns {number} Number of days in the month
+   */
+  getDaysInMonth(monthIndex, year) {
+    const month = this.months?.values?.[monthIndex];
+    if (!month) return 0;
+
+    if (this.isLeapYear(year) && month.leapDays != null) {
+      return month.leapDays;
+    }
+    return month.days;
+  }
+
+  /**
+   * Get total days in a year, accounting for leap years.
+   * @param {number} year - The display year
+   * @returns {number} Total days in the year
+   */
+  getDaysInYear(year) {
+    const isLeap = this.isLeapYear(year);
+    return (this.months?.values ?? []).reduce((sum, month) => {
+      const days = isLeap && month.leapDays != null ? month.leapDays : month.days;
+      return sum + days;
+    }, 0);
+  }
+
+  /**
+   * Get a description of the leap year rule.
+   * @returns {string} Human-readable description
+   */
+  getLeapYearDescription() {
+    // Check for advanced leap year config first
+    const advancedConfig = this.leapYearConfig;
+    if (advancedConfig?.rule && advancedConfig.rule !== 'none') {
+      return LeapYearUtils.getLeapYearDescription(advancedConfig);
+    }
+
+    // Fall back to standard Foundry leap year config
+    const leapConfig = this.years?.leapYear;
+    if (!leapConfig) return LeapYearUtils.getLeapYearDescription(null);
+
+    // Convert Foundry format to LeapYearUtils format
+    return LeapYearUtils.getLeapYearDescription({
+      rule: 'simple',
+      interval: leapConfig.leapInterval,
+      start: leapConfig.leapStart ?? 0
+    });
+  }
+
+  /* -------------------------------------------- */
 
   /**
    * Get the number of hours in a given day.
@@ -482,7 +630,7 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
   /**
    * Get the current era for a given year.
    * @param {number|TimeComponents} [time]  Time to use, by default the current world time.
-   * @returns {{name: string, abbreviation: string, format: string, yearInEra: number}|null}
+   * @returns {{name: string, abbreviation: string, format: string, template: string|null, yearInEra: number}|null}
    */
   getCurrentEra(time = game.time.worldTime) {
     if (!this.eras?.length) return null;
@@ -498,6 +646,7 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
           name: era.name,
           abbreviation: era.abbreviation,
           format: era.format || 'suffix',
+          template: era.template || null,
           yearInEra: displayYear - era.startYear + 1
         };
       }
@@ -510,6 +659,7 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
         name: era.name,
         abbreviation: era.abbreviation,
         format: era.format || 'suffix',
+        template: era.template || null,
         yearInEra: displayYear
       };
     }
@@ -523,12 +673,25 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
    * @returns {string}  Formatted year string (e.g., "1492 DR" or "CY 591").
    */
   formatYearWithEra(year) {
-    const era = this.getCurrentEra({ year: year - (this.years?.yearZero ?? 0), month: 0, dayOfMonth: 0 });
-    if (!era) return String(year);
+    const eraData = this.getCurrentEra({ year: year - (this.years?.yearZero ?? 0), month: 0, dayOfMonth: 0 });
+    if (!eraData) return String(year);
 
-    const abbr = era.abbreviation ? game.i18n.localize(era.abbreviation) : '';
+    const abbr = eraData.abbreviation ? game.i18n.localize(eraData.abbreviation) : '';
+    const eraName = eraData.name ? game.i18n.localize(eraData.name) : '';
+
+    // Template mode: use {{variable}} pattern substitution
+    if (eraData.template) {
+      return formatEraTemplate(eraData.template, {
+        year,
+        abbreviation: abbr,
+        era: eraName,
+        yearInEra: eraData.yearInEra
+      });
+    }
+
+    // Legacy mode: simple prefix/suffix
     if (!abbr) return String(year);
-    if (era.format === 'prefix') return `${abbr} ${year}`;
+    if (eraData.format === 'prefix') return `${abbr} ${year}`;
     return `${year} ${abbr}`;
   }
 
@@ -538,6 +701,97 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
    */
   getAllEras() {
     return this.eras ?? [];
+  }
+
+  /* -------------------------------------------- */
+  /*  Cycle Methods                               */
+  /* -------------------------------------------- */
+
+  /**
+   * Get the current values for all cycles.
+   * @param {number|TimeComponents} [time]  Time to use, by default the current world time.
+   * @returns {{text: string, values: Array<{cycleName: string, entryName: string, index: number}>}}
+   */
+  getCycleValues(time = game.time.worldTime) {
+    if (!this.cycles?.length) return { text: '', values: [] };
+
+    const components = typeof time === 'number' ? this.timeToComponents(time) : time;
+    const displayYear = components.year + (this.years?.yearZero ?? 0);
+
+    // Calculate various epoch values for different basedOn types
+    const epochValues = this._getCycleEpochValues(components, displayYear);
+
+    const values = [];
+    const textReplacements = { n: '<br>' };
+
+    for (let i = 0; i < this.cycles.length; i++) {
+      const cycle = this.cycles[i];
+      if (!cycle.entries?.length) continue;
+
+      const epochValue = epochValues[cycle.basedOn] ?? 0;
+
+      // Calculate cycle index: floor((epochValue / length) + (offset / length)) % entries.length
+      let cycleNum = Math.floor(epochValue / cycle.length);
+      if (cycleNum < 0) cycleNum += Math.ceil(Math.abs(epochValue) / cycle.entries.length) * cycle.entries.length;
+      const cycleIndex = (cycleNum + Math.floor((cycle.offset || 0) / cycle.length)) % cycle.entries.length;
+      const normalizedIndex = ((cycleIndex % cycle.entries.length) + cycle.entries.length) % cycle.entries.length;
+
+      const entry = cycle.entries[normalizedIndex];
+      values.push({
+        cycleName: cycle.name,
+        entryName: entry?.name ?? '',
+        index: normalizedIndex
+      });
+
+      // Add to text replacements for format template
+      textReplacements[(i + 1).toString()] = game.i18n.localize(entry?.name ?? '');
+    }
+
+    // Format the cycle text using the template
+    let text = this.cycleFormat || '';
+    for (const [key, value] of Object.entries(textReplacements)) {
+      text = text.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+    }
+
+    return { text, values };
+  }
+
+  /**
+   * Calculate epoch values for different cycle basedOn types.
+   * @param {TimeComponents} components  Time components.
+   * @param {number} displayYear         The display year (with yearZero applied).
+   * @returns {object}                   Epoch values keyed by basedOn type.
+   * @private
+   */
+  _getCycleEpochValues(components, displayYear) {
+    // Calculate day of year
+    let dayOfYear = components.dayOfMonth;
+    for (let i = 0; i < components.month; i++) dayOfYear += this.months.values[i]?.days ?? 0;
+
+    // Calculate total days
+    const totalDays = this._componentsToDays(components);
+
+    // Get era year if applicable
+    let eraYear = displayYear;
+    const era = this.getCurrentEra({ year: components.year, month: components.month, dayOfMonth: components.dayOfMonth });
+    if (era) eraYear = era.yearInEra;
+
+    return {
+      year: displayYear,
+      eraYear,
+      month: components.month,
+      monthDay: components.dayOfMonth,
+      day: totalDays,
+      yearDay: dayOfYear
+    };
+  }
+
+  /**
+   * Get all cycles for this calendar.
+   * @returns {Array<{name: string, length: number, offset: number, basedOn: string, entries: Array}>}
+   */
+  getAllCycles() {
+    return this.cycles ?? [];
   }
 
   /* -------------------------------------------- */

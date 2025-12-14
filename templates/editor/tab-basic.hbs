@@ -72,19 +72,58 @@
       <legend>{{localize "CALENDARIA.Editor.Section.LeapYear"}}</legend>
 
       <div class="form-group">
-        <label>{{localize "CALENDARIA.Editor.Field.LeapInterval"}}</label>
+        <label>{{localize "CALENDARIA.Editor.Field.LeapRule"}}</label>
         <div class="form-fields fit-content">
-          <input type="number" name="years.leapYear.leapInterval" value="{{leapInterval}}" step="1" class="year-input">
+          <select name="leapYearConfig.rule" class="leap-rule-select">
+            {{#each leapRuleOptions}}
+              <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+          </select>
         </div>
-        <p class="hint">{{localize "CALENDARIA.Editor.Hint.LeapIntervalDisable"}}</p>
+        <p class="hint">{{localize "CALENDARIA.Editor.Hint.LeapRule"}}</p>
       </div>
 
-      <div class="form-group">
-        <label>{{localize "CALENDARIA.Editor.Field.LeapStart"}}</label>
-        <div class="form-fields fit-content">
-          <input type="number" name="years.leapYear.leapStart" value="{{leapStart}}" step="1" class="year-input">
+      {{!-- Simple interval fields --}}
+      <div class="leap-simple-fields" {{#unless showLeapSimple}}style="display: none;"{{/unless}}>
+        <div class="form-group">
+          <label>{{localize "CALENDARIA.Editor.Field.LeapInterval"}}</label>
+          <div class="form-fields fit-content">
+            <input type="number" name="leapYearConfig.interval" value="{{leapInterval}}" step="1" min="1" class="year-input">
+          </div>
+          <p class="hint">{{localize "CALENDARIA.Editor.Hint.LeapInterval"}}</p>
         </div>
-        <p class="hint">{{localize "CALENDARIA.Editor.Hint.LeapStart"}}</p>
+
+        <div class="form-group">
+          <label>{{localize "CALENDARIA.Editor.Field.LeapStart"}}</label>
+          <div class="form-fields fit-content">
+            <input type="number" name="leapYearConfig.start" value="{{leapStart}}" step="1" class="year-input">
+          </div>
+          <p class="hint">{{localize "CALENDARIA.Editor.Hint.LeapStart"}}</p>
+        </div>
+      </div>
+
+      {{!-- Custom pattern field --}}
+      <div class="leap-custom-fields" {{#unless showLeapCustom}}style="display: none;"{{/unless}}>
+        <div class="form-group">
+          <label>{{localize "CALENDARIA.Editor.Field.LeapPattern"}}</label>
+          <div class="form-fields fit-content">
+            <input type="text" name="leapYearConfig.pattern" value="{{leapPattern}}" placeholder="400,!100,4" class="pattern-input">
+          </div>
+          <p class="hint">{{localize "CALENDARIA.Editor.Hint.LeapPattern"}}</p>
+        </div>
+
+        <div class="form-group">
+          <label>{{localize "CALENDARIA.Editor.Field.LeapStart"}}</label>
+          <div class="form-fields fit-content">
+            <input type="number" name="leapYearConfig.start" value="{{leapStart}}" step="1" class="year-input">
+          </div>
+          <p class="hint">{{localize "CALENDARIA.Editor.Hint.LeapStart"}}</p>
+        </div>
+      </div>
+
+      {{!-- Gregorian info --}}
+      <div class="leap-gregorian-info" {{#unless showLeapGregorian}}style="display: none;"{{/unless}}>
+        <p class="hint gregorian-explanation">{{localize "CALENDARIA.Editor.Hint.LeapGregorian"}}</p>
       </div>
     </fieldset>
   </div>

@@ -115,7 +115,7 @@
         {{#if festivalName}}data-tooltip="{{festivalName}}"{{/if}}>
         <span class="day-num">{{day}}</span>
         {{#if hasNotes}}<span class="note-badge">{{noteCount}}</span>{{/if}}
-        {{#if moonIcon}}<img class="moon-tiny" src="{{moonIcon}}" alt="{{moonPhase}}" data-tooltip="{{moonPhase}}" />{{/if}}
+        {{#if moonIcon}}{{#if moonColor}}<span class="moon-tint" style="--moon-color: {{moonColor}}"><img class="moon-tiny tinted" src="{{moonIcon}}" alt="{{moonPhase}}" data-tooltip="{{moonPhase}}" /></span>{{else}}<img class="moon-tiny" src="{{moonIcon}}" alt="{{moonPhase}}" data-tooltip="{{moonPhase}}" />{{/if}}{{/if}}
       </div>
       {{/if}}
       {{/each}}

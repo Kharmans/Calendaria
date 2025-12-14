@@ -12,6 +12,8 @@ import { MODULE, SETTINGS } from '../constants.mjs';
 import { log } from '../utils/logger.mjs';
 import CalendarManager from '../calendar/calendar-manager.mjs';
 import { getAllCategories, addCustomCategory, deleteCustomCategory, isCustomCategory } from '../notes/note-data.mjs';
+import { getRecurrenceDescription, generateRandomOccurrences, needsRandomRegeneration } from '../notes/utils/recurrence.mjs';
+import NoteManager from '../notes/note-manager.mjs';
 
 export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applications.sheets.journal.JournalEntryPageSheet) {
   /** View/Edit mode enum. */
@@ -30,7 +32,11 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
       reset: this._onReset,
       deleteNote: this._onDeleteNote,
       addCategory: this._onAddCategory,
-      toggleMode: this._onToggleMode
+      toggleMode: this._onToggleMode,
+      addMoonCondition: this._onAddMoonCondition,
+      removeMoonCondition: this._onRemoveMoonCondition,
+      regenerateSeed: this._onRegenerateSeed,
+      clearLinkedEvent: this._onClearLinkedEvent
     },
     form: { closeOnSubmit: false }
   };
@@ -113,6 +119,21 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
 
         event.preventDefault();
         this.#showDeleteCategoryMenu(event, categoryId, tag.textContent.trim());
+      });
+    }
+
+    // Add moon phase filter listener
+    const moonSelect = htmlElement.querySelector('select[name="newMoonCondition.moonIndex"]');
+    const phaseSelect = htmlElement.querySelector('select[name="newMoonCondition.phase"]');
+    if (moonSelect && phaseSelect) {
+      moonSelect.addEventListener('change', () => {
+        const selectedMoon = moonSelect.value;
+        const phaseOptions = phaseSelect.querySelectorAll('option[data-moon]');
+        phaseOptions.forEach((opt) => {
+          opt.hidden = selectedMoon !== '' && opt.dataset.moon !== selectedMoon;
+        });
+        // Reset phase selection if hidden
+        if (phaseSelect.selectedOptions[0]?.hidden) phaseSelect.value = '';
       });
     }
   }
@@ -257,13 +278,88 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
     context.endTimeValue = `${endHour}:${endMinute}`;
 
     // Prepare repeat options with selected state
+    // Note: 'linked' shows when linkedEvent is set (not a normal repeat type)
+    const hasLinkedEvent = !!this.document.system.linkedEvent?.noteId;
+    const repeatType = this.document.system.repeat;
     context.repeatOptions = [
-      { value: 'never', label: 'Never', selected: this.document.system.repeat === 'never' },
-      { value: 'daily', label: 'Daily', selected: this.document.system.repeat === 'daily' },
-      { value: 'weekly', label: 'Weekly', selected: this.document.system.repeat === 'weekly' },
-      { value: 'monthly', label: 'Monthly', selected: this.document.system.repeat === 'monthly' },
-      { value: 'yearly', label: 'Yearly', selected: this.document.system.repeat === 'yearly' }
+      { value: 'never', label: 'Never', selected: repeatType === 'never' && !hasLinkedEvent },
+      { value: 'daily', label: 'Daily', selected: repeatType === 'daily' },
+      { value: 'weekly', label: 'Weekly', selected: repeatType === 'weekly' },
+      { value: 'monthly', label: 'Monthly', selected: repeatType === 'monthly' },
+      { value: 'yearly', label: 'Yearly', selected: repeatType === 'yearly' },
+      { value: 'moon', label: 'Moon Phase', selected: repeatType === 'moon' },
+      { value: 'random', label: 'Random', selected: repeatType === 'random' },
+      { value: 'linked', label: 'Linked to Event', selected: hasLinkedEvent }
     ];
+
+    // Show repeat options (maxOccurrences) when repeat is not 'never'
+    context.showRepeatOptions = repeatType !== 'never' || hasLinkedEvent;
+
+    // Prepare moon data for moon conditions UI
+    context.moons = calendar?.moons?.map((moon, index) => ({
+      index,
+      name: game.i18n.localize(moon.name),
+      phases: moon.phases?.map((phase) => ({
+        name: game.i18n.localize(phase.name),
+        start: phase.start,
+        end: phase.end
+      })) || []
+    })) || [];
+    context.hasMoons = context.moons.length > 0;
+
+    // Prepare existing moon conditions for display
+    context.moonConditions = (this.document.system.moonConditions || []).map((cond, index) => {
+      const moon = context.moons[cond.moonIndex];
+      const matchingPhase = moon?.phases?.find((p) => Math.abs(p.start - cond.phaseStart) < 0.01 && Math.abs(p.end - cond.phaseEnd) < 0.01);
+      return {
+        index,
+        moonIndex: cond.moonIndex,
+        moonName: moon?.name || `Moon ${cond.moonIndex + 1}`,
+        phaseStart: cond.phaseStart,
+        phaseEnd: cond.phaseEnd,
+        phaseName: matchingPhase?.name || 'Custom Range'
+      };
+    });
+    context.showMoonConditions = this.document.system.repeat === 'moon' || (this.document.system.moonConditions?.length > 0);
+
+    // Prepare random config context
+    context.showRandomConfig = this.document.system.repeat === 'random';
+    const randomConfig = this.document.system.randomConfig || {};
+    context.randomConfig = {
+      seed: randomConfig.seed ?? Math.floor(Math.random() * 1000000),
+      probability: randomConfig.probability ?? 10,
+      checkInterval: randomConfig.checkInterval ?? 'daily',
+      checkIntervalLabel: randomConfig.checkInterval === 'weekly' ? 'week' : randomConfig.checkInterval === 'monthly' ? 'month' : 'day'
+    };
+    context.randomIntervalOptions = [
+      { value: 'daily', label: 'Day', selected: context.randomConfig.checkInterval === 'daily' },
+      { value: 'weekly', label: 'Week', selected: context.randomConfig.checkInterval === 'weekly' },
+      { value: 'monthly', label: 'Month', selected: context.randomConfig.checkInterval === 'monthly' }
+    ];
+
+    // Prepare linked event context
+    context.showLinkedConfig = hasLinkedEvent || this.document.system.repeat === 'linked';
+    const linkedEvent = this.document.system.linkedEvent || {};
+    context.linkedEvent = {
+      noteId: linkedEvent.noteId || '',
+      offset: linkedEvent.offset ?? 0
+    };
+
+    // Get available notes for linking (exclude self)
+    const allNotes = NoteManager.getAllNotes() || [];
+    context.availableNotes = allNotes
+      .filter((note) => note.id !== this.document.id)
+      .map((note) => ({
+        id: note.id,
+        name: note.name,
+        selected: note.id === linkedEvent.noteId
+      }));
+
+    // Get linked note name for display
+    if (linkedEvent.noteId) {
+      const linkedNote = NoteManager.getNoteById(linkedEvent.noteId);
+      context.linkedNoteName = linkedNote?.name || 'Unknown Event';
+    }
 
     // Prepare category options with selected state
     const selectedCategories = this.document.system.categories || [];
@@ -294,8 +390,13 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
       context.hasEndTime = this.document.system.endDate?.hour !== undefined || this.document.system.endDate?.minute !== undefined;
 
       // Repeat label for view mode
-      const repeatLabels = { never: null, daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' };
+      const repeatLabels = { never: null, daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly', moon: 'Moon Phase' };
       context.repeatLabel = repeatLabels[this.document.system.repeat] || null;
+
+      // Moon conditions display for view mode
+      if (this.document.system.moonConditions?.length > 0) {
+        context.moonConditionsDisplay = getRecurrenceDescription(this.document.system);
+      }
     }
 
     return context;
@@ -385,6 +486,28 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
       const endTimeInput = form.querySelector('input[name="system.endDate.time"]');
       if (startTimeInput) startTimeInput.disabled = event.target.checked;
       if (endTimeInput) endTimeInput.disabled = event.target.checked;
+    }
+
+    // Handle repeat type changes to show/hide moon/random/linked/options sections
+    if (event.target?.name === 'system.repeat') {
+      const form = event.target.closest('form');
+      const repeatValue = event.target.value;
+
+      const moonRow = form?.querySelector('.form-row-moon');
+      const randomRow = form?.querySelector('.form-row-random');
+      const linkedRow = form?.querySelector('.form-row-linked');
+      const repeatOptions = form?.querySelector('.repeat-options');
+
+      if (moonRow) moonRow.style.display = repeatValue === 'moon' ? '' : 'none';
+      if (randomRow) randomRow.style.display = repeatValue === 'random' ? '' : 'none';
+      if (linkedRow) linkedRow.style.display = repeatValue === 'linked' ? '' : 'none';
+      if (repeatOptions) repeatOptions.style.display = repeatValue !== 'never' ? '' : 'none';
+
+      // Re-render if section doesn't exist yet (to create repeat-options or other sections)
+      const needsRerender = (repeatValue === 'moon' && !moonRow) || (repeatValue === 'random' && !randomRow) || (repeatValue === 'linked' && !linkedRow) || (repeatValue !== 'never' && !repeatOptions);
+      if (needsRerender) {
+        this.render();
+      }
     }
 
     // Handle color changes to update icon preview
@@ -847,5 +970,144 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
 
     // Re-render to switch templates
     this.render();
+  }
+
+  /**
+   * Handle add moon condition button click.
+   * @param {PointerEvent} event - The originating click event
+   * @param {HTMLElement} target - The capturing HTML element
+   */
+  static async _onAddMoonCondition(event, target) {
+    const form = target.closest('form');
+    const moonSelect = form?.querySelector('select[name="newMoonCondition.moonIndex"]');
+    const phaseSelect = form?.querySelector('select[name="newMoonCondition.phase"]');
+
+    if (!moonSelect || !phaseSelect) return;
+
+    const moonIndex = parseInt(moonSelect.value);
+    const phaseValue = phaseSelect.value;
+
+    if (isNaN(moonIndex) || !phaseValue) {
+      ui.notifications.warn('Please select a moon and phase');
+      return;
+    }
+
+    // Parse phase value (format: "start-end")
+    const [phaseStart, phaseEnd] = phaseValue.split('-').map(Number);
+
+    // Get current moon conditions
+    const currentConditions = foundry.utils.deepClone(this.document.system.moonConditions || []);
+
+    // Check for duplicate
+    const isDuplicate = currentConditions.some((c) => c.moonIndex === moonIndex && c.phaseStart === phaseStart && c.phaseEnd === phaseEnd);
+    if (isDuplicate) {
+      ui.notifications.warn('This moon condition already exists');
+      return;
+    }
+
+    // Add new condition
+    currentConditions.push({ moonIndex, phaseStart, phaseEnd });
+
+    // Update document
+    await this.document.update({ 'system.moonConditions': currentConditions });
+  }
+
+  /**
+   * Handle remove moon condition button click.
+   * @param {PointerEvent} event - The originating click event
+   * @param {HTMLElement} target - The capturing HTML element
+   */
+  static async _onRemoveMoonCondition(event, target) {
+    const conditionIndex = parseInt(target.dataset.index);
+    if (isNaN(conditionIndex)) return;
+
+    // Get current moon conditions
+    const currentConditions = foundry.utils.deepClone(this.document.system.moonConditions || []);
+
+    // Remove the condition at index
+    currentConditions.splice(conditionIndex, 1);
+
+    // Update document
+    await this.document.update({ 'system.moonConditions': currentConditions });
+  }
+
+  /**
+   * Handle regenerate seed button click.
+   * @param {PointerEvent} event - The originating click event
+   * @param {HTMLElement} target - The capturing HTML element
+   */
+  static async _onRegenerateSeed(event, target) {
+    const newSeed = Math.floor(Math.random() * 1000000);
+    const currentConfig = foundry.utils.deepClone(this.document.system.randomConfig || {});
+    currentConfig.seed = newSeed;
+
+    // Update seed first
+    await this.document.update({ 'system.randomConfig': currentConfig });
+
+    // Regenerate cached occurrences with new seed
+    await this.#regenerateRandomOccurrences();
+  }
+
+  /**
+   * Regenerate cached random occurrences for this note.
+   * Generates occurrences until end of current year (or next year if approaching year end).
+   * @returns {Promise<void>}
+   */
+  async #regenerateRandomOccurrences() {
+    if (this.document.system.repeat !== 'random') return;
+
+    const calendar = CalendarManager.getActiveCalendar();
+    if (!calendar?.months?.values) return;
+
+    const components = game.time.components || {};
+    const yearZero = calendar?.years?.yearZero ?? 0;
+    const currentYear = (components.year ?? 0) + yearZero;
+
+    // Check if we need to generate for next year as well
+    const cachedData = this.document.getFlag(MODULE.ID, 'randomOccurrences') || {};
+    const generateNextYear = needsRandomRegeneration({ year: currentYear, occurrences: [] });
+    const targetYear = generateNextYear ? currentYear + 1 : currentYear;
+
+    // Build note data for generation
+    const noteData = {
+      startDate: this.document.system.startDate,
+      randomConfig: this.document.system.randomConfig,
+      repeatEndDate: this.document.system.repeatEndDate
+    };
+
+    // Generate occurrences
+    const occurrences = generateRandomOccurrences(noteData, targetYear);
+
+    // Store in flag
+    await this.document.setFlag(MODULE.ID, 'randomOccurrences', {
+      year: targetYear,
+      generatedAt: Date.now(),
+      occurrences
+    });
+
+    log(2, `Generated ${occurrences.length} random occurrences for ${this.document.name} until year ${targetYear}`);
+  }
+
+  /** @override */
+  async _processSubmitData(event, form, formData) {
+    const submitData = super._processSubmitData(event, form, formData);
+
+    // If repeat type is 'random', ensure we generate occurrences after save
+    if (submitData.system?.repeat === 'random') {
+      // Schedule regeneration after the update completes
+      setTimeout(() => this.#regenerateRandomOccurrences(), 100);
+    }
+
+    return submitData;
+  }
+
+  /**
+   * Handle clear linked event button click.
+   * @param {PointerEvent} event - The originating click event
+   * @param {HTMLElement} target - The capturing HTML element
+   */
+  static async _onClearLinkedEvent(event, target) {
+    // Clear the linked event
+    await this.document.update({ 'system.linkedEvent': null });
   }
 }

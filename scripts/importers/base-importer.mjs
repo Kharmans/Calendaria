@@ -232,7 +232,7 @@ export default class BaseImporter {
       eraCount: transformedData.eras?.length ?? 0,
       festivalCount: transformedData.festivals?.length ?? 0,
       noteCount: notes,
-      hasLeapYear: !!transformedData.years?.leapYearRule,
+      hasLeapYear: !!transformedData.years?.leapYear?.rule,
       daysPerYear: this.#calculateDaysPerYear(transformedData)
     };
   }

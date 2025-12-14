@@ -399,17 +399,22 @@ export class ImporterApp extends HandlebarsApplicationMixin(ApplicationV2) {
     // Store pending notes for later import (after calendar is saved)
     const pendingNotes = [];
     if (this.#extractedNotes?.length > 0) {
+      log(3, `Processing ${this.#extractedNotes.length} extracted notes for pending import`);
       this.#extractedNotes.forEach((note, index) => {
         const noteType = noteTypes[index] || note.suggestedType;
+        log(3, `Note ${index} "${note.name}": type=${noteType}, suggestedType=${note.suggestedType}`);
         if (noteType === 'note') pendingNotes.push(note);
       });
     }
+
+    log(3, `Pending notes to import: ${pendingNotes.length}`);
 
     // Store pending notes in metadata for the editor to handle after save
     if (pendingNotes.length > 0) {
       if (!this.#transformedData.metadata) this.#transformedData.metadata = {};
       this.#transformedData.metadata.pendingNotes = pendingNotes;
       this.#transformedData.metadata.importerId = this.#selectedImporterId;
+      log(3, `Stored ${pendingNotes.length} pending notes with importerId: ${this.#selectedImporterId}`);
     }
 
     // Close importer and open Calendar Editor with the transformed data

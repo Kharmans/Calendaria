@@ -11,6 +11,7 @@ import CalendarManager from '../calendar/calendar-manager.mjs';
 import NoteManager from '../notes/note-manager.mjs';
 import TimeKeeper, { getTimeIncrements } from '../time/time-keeper.mjs';
 import { dayOfWeek } from '../notes/utils/date-utils.mjs';
+import { isRecurringMatch } from '../notes/utils/recurrence.mjs';
 import { CalendarApplication } from './calendar-application.mjs';
 import * as ViewUtils from './calendar-view-utils.mjs';
 
@@ -243,7 +244,8 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
         isFestival: !!festivalDay,
         festivalName: festivalDay ? game.i18n.localize(festivalDay.name) : null,
         moonIcon: moonData?.icon ?? null,
-        moonPhase: moonData?.tooltip ?? null
+        moonPhase: moonData?.tooltip ?? null,
+        moonColor: moonData?.color ?? null
       });
 
       if (currentWeek.length === daysInWeek) {
@@ -298,20 +300,22 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {number}
    */
   _countNotesOnDay(notes, year, month, day) {
+    const targetDate = { year, month, day };
     return notes.filter((page) => {
-      const start = page.system.startDate;
-      const end = page.system.endDate;
-
-      if (start.year === year && start.month === month && start.day === day) return true;
-
-      if (end?.year != null && end?.month != null && end?.day != null) {
-        const startDate = new Date(start.year, start.month, start.day);
-        const endDate = new Date(end.year, end.month, end.day);
-        const checkDate = new Date(year, month, day);
-        if (checkDate >= startDate && checkDate <= endDate) return true;
-      }
-
-      return false;
+      // Build noteData from page.system for recurrence check
+      const noteData = {
+        startDate: page.system.startDate,
+        endDate: page.system.endDate,
+        repeat: page.system.repeat,
+        repeatInterval: page.system.repeatInterval,
+        repeatEndDate: page.system.repeatEndDate,
+        maxOccurrences: page.system.maxOccurrences,
+        moonConditions: page.system.moonConditions,
+        randomConfig: page.system.randomConfig,
+        cachedRandomOccurrences: page.flags?.[MODULE.ID]?.randomOccurrences,
+        linkedEvent: page.system.linkedEvent
+      };
+      return isRecurringMatch(noteData, targetDate);
     }).length;
   }
 
