@@ -933,6 +933,8 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       const phases = [];
       for (const pIdx of sortedPhaseIndices) {
         const phaseName = data[`moons.${moonIdx}.phases.${pIdx}.name`];
+        const phaseRisingName = data[`moons.${moonIdx}.phases.${pIdx}.risingName`];
+        const phaseFadingName = data[`moons.${moonIdx}.phases.${pIdx}.fadingName`];
         const phaseIcon = data[`moons.${moonIdx}.phases.${pIdx}.icon`];
         const phaseStartPercent = data[`moons.${moonIdx}.phases.${pIdx}.startPercent`];
         const phaseEndPercent = data[`moons.${moonIdx}.phases.${pIdx}.endPercent`];
@@ -940,6 +942,8 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
         // Use form data if available, otherwise fall back to existing (convert % to decimal)
         phases.push({
           name: phaseName ?? existingPhases[pIdx]?.name ?? '',
+          risingName: phaseRisingName ?? existingPhases[pIdx]?.risingName ?? '',
+          fadingName: phaseFadingName ?? existingPhases[pIdx]?.fadingName ?? '',
           icon: phaseIcon ?? existingPhases[pIdx]?.icon ?? '',
           start: phaseStartPercent != null ? parseFloat(phaseStartPercent) / 100 : (existingPhases[pIdx]?.start ?? pIdx * 0.125),
           end: phaseEndPercent != null ? parseFloat(phaseEndPercent) / 100 : (existingPhases[pIdx]?.end ?? (pIdx + 1) * 0.125)
@@ -974,14 +978,14 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   #getDefaultMoonPhases() {
     return [
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.NewMoon'), icon: 'modules/calendaria/assets/moon-phases/01_newmoon.svg', start: 0, end: 0.125 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaxingCrescent'), icon: 'modules/calendaria/assets/moon-phases/02_waxingcrescent.svg', start: 0.125, end: 0.25 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.FirstQuarter'), icon: 'modules/calendaria/assets/moon-phases/03_firstquarter.svg', start: 0.25, end: 0.375 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaxingGibbous'), icon: 'modules/calendaria/assets/moon-phases/04_waxinggibbous.svg', start: 0.375, end: 0.5 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.FullMoon'), icon: 'modules/calendaria/assets/moon-phases/05_fullmoon.svg', start: 0.5, end: 0.625 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaningGibbous'), icon: 'modules/calendaria/assets/moon-phases/06_waninggibbous.svg', start: 0.625, end: 0.75 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.LastQuarter'), icon: 'modules/calendaria/assets/moon-phases/07_lastquarter.svg', start: 0.75, end: 0.875 },
-      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaningCrescent'), icon: 'modules/calendaria/assets/moon-phases/08_waningcrescent.svg', start: 0.875, end: 1 }
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.NewMoon'), risingName: '', fadingName: '', icon: 'modules/calendaria/assets/moon-phases/01_newmoon.svg', start: 0, end: 0.125 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaxingCrescent'), risingName: '', fadingName: '', icon: 'modules/calendaria/assets/moon-phases/02_waxingcrescent.svg', start: 0.125, end: 0.25 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.FirstQuarter'), risingName: '', fadingName: '', icon: 'modules/calendaria/assets/moon-phases/03_firstquarter.svg', start: 0.25, end: 0.375 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaxingGibbous'), risingName: '', fadingName: '', icon: 'modules/calendaria/assets/moon-phases/04_waxinggibbous.svg', start: 0.375, end: 0.5 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.FullMoon'), risingName: '', fadingName: '', icon: 'modules/calendaria/assets/moon-phases/05_fullmoon.svg', start: 0.5, end: 0.625 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaningGibbous'), risingName: '', fadingName: '', icon: 'modules/calendaria/assets/moon-phases/06_waninggibbous.svg', start: 0.625, end: 0.75 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.LastQuarter'), risingName: '', fadingName: '', icon: 'modules/calendaria/assets/moon-phases/07_lastquarter.svg', start: 0.75, end: 0.875 },
+      { name: game.i18n.localize('CALENDARIA.MoonPhase.WaningCrescent'), risingName: '', fadingName: '', icon: 'modules/calendaria/assets/moon-phases/08_waningcrescent.svg', start: 0.875, end: 1 }
     ];
   }
 
@@ -1324,6 +1328,8 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     // Add new phase at end
     moon.phases.push({
       name: game.i18n.format('CALENDARIA.Editor.Default.PhaseName', { num: phaseCount + 1 }),
+      risingName: '',
+      fadingName: '',
       icon: 'modules/calendaria/assets/moon-phases/05_fullmoon.svg',
       start: phaseCount * interval,
       end: 1

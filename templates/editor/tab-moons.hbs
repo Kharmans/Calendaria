@@ -75,6 +75,10 @@
                     data-tooltip="{{localize 'CALENDARIA.Editor.Tooltip.PhaseIcon'}}">{{localize "CALENDARIA.Editor.Column.Icon"}}</span>
                   <span class="col-phase-name"
                     data-tooltip="{{localize 'CALENDARIA.Editor.Tooltip.PhaseName'}}">{{localize "CALENDARIA.Editor.Column.Phase"}}</span>
+                  <span class="col-rising"
+                    data-tooltip="{{localize 'CALENDARIA.Editor.Tooltip.RisingName'}}">{{localize "CALENDARIA.Editor.Column.Rising"}}</span>
+                  <span class="col-fading"
+                    data-tooltip="{{localize 'CALENDARIA.Editor.Tooltip.FadingName'}}">{{localize "CALENDARIA.Editor.Column.Fading"}}</span>
                   <span class="col-start"
                     data-tooltip="{{localize 'CALENDARIA.Editor.Tooltip.PhaseStart'}}">{{localize "CALENDARIA.Editor.Column.StartPercent"}}</span>
                   <span class="col-end"
@@ -98,7 +102,11 @@
                         value="{{this.icon}}">
                     </div>
                     <input type="text" name="moons.{{this.moonIndex}}.phases.{{this.index}}.name" value="{{this.name}}"
-                      class="col-phase-name">
+                      class="col-phase-name" placeholder="{{localize 'CALENDARIA.Editor.Placeholder.PhaseName'}}">
+                    <input type="text" name="moons.{{this.moonIndex}}.phases.{{this.index}}.risingName" value="{{this.risingName}}"
+                      class="col-rising" placeholder="{{localize 'CALENDARIA.Editor.Placeholder.RisingName'}}">
+                    <input type="text" name="moons.{{this.moonIndex}}.phases.{{this.index}}.fadingName" value="{{this.fadingName}}"
+                      class="col-fading" placeholder="{{localize 'CALENDARIA.Editor.Placeholder.FadingName'}}">
                     <input type="number" name="moons.{{this.moonIndex}}.phases.{{this.index}}.startPercent"
                       value="{{this.startPercent}}" min="0" max="100" step="0.1" class="col-start">
                     <input type="number" name="moons.{{this.moonIndex}}.phases.{{this.index}}.endPercent"

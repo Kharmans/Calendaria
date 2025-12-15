@@ -2172,12 +2172,18 @@
 
         .col-phase-name {
           flex: 2;
-          min-width: 100px;
+          min-width: 80px;
+        }
+
+        .col-rising,
+        .col-fading {
+          flex: 1;
+          min-width: 70px;
         }
 
         .col-start,
         .col-end {
-          width: 70px;
+          width: 55px;
           flex: none;
         }
 

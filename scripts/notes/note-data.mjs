@@ -29,6 +29,9 @@ export function getDefaultNoteData() {
     repeat: 'never',
     repeatInterval: 1,
     repeatEndDate: null,
+    weekday: null, // For weekly recurrence: 0-indexed day of week (0 = first weekday)
+    seasonIndex: null, // For seasonal recurrence: 0-indexed season
+    weekNumber: null, // For weekOfMonth recurrence: 1-indexed week number
     moonConditions: [], // Array of { moonIndex, phaseStart, phaseEnd } (0-1 values)
     linkedEvent: null, // { noteId: string, offset: number } - occurs X days from linked event
     categories: [],
@@ -70,8 +73,23 @@ export function validateNoteData(noteData) {
   if (noteData.allDay !== undefined && typeof noteData.allDay !== 'boolean') errors.push('allDay must be a boolean');
 
   // Validate repeat
-  const validRepeatValues = ['never', 'daily', 'weekly', 'monthly', 'yearly', 'moon', 'random', 'linked'];
+  const validRepeatValues = ['never', 'daily', 'weekly', 'monthly', 'yearly', 'moon', 'random', 'linked', 'seasonal', 'weekOfMonth'];
   if (noteData.repeat && !validRepeatValues.includes(noteData.repeat)) errors.push(`repeat must be one of: ${validRepeatValues.join(', ')}`);
+
+  // Validate weekday (for weekly recurrence)
+  if (noteData.weekday !== undefined && noteData.weekday !== null) {
+    if (typeof noteData.weekday !== 'number' || noteData.weekday < 0) errors.push('weekday must be a non-negative number (0-indexed day of week)');
+  }
+
+  // Validate seasonIndex (for seasonal recurrence)
+  if (noteData.seasonIndex !== undefined && noteData.seasonIndex !== null) {
+    if (typeof noteData.seasonIndex !== 'number' || noteData.seasonIndex < 0) errors.push('seasonIndex must be a non-negative number');
+  }
+
+  // Validate weekNumber (for weekOfMonth recurrence)
+  if (noteData.weekNumber !== undefined && noteData.weekNumber !== null) {
+    if (typeof noteData.weekNumber !== 'number' || noteData.weekNumber < 1) errors.push('weekNumber must be a positive number (1-indexed week of month)');
+  }
 
   // Validate repeat interval
   if (noteData.repeatInterval !== undefined) if (typeof noteData.repeatInterval !== 'number' || noteData.repeatInterval < 1) errors.push('repeatInterval must be a positive number');
@@ -161,6 +179,9 @@ export function sanitizeNoteData(noteData) {
     repeat: noteData.repeat || defaults.repeat,
     repeatInterval: noteData.repeatInterval ?? defaults.repeatInterval,
     repeatEndDate: noteData.repeatEndDate || null,
+    weekday: noteData.weekday ?? null,
+    seasonIndex: noteData.seasonIndex ?? null,
+    weekNumber: noteData.weekNumber ?? null,
     moonConditions: Array.isArray(noteData.moonConditions) ? noteData.moonConditions : defaults.moonConditions,
     linkedEvent: noteData.linkedEvent || null,
     categories: Array.isArray(noteData.categories) ? noteData.categories : defaults.categories,

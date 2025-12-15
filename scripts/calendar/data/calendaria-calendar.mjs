@@ -82,18 +82,21 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
           cycleLength: new NumberField({ required: true, nullable: false, min: 1 }),
           cycleDayAdjust: new NumberField({ required: false, nullable: false, initial: 0 }), // Manual day offset
           color: new StringField({ required: false, initial: '' }), // Hex color for tinting moon icon
+          hidden: new BooleanField({ required: false, initial: false }), // Hide moon from UI
           phases: new ArrayField(
             new SchemaField({
               name: new StringField({ required: true }),
+              risingName: new StringField({ required: false }), // Sub-phase name for early part of phase
+              fadingName: new StringField({ required: false }), // Sub-phase name for late part of phase
               icon: new StringField({ required: false }),
               start: new NumberField({ required: true, min: 0, max: 1 }), // Percentage of cycle
               end: new NumberField({ required: true, min: 0, max: 1 })
             })
           ),
           referenceDate: new SchemaField({
-            year: new NumberField({ required: true, integer: true }),
-            month: new NumberField({ required: true, integer: true }),
-            day: new NumberField({ required: true, integer: true })
+            year: new NumberField({ required: true, integer: true, initial: 1 }),
+            month: new NumberField({ required: true, integer: true, min: 0, initial: 0 }), // 0-indexed
+            day: new NumberField({ required: true, integer: true, min: 1, initial: 1 }) // 1-indexed (user-facing)
           })
         })
       ),
@@ -174,6 +177,22 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
           summerSolstice: new NumberField({ required: false, initial: 172, integer: true, min: 0 })
         },
         { required: false }
+      ),
+
+      /**
+       * Current/starting date from import (e.g., Fantasy-Calendar's dynamic_data)
+       * Can be used to set initial game time after import.
+       * @type {object|null}
+       */
+      currentDate: new SchemaField(
+        {
+          year: new NumberField({ required: true, integer: true }),
+          month: new NumberField({ required: true, integer: true, min: 0 }),
+          day: new NumberField({ required: true, integer: true, min: 1 }),
+          hour: new NumberField({ required: false, integer: true, initial: 0, min: 0 }),
+          minute: new NumberField({ required: false, integer: true, initial: 0, min: 0 })
+        },
+        { required: false, nullable: true }
       )
     };
   }
@@ -473,10 +492,12 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
   /* -------------------------------------------- */
 
   /**
-   * Get the current phase of a moon.
+   * Get the current phase of a moon using FC-style distribution.
+   * Primary phases (new/full moon) get floor(cycleLength/8) days each,
+   * remaining phases split the leftover days evenly.
    * @param {number} [moonIndex=0]  Index of the moon (0 for primary moon).
    * @param {number|TimeComponents} [time]  Time to use, by default the current world time.
-   * @returns {{name: string, icon: string, position: number}|null}
+   * @returns {{name: string, subPhaseName: string, icon: string, position: number}|null}
    */
   getMoonPhase(moonIndex = 0, time = game.time.worldTime) {
     const moon = this.moons?.[moonIndex];
@@ -493,28 +514,123 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
 
     // Guard against invalid calculations
     if (!Number.isFinite(daysSinceReference) || !Number.isFinite(moon.cycleLength) || moon.cycleLength <= 0) {
-      return moon.phases?.[0] ? { name: moon.phases[0].name, icon: moon.phases[0].icon || '', position: 0, dayInCycle: 0 } : null;
+      return moon.phases?.[0] ? { name: moon.phases[0].name, subPhaseName: moon.phases[0].name, icon: moon.phases[0].icon || '', position: 0, dayInCycle: 0 } : null;
     }
 
     // Calculate position in cycle (0-1), including manual adjustment
     const cycleDayAdjust = Number.isFinite(moon.cycleDayAdjust) ? moon.cycleDayAdjust : 0;
-    const daysIntoCycle = (((daysSinceReference % moon.cycleLength) + moon.cycleLength) % moon.cycleLength) + cycleDayAdjust;
-    const normalizedPosition = (((daysIntoCycle / moon.cycleLength) % 1) + 1) % 1; // Ensure 0-1 range
+    const daysIntoCycleRaw = (((daysSinceReference % moon.cycleLength) + moon.cycleLength) % moon.cycleLength) + cycleDayAdjust;
+    const daysIntoCycle = ((daysIntoCycleRaw % moon.cycleLength) + moon.cycleLength) % moon.cycleLength;
+    const normalizedPosition = daysIntoCycle / moon.cycleLength;
 
-    // Find which phase this position falls into
-    const phase = moon.phases.find((p) => normalizedPosition >= p.start && normalizedPosition < p.end);
+    // Build FC-style phase distribution: [3, 4, 4, 4, 3, 4, 4, 4] for 30-day cycle
+    const numPhases = moon.phases?.length || 8;
+    const phaseDays = CalendariaCalendar.#buildPhaseDayDistribution(moon.cycleLength, numPhases);
 
-    // Fall back to first phase if no match (handles edge case where position = 1.0)
-    const matchedPhase = phase || moon.phases?.[0];
+    // Find which phase contains the current day
+    const dayIndex = Math.floor(daysIntoCycle);
+    let cumulativeDays = 0;
+    let phaseArrayIndex = 0;
+    let dayWithinPhase = 0;
 
-    return matchedPhase
-      ? {
-          name: matchedPhase.name,
-          icon: matchedPhase.icon || '',
-          position: normalizedPosition,
-          dayInCycle: Math.floor(normalizedPosition * moon.cycleLength)
-        }
-      : null;
+    for (let i = 0; i < phaseDays.length; i++) {
+      if (dayIndex < cumulativeDays + phaseDays[i]) {
+        phaseArrayIndex = i;
+        dayWithinPhase = dayIndex - cumulativeDays;
+        break;
+      }
+      cumulativeDays += phaseDays[i];
+    }
+
+    const matchedPhase = moon.phases[phaseArrayIndex] || moon.phases?.[0];
+    if (!matchedPhase) return null;
+
+    // Calculate sub-phase name (Rising/Peak/Fading)
+    const phaseDuration = phaseDays[phaseArrayIndex];
+    const subPhaseName = CalendariaCalendar.#getSubPhaseName(matchedPhase, dayWithinPhase, phaseDuration);
+
+    return {
+      name: matchedPhase.name,
+      subPhaseName,
+      icon: matchedPhase.icon || '',
+      position: normalizedPosition,
+      dayInCycle: dayIndex,
+      phaseIndex: phaseArrayIndex,
+      dayWithinPhase,
+      phaseDuration
+    };
+  }
+
+  /**
+   * Build FC-style phase day distribution.
+   * Primary phases (new moon at 0, full moon at 4) get floor(cycleLength/8) days,
+   * remaining phases split leftover days evenly.
+   * @param {number} cycleLength  Total days in moon cycle.
+   * @param {number} numPhases  Number of phases (typically 8).
+   * @returns {number[]}  Array of days per phase.
+   * @private
+   */
+  static #buildPhaseDayDistribution(cycleLength, numPhases = 8) {
+    if (numPhases !== 8) {
+      // For non-standard phase counts, distribute evenly
+      const baseDays = Math.floor(cycleLength / numPhases);
+      const remainder = cycleLength % numPhases;
+      return Array.from({ length: numPhases }, (_, i) => baseDays + (i < remainder ? 1 : 0));
+    }
+
+    // FC algorithm: primary phases get fixed days, others split remainder
+    const primaryDays = Math.floor(cycleLength / 8);
+    const totalPrimaryDays = primaryDays * 2; // New moon + Full moon
+    const remainingDays = cycleLength - totalPrimaryDays;
+    const secondaryDays = Math.floor(remainingDays / 6);
+    const extraDays = remainingDays % 6;
+
+    // Distribution: [New, WaxCres, 1stQ, WaxGib, Full, WanGib, LastQ, WanCres]
+    // Primary phases at index 0 (new) and 4 (full)
+    const distribution = [];
+    let extraAssigned = 0;
+
+    for (let i = 0; i < 8; i++) {
+      if (i === 0 || i === 4) {
+        // Primary phases (new moon, full moon)
+        distribution.push(primaryDays);
+      } else {
+        // Secondary phases - distribute extra days to early secondary phases
+        const extra = extraAssigned < extraDays ? 1 : 0;
+        distribution.push(secondaryDays + extra);
+        extraAssigned++;
+      }
+    }
+
+    return distribution;
+  }
+
+  /**
+   * Get sub-phase name based on position within phase.
+   * Uses stored risingName/fadingName if available, otherwise generates from localization.
+   * @param {object} phase  Phase object with name, risingName, fadingName.
+   * @param {number} dayWithinPhase  Current day within this phase (0-indexed).
+   * @param {number} phaseDuration  Total days in this phase.
+   * @returns {string}  Sub-phase name.
+   * @private
+   */
+  static #getSubPhaseName(phase, dayWithinPhase, phaseDuration) {
+    const phaseName = phase.name;
+    if (phaseDuration <= 1) return game.i18n.localize(phaseName);
+
+    // Divide phase into thirds: Rising, Peak, Fading
+    const third = phaseDuration / 3;
+
+    if (dayWithinPhase < third) {
+      // Use stored risingName or generate from localization
+      if (phase.risingName) return game.i18n.localize(phase.risingName);
+      return game.i18n.format('CALENDARIA.MoonPhase.SubPhase.Rising', { phase: game.i18n.localize(phaseName) });
+    } else if (dayWithinPhase >= phaseDuration - third) {
+      // Use stored fadingName or generate from localization
+      if (phase.fadingName) return game.i18n.localize(phase.fadingName);
+      return game.i18n.format('CALENDARIA.MoonPhase.SubPhase.Fading', { phase: game.i18n.localize(phaseName) });
+    }
+    return game.i18n.localize(phaseName);
   }
 
   /**
@@ -538,9 +654,11 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
 
     const year = Number(components.year) || 0;
     const month = Number(components.month) || 0;
-    const dayOfMonth = Number(components.dayOfMonth ?? components.day) || 0;
+    // dayOfMonth from TimeComponents is 0-indexed, but user-facing 'day' is 1-indexed
+    // Prefer dayOfMonth (internal), fall back to day - 1 (user-facing converted to 0-indexed)
+    const dayOfMonth = components.dayOfMonth ?? (Number(components.day) || 1) - 1;
 
-    // Foundry's componentsToTime expects 'day' as day-of-year, not day-of-month
+    // Foundry's componentsToTime expects 'day' as 0-indexed day-of-year
     // Convert month + dayOfMonth to day-of-year
     let dayOfYear = dayOfMonth;
     const monthDays = this.months?.values || [];

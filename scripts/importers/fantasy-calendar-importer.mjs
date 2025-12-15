@@ -110,7 +110,7 @@ export default class FantasyCalendarImporter extends BaseImporter {
     this._categories = this.#buildCategoryMap(data.categories);
 
     // Transform months first (needed for season calculations)
-    const months = this.#transformMonths(timespans);
+    const months = this.#transformMonths(timespans, yearData.leap_days);
     const daysPerYear = months.reduce((sum, m) => sum + (m.days || 0), 0);
 
     // Transform weekdays
@@ -170,13 +170,33 @@ export default class FantasyCalendarImporter extends BaseImporter {
         description: `Imported from Fantasy-Calendar.com`,
         system: data.name || 'Unknown',
         importedFrom: 'fantasy-calendar'
-      }
+      },
+
+      // Import current date/time from dynamic_data
+      currentDate: this.#transformCurrentDate(data.dynamic_data)
     };
   }
 
   /* -------------------------------------------- */
   /*  Transform Helpers                           */
   /* -------------------------------------------- */
+
+  /**
+   * Transform FC dynamic_data to current date.
+   * @param {object} dynamicData - FC dynamic_data
+   * @returns {object|null}
+   */
+  #transformCurrentDate(dynamicData = {}) {
+    if (!dynamicData.year && dynamicData.year !== 0) return null;
+
+    return {
+      year: dynamicData.year,
+      month: dynamicData.timespan ?? 0,
+      day: dynamicData.day ?? 1,
+      hour: dynamicData.hour ?? 0,
+      minute: dynamicData.minute ?? 0
+    };
+  }
 
   /**
    * Transform FC clock to time config.
@@ -194,18 +214,31 @@ export default class FantasyCalendarImporter extends BaseImporter {
   /**
    * Transform FC timespans to months.
    * @param {object[]} timespans - FC timespans array
+   * @param {object[]} leapDays - FC leap_days array
    * @returns {object[]}
    */
-  #transformMonths(timespans = []) {
-    return timespans.map((ts, index) => ({
-      name: ts.name,
-      abbreviation: ts.name.substring(0, 3),
-      days: ts.length,
-      leapDays: null,
-      ordinal: index + 1,
-      type: ts.type === 'intercalary' ? 'intercalary' : null,
-      startingWeekday: null
-    }));
+  #transformMonths(timespans = [], leapDays = []) {
+    // Count leap days per month (timespan)
+    const leapDaysByMonth = new Map();
+    for (const ld of leapDays) {
+      if (ld.timespan == null) continue;
+      const current = leapDaysByMonth.get(ld.timespan) || 0;
+      // Each leap day adds 1 day to the month on leap years
+      leapDaysByMonth.set(ld.timespan, current + 1);
+    }
+
+    return timespans.map((ts, index) => {
+      const extraLeapDays = leapDaysByMonth.get(index) || 0;
+      return {
+        name: ts.name,
+        abbreviation: ts.name.substring(0, 3),
+        days: ts.length,
+        leapDays: extraLeapDays > 0 ? ts.length + extraLeapDays : null,
+        ordinal: index + 1,
+        type: ts.type === 'intercalary' ? 'intercalary' : null,
+        startingWeekday: null
+      };
+    });
   }
 
   /**
@@ -317,52 +350,28 @@ export default class FantasyCalendarImporter extends BaseImporter {
       cycleLength: moon.cycle,
       cycleDayAdjust: moon.shift ?? 0,
       color: moon.color || '',
-      phases: this.#generateMoonPhases(moon.granularity || 8),
-      referenceDate: { year: 0, month: 0, day: 0 }
+      hidden: moon.hidden ?? false,
+      phases: this.#generateMoonPhases(),
+      referenceDate: { year: 1, month: 0, day: 1 } // User must set to actual New Moon date
     }));
   }
 
   /**
-   * Generate moon phases for a given granularity.
-   * @param {number} granularity - Number of phases
+   * Generate 8 standard moon phases.
+   * Sub-phase names (risingName/fadingName) are left empty to auto-generate from localization.
    * @returns {object[]}
    */
-  #generateMoonPhases(granularity) {
-    const phases = [];
-
-    for (let i = 0; i < granularity; i++) {
-      const start = i / granularity;
-      const end = (i + 1) / granularity;
-
-      // Map phase index to name and icon
-      const { name, icon } = this.#getPhaseNameAndIcon(i, granularity);
-
-      phases.push({ name, icon, start, end });
-    }
-
-    return phases;
-  }
-
-  /**
-   * Get phase name and icon for index.
-   * @param {number} index - Phase index
-   * @param {number} total - Total phases
-   * @returns {{name: string, icon: string}}
-   */
-  #getPhaseNameAndIcon(index, total) {
-    // Map index to approximate 8-phase position
-    const position8 = Math.floor((index / total) * 8);
-    const baseName = PHASE_NAMES_8[position8] || `Phase ${index + 1}`;
-
-    // Icon based on 8-phase mapping
-    const iconIndex = position8 + 1;
+  #generateMoonPhases() {
     const iconNames = ['01_newmoon', '02_waxingcrescent', '03_firstquarter', '04_waxinggibbous', '05_fullmoon', '06_waninggibbous', '07_lastquarter', '08_waningcrescent'];
-    const iconName = iconNames[position8] || '01_newmoon';
 
-    return {
-      name: baseName,
-      icon: `${MOON_ICON_PATH}/${iconName}.svg`
-    };
+    return PHASE_NAMES_8.map((name, i) => ({
+      name,
+      risingName: '', // Auto-generated from localization if empty
+      fadingName: '', // Auto-generated from localization if empty
+      icon: `${MOON_ICON_PATH}/${iconNames[i]}.svg`,
+      start: i / 8,
+      end: (i + 1) / 8
+    }));
   }
 
   /**
@@ -377,7 +386,7 @@ export default class FantasyCalendarImporter extends BaseImporter {
       startYear: era.start ?? 0,
       endYear: era.end ?? null,
       format: 'suffix',
-      template: era.date_format || null
+      template: era.format || era.formatting || era.date_format || null
     }));
   }
 
@@ -477,8 +486,18 @@ export default class FantasyCalendarImporter extends BaseImporter {
 
     for (const event of events) {
       try {
-        const note = this.#transformEvent(event, data);
-        if (note) notes.push(note);
+        const conditions = event.data?.conditions || [];
+
+        // Check for OR logic - split into multiple notes
+        if (this.#hasOrLogic(conditions)) {
+          const splitNotes = this.#splitOrEvent(event, data);
+          for (const note of splitNotes) {
+            if (note) notes.push(note);
+          }
+        } else {
+          const note = this.#transformEvent(event, data);
+          if (note) notes.push(note);
+        }
       } catch (error) {
         log(2, `Error transforming event "${event.name}":`, error);
       }
@@ -489,6 +508,97 @@ export default class FantasyCalendarImporter extends BaseImporter {
   }
 
   /**
+   * Split an event with OR conditions into multiple notes.
+   * @param {object} event - FC event with OR conditions
+   * @param {object} data - Full FC data
+   * @returns {object[]} Array of note objects
+   */
+  #splitOrEvent(event, data) {
+    const conditions = event.data?.conditions || [];
+    const orBranches = this.#extractOrBranches(conditions);
+
+    if (orBranches.length <= 1) {
+      // No real OR logic found, just transform normally
+      const note = this.#transformEvent(event, data);
+      return note ? [note] : [];
+    }
+
+    log(3, `Splitting event "${event.name}" into ${orBranches.length} notes (OR conditions)`);
+
+    const notes = [];
+    for (let i = 0; i < orBranches.length; i++) {
+      // Create a modified event with just this branch's conditions
+      const branchEvent = {
+        ...event,
+        data: {
+          ...event.data,
+          conditions: orBranches[i]
+        }
+      };
+
+      const note = this.#transformEvent(branchEvent, data);
+      if (note) {
+        // Append branch number to name if multiple branches
+        if (orBranches.length > 1) {
+          note.name = `${event.name} (${i + 1}/${orBranches.length})`;
+        }
+        // Remove the OR warning since we're handling it
+        if (note.importWarnings) {
+          note.importWarnings = note.importWarnings.filter((w) => !w.includes('OR conditions'));
+        }
+        notes.push(note);
+      }
+    }
+
+    return notes;
+  }
+
+  /**
+   * Extract OR branches from nested conditions.
+   * @param {Array} conditions - FC conditions array
+   * @returns {Array[]} Array of condition arrays, one per OR branch
+   */
+  #extractOrBranches(conditions) {
+    const branches = [];
+    let currentBranch = [];
+
+    const processLevel = (arr) => {
+      for (let i = 0; i < arr.length; i++) {
+        const item = arr[i];
+
+        if (item === '||' || (Array.isArray(item) && item[0] === '||')) {
+          // OR operator - save current branch and start new one
+          if (currentBranch.length > 0) {
+            branches.push([...currentBranch]);
+            currentBranch = [];
+          }
+        } else if (Array.isArray(item)) {
+          // Check if this is a condition tuple or a nested group
+          if (item.length >= 1 && typeof item[0] === 'string' && item[0] !== '&&' && item[0] !== '') {
+            // This is a condition tuple
+            currentBranch.push(item);
+          } else if (item[0] === '') {
+            // Nested group - recurse but keep track of grouping
+            processLevel(item.slice(1));
+          } else {
+            // Recurse into nested array
+            processLevel(item);
+          }
+        }
+      }
+    };
+
+    processLevel(conditions);
+
+    // Don't forget the last branch
+    if (currentBranch.length > 0) {
+      branches.push(currentBranch);
+    }
+
+    return branches.length > 0 ? branches : [conditions];
+  }
+
+  /**
    * Transform a single FC event to note format.
    * @param {object} event - FC event
    * @param {object} data - Full FC data (for context)
@@ -496,7 +606,14 @@ export default class FantasyCalendarImporter extends BaseImporter {
    */
   #transformEvent(event, data) {
     const conditions = event.data?.conditions || [];
-    const eventType = this.#detectEventType(conditions);
+    const eventType = this.#detectEventType(conditions, data);
+
+    // Log any import warnings
+    if (eventType.warnings?.length) {
+      for (const warning of eventType.warnings) {
+        log(2, `Event "${event.name}": ${warning}`);
+      }
+    }
 
     // Get category info
     const category = this._categories?.get(event.event_category_id);
@@ -541,21 +658,51 @@ export default class FantasyCalendarImporter extends BaseImporter {
       noteData.maxOccurrences = event.data.limited_repeat_num;
     }
 
+    // Add weekday for weekly recurrence
+    if (eventType.weekday != null) {
+      noteData.weekday = eventType.weekday;
+    }
+
+    // Add seasonIndex for seasonal recurrence
+    if (eventType.seasonIndex != null) {
+      noteData.seasonIndex = eventType.seasonIndex;
+    }
+
+    // Add weekNumber for weekOfMonth recurrence
+    if (eventType.weekNumber != null) {
+      noteData.weekNumber = eventType.weekNumber;
+    }
+
+    // Add import warnings for reference
+    if (eventType.warnings?.length) {
+      noteData.importWarnings = eventType.warnings;
+    }
+
     return noteData;
   }
 
   /**
    * Detect event type from FC conditions.
    * @param {Array} conditions - FC conditions array
-   * @returns {{repeat: string, interval: number, moonConditions?: Array, randomConfig?: object}}
+   * @param {object} data - Full FC data for context (weekday names, etc.)
+   * @returns {{repeat: string, interval: number, moonConditions?: Array, randomConfig?: object, weekday?: number, seasonIndex?: number, weekNumber?: number, warnings?: string[]}}
    */
-  #detectEventType(conditions) {
-    const result = { repeat: 'yearly', interval: 1 };
-    const types = conditions.filter((c) => Array.isArray(c) && c.length >= 1).map((c) => c[0]);
+  #detectEventType(conditions, data) {
+    const result = { repeat: 'yearly', interval: 1, warnings: [] };
+
+    // Flatten nested conditions to extract all types
+    const flatConditions = this.#flattenConditions(conditions);
+    const types = new Set(flatConditions.map((c) => c[0]).filter(Boolean));
+
+    // Check for OR logic (multiple date conditions)
+    const hasOrLogic = this.#hasOrLogic(conditions);
+    if (hasOrLogic) {
+      result.warnings.push('Event has OR conditions; importing first date only');
+    }
 
     // Random event
-    if (types.includes('Random')) {
-      const randomCond = conditions.find((c) => c[0] === 'Random');
+    if (types.has('Random')) {
+      const randomCond = flatConditions.find((c) => c[0] === 'Random');
       if (randomCond) {
         result.repeat = 'random';
         result.randomConfig = {
@@ -568,14 +715,63 @@ export default class FantasyCalendarImporter extends BaseImporter {
     }
 
     // One-time date event
-    if (types.includes('Date') && !types.includes('Month') && !types.includes('Day')) {
+    if (types.has('Date') && !types.has('Month') && !types.has('Day')) {
       result.repeat = 'never';
       return result;
     }
 
+    // Weekday-based event (e.g., "every Sunday")
+    if (types.has('Weekday') && !types.has('Month') && !types.has('Day')) {
+      const weekdayCond = flatConditions.find((c) => c[0] === 'Weekday');
+      if (weekdayCond) {
+        const weekdayName = weekdayCond[2]?.[0];
+        const weekdays = data?.static_data?.year_data?.global_week || [];
+        const weekdayIndex = weekdays.findIndex((w) => w.toLowerCase() === weekdayName?.toLowerCase());
+        result.repeat = 'weekly';
+        result.weekday = weekdayIndex >= 0 ? weekdayIndex : 0;
+      }
+      return result;
+    }
+
+    // Season-based event
+    if (types.has('Season') && !types.has('Month') && !types.has('Day')) {
+      const seasonCond = flatConditions.find((c) => c[0] === 'Season');
+      result.repeat = 'seasonal';
+      result.seasonIndex = parseInt(seasonCond?.[2]?.[0]) || 0;
+      return result;
+    }
+
+    // Week-based event (Nth week of month/year)
+    if (types.has('Week') && !types.has('Day')) {
+      const weekCond = flatConditions.find((c) => c[0] === 'Week');
+      result.repeat = 'weekOfMonth';
+      result.weekNumber = parseInt(weekCond?.[2]?.[0]) || 1;
+      // If there's also a Weekday condition, capture that too
+      if (types.has('Weekday')) {
+        const weekdayCond = flatConditions.find((c) => c[0] === 'Weekday');
+        const weekdayName = weekdayCond?.[2]?.[0];
+        const weekdays = data?.static_data?.year_data?.global_week || [];
+        const weekdayIndex = weekdays.findIndex((w) => w.toLowerCase() === weekdayName?.toLowerCase());
+        result.weekday = weekdayIndex >= 0 ? weekdayIndex : 0;
+      }
+      return result;
+    }
+
+    // Year-specific event (specific years only)
+    if (types.has('Year') && !types.has('Month') && !types.has('Day')) {
+      const yearCond = flatConditions.find((c) => c[0] === 'Year');
+      const years = yearCond?.[2] || [];
+      if (years.length === 1) {
+        result.repeat = 'never'; // Single year = one-time event
+      } else if (years.length > 1) {
+        result.warnings.push(`Event spans specific years (${years.join(', ')}); importing for first year only`);
+        result.repeat = 'never';
+      }
+    }
+
     // Moon-based event
-    if (types.includes('Moons')) {
-      const moonCond = conditions.find((c) => c[0] === 'Moons');
+    if (types.has('Moons')) {
+      const moonCond = flatConditions.find((c) => c[0] === 'Moons');
       if (moonCond) {
         const moonIndex = parseInt(moonCond[2]?.[0]) || 0;
         const phaseIndex = parseInt(moonCond[2]?.[1]) || 0;
@@ -590,20 +786,61 @@ export default class FantasyCalendarImporter extends BaseImporter {
         ];
 
         // If only moon condition, set repeat to 'moon'
-        if (!types.includes('Month') && !types.includes('Day')) {
+        if (!types.has('Month') && !types.has('Day')) {
           result.repeat = 'moon';
         }
       }
     }
 
     // Yearly (Month + Day)
-    if (types.includes('Month') && types.includes('Day')) {
+    if (types.has('Month') && types.has('Day')) {
       result.repeat = 'yearly';
-    } else if (types.includes('Day') && !types.includes('Month')) {
+    } else if (types.has('Day') && !types.has('Month')) {
       result.repeat = 'monthly';
     }
 
     return result;
+  }
+
+  /**
+   * Flatten nested FC conditions to a flat array.
+   * @param {Array} conditions - Nested conditions array
+   * @returns {Array} Flat array of condition tuples
+   */
+  #flattenConditions(conditions) {
+    const result = [];
+    const flatten = (arr) => {
+      if (!Array.isArray(arr)) return;
+      // Check if this is a condition tuple (starts with string type)
+      if (arr.length >= 1 && typeof arr[0] === 'string' && arr[0] !== '&&' && arr[0] !== '||' && arr[0] !== '') {
+        result.push(arr);
+      } else {
+        // Recurse into nested arrays
+        for (const item of arr) {
+          if (Array.isArray(item)) flatten(item);
+        }
+      }
+    };
+    flatten(conditions);
+    return result;
+  }
+
+  /**
+   * Check if conditions contain OR logic.
+   * @param {Array} conditions - FC conditions array
+   * @returns {boolean}
+   */
+  #hasOrLogic(conditions) {
+    const check = (arr) => {
+      if (!Array.isArray(arr)) return false;
+      for (const item of arr) {
+        if (item === '||') return true;
+        if (Array.isArray(item) && item[0] === '||') return true;
+        if (Array.isArray(item) && check(item)) return true;
+      }
+      return false;
+    };
+    return check(conditions);
   }
 
   /**
