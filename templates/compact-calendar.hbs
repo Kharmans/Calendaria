@@ -97,6 +97,19 @@
     </button>
   </div>
 
+  {{!-- Weather Badge --}}
+  {{#if weather}}
+  <div class="compact-weather-badge{{#if isGM}} clickable{{/if}}" data-action="{{#if isGM}}cycleWeather{{else}}{{/if}}"
+    style="--weather-color: {{weather.color}}"
+    data-tooltip="{{weather.tooltip}}">
+    <i class="fas {{weather.icon}}"></i>
+    <span class="weather-label">{{weather.label}}</span>
+    {{#if weather.temperature}}
+    <span class="weather-temp">{{weather.temperature}}°</span>
+    {{/if}}
+  </div>
+  {{/if}}
+
   {{!-- Mini Calendar Grid --}}
   <div class="compact-grid">
     <div class="compact-weekdays">

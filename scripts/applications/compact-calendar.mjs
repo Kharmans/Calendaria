@@ -14,6 +14,7 @@ import { dayOfWeek } from '../notes/utils/date-utils.mjs';
 import { isRecurringMatch } from '../notes/utils/recurrence.mjs';
 import { CalendarApplication } from './calendar-application.mjs';
 import * as ViewUtils from './calendar-view-utils.mjs';
+import WeatherManager from '../weather/weather-manager.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -103,7 +104,8 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       toSunrise: CompactCalendar._onToSunrise,
       toMidday: CompactCalendar._onToMidday,
       toSunset: CompactCalendar._onToSunset,
-      toMidnight: CompactCalendar._onToMidnight
+      toMidnight: CompactCalendar._onToMidnight,
+      cycleWeather: CompactCalendar._onCycleWeather
     }
   };
 
@@ -193,7 +195,28 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       context.showViewNotes = noteCount > 0;
     }
 
+    // Weather badge data
+    context.weather = this._getWeatherContext();
+
     return context;
+  }
+
+  /**
+   * Get weather context for template.
+   * @returns {object|null} Weather context or null if no weather set
+   */
+  _getWeatherContext() {
+    const weather = WeatherManager.getCurrentWeather();
+    if (!weather) return null;
+
+    return {
+      id: weather.id,
+      label: game.i18n.localize(weather.label),
+      icon: weather.icon,
+      color: weather.color,
+      temperature: weather.temperature,
+      tooltip: weather.description ? game.i18n.localize(weather.description) : game.i18n.localize(weather.label)
+    };
   }
 
   /**
@@ -511,6 +534,12 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       id: Hooks.on('deleteJournalEntryPage', (page) => {
         if (page.type === 'calendaria.calendarnote') debouncedRender();
       })
+    });
+
+    // Weather change hook
+    this.#hooks.push({
+      name: HOOKS.WEATHER_CHANGE,
+      id: Hooks.on(HOOKS.WEATHER_CHANGE, () => debouncedRender())
     });
   }
 
@@ -1072,6 +1101,15 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const secondsToAdvance = Math.round(hoursUntil * secondsPerHour);
     if (secondsToAdvance > 0) await game.time.advance(secondsToAdvance);
+  }
+
+  /**
+   * Cycle through weather presets or open weather picker.
+   * For now, generates new weather based on climate/season.
+   */
+  static async _onCycleWeather() {
+    if (!game.user.isGM) return;
+    await WeatherManager.generateAndSetWeather();
   }
 
   /* -------------------------------------------- */

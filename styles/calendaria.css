@@ -3077,6 +3077,45 @@
     }
   }
 
+  /* Weather Badge */
+  .compact-weather-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 4px 10px;
+    margin: 0 8px 4px;
+    background: var(--calendaria-bg-lighter);
+    border-radius: 12px;
+    font-size: 0.8rem;
+    color: var(--calendaria-text);
+    transition: all 0.15s;
+
+    i {
+      color: var(--weather-color, var(--calendaria-primary));
+      font-size: 0.9rem;
+    }
+
+    .weather-label {
+      font-weight: 500;
+    }
+
+    .weather-temp {
+      font-size: 0.75rem;
+      color: var(--calendaria-text-dim);
+      padding-left: 4px;
+      border-left: 1px solid var(--calendaria-border-light);
+    }
+
+    &.clickable {
+      cursor: pointer;
+
+      &:hover {
+        background: var(--calendaria-bg-hover);
+      }
+    }
+  }
+
   /* Calendar Grid */
   .compact-grid {
     position: relative;

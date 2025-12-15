@@ -1031,6 +1031,182 @@ export const CalendariaAPI = {
   },
 
   /* -------------------------------------------- */
+  /*  Weather System                              */
+  /* -------------------------------------------- */
+
+  /**
+   * Get the current weather.
+   * @returns {object|null} Current weather state with id, label, icon, color, temperature
+   * @example
+   * const weather = CALENDARIA.api.getCurrentWeather();
+   * if (weather) console.log(`Current weather: ${weather.label}`);
+   */
+  getCurrentWeather() {
+    return import('./weather/weather-manager.mjs').then((m) => m.default.getCurrentWeather());
+  },
+
+  /**
+   * Set the current weather by preset ID.
+   * @param {string} presetId - Weather preset ID (e.g., 'clear', 'rain', 'thunderstorm')
+   * @param {object} [options={}] - Additional options
+   * @param {number} [options.temperature] - Optional temperature value
+   * @returns {Promise<object>} The set weather
+   * @example
+   * await CALENDARIA.api.setWeather('rain');
+   * await CALENDARIA.api.setWeather('snow', { temperature: -5 });
+   */
+  async setWeather(presetId, options = {}) {
+    const WeatherManager = (await import('./weather/weather-manager.mjs')).default;
+    return WeatherManager.setWeather(presetId, options);
+  },
+
+  /**
+   * Set custom weather with arbitrary values.
+   * @param {object} weatherData - Weather data
+   * @param {string} weatherData.label - Display label
+   * @param {string} [weatherData.icon='fa-question'] - Font Awesome icon class
+   * @param {string} [weatherData.color='#888888'] - Display color
+   * @param {string} [weatherData.description] - Description text
+   * @param {number} [weatherData.temperature] - Temperature value
+   * @returns {Promise<object>} The set weather
+   * @example
+   * await CALENDARIA.api.setCustomWeather({
+   *   label: 'Magical Aurora',
+   *   icon: 'fa-star',
+   *   color: '#E0BBFF',
+   *   description: 'Shimmering lights dance across the sky'
+   * });
+   */
+  async setCustomWeather(weatherData) {
+    const WeatherManager = (await import('./weather/weather-manager.mjs')).default;
+    return WeatherManager.setCustomWeather(weatherData);
+  },
+
+  /**
+   * Clear the current weather.
+   * @returns {Promise<void>}
+   * @example
+   * await CALENDARIA.api.clearWeather();
+   */
+  async clearWeather() {
+    const WeatherManager = (await import('./weather/weather-manager.mjs')).default;
+    return WeatherManager.clearWeather();
+  },
+
+  /**
+   * Generate and set weather based on current climate and season.
+   * @param {object} [options={}] - Generation options
+   * @param {string} [options.climate] - Climate override (uses setting if not provided)
+   * @param {string} [options.season] - Season override (uses current if not provided)
+   * @returns {Promise<object>} Generated weather
+   * @example
+   * await CALENDARIA.api.generateWeather();
+   * await CALENDARIA.api.generateWeather({ climate: 'polar' });
+   */
+  async generateWeather(options = {}) {
+    const WeatherManager = (await import('./weather/weather-manager.mjs')).default;
+    return WeatherManager.generateAndSetWeather(options);
+  },
+
+  /**
+   * Get a weather forecast for upcoming days.
+   * @param {object} [options={}] - Forecast options
+   * @param {number} [options.days=7] - Number of days to forecast
+   * @param {string} [options.climate] - Climate override
+   * @returns {Promise<object[]>} Array of forecast entries
+   * @example
+   * const forecast = await CALENDARIA.api.getWeatherForecast({ days: 5 });
+   * forecast.forEach(day => console.log(day.preset.label, day.temperature));
+   */
+  async getWeatherForecast(options = {}) {
+    const WeatherManager = (await import('./weather/weather-manager.mjs')).default;
+    return WeatherManager.getForecast(options);
+  },
+
+  /**
+   * Get the current climate zone.
+   * @returns {Promise<string>} Climate zone ID
+   * @example
+   * const climate = await CALENDARIA.api.getCurrentClimate();
+   * console.log(climate); // 'temperate'
+   */
+  async getCurrentClimate() {
+    const WeatherManager = (await import('./weather/weather-manager.mjs')).default;
+    return WeatherManager.getCurrentClimate();
+  },
+
+  /**
+   * Set the current climate zone.
+   * @param {string} climateId - Climate zone ID ('tropical', 'subtropical', 'temperate', 'polar')
+   * @returns {Promise<void>}
+   * @example
+   * await CALENDARIA.api.setClimate('polar');
+   */
+  async setClimate(climateId) {
+    const WeatherManager = (await import('./weather/weather-manager.mjs')).default;
+    return WeatherManager.setClimate(climateId);
+  },
+
+  /**
+   * Get all available weather presets.
+   * @returns {Promise<object[]>} Array of weather presets
+   * @example
+   * const presets = await CALENDARIA.api.getWeatherPresets();
+   * presets.forEach(p => console.log(p.id, p.label));
+   */
+  async getWeatherPresets() {
+    const WeatherManager = (await import('./weather/weather-manager.mjs')).default;
+    return WeatherManager.getAllPresets();
+  },
+
+  /**
+   * Get all available climate zones.
+   * @returns {Promise<object[]>} Array of climate zones
+   * @example
+   * const climates = await CALENDARIA.api.getClimateZones();
+   * climates.forEach(c => console.log(c.id, c.label));
+   */
+  async getClimateZones() {
+    const WeatherManager = (await import('./weather/weather-manager.mjs')).default;
+    return WeatherManager.getClimateZones();
+  },
+
+  /**
+   * Add a custom weather preset.
+   * @param {object} preset - Preset definition
+   * @param {string} preset.id - Unique ID
+   * @param {string} preset.label - Display label
+   * @param {string} [preset.icon='fa-question'] - Icon class
+   * @param {string} [preset.color='#888888'] - Display color
+   * @param {string} [preset.description] - Description
+   * @returns {Promise<object>} The added preset
+   * @example
+   * await CALENDARIA.api.addWeatherPreset({
+   *   id: 'acid-rain',
+   *   label: 'Acid Rain',
+   *   icon: 'fa-skull',
+   *   color: '#00FF00',
+   *   description: 'Corrosive rainfall'
+   * });
+   */
+  async addWeatherPreset(preset) {
+    const WeatherManager = (await import('./weather/weather-manager.mjs')).default;
+    return WeatherManager.addCustomPreset(preset);
+  },
+
+  /**
+   * Remove a custom weather preset.
+   * @param {string} presetId - Preset ID to remove
+   * @returns {Promise<boolean>} True if removed
+   * @example
+   * await CALENDARIA.api.removeWeatherPreset('acid-rain');
+   */
+  async removeWeatherPreset(presetId) {
+    const WeatherManager = (await import('./weather/weather-manager.mjs')).default;
+    return WeatherManager.removeCustomPreset(presetId);
+  },
+
+  /* -------------------------------------------- */
   /*  Hook Constants                              */
   /* -------------------------------------------- */
 

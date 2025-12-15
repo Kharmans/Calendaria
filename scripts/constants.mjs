@@ -107,7 +107,23 @@ export const SETTINGS = {
   COMPACT_STICKY_STATES: 'compactStickyStates',
 
   /** @type {string} Dev mode - allows deletion of calendar note journals */
-  DEV_MODE: 'devMode'
+  DEV_MODE: 'devMode',
+
+  /* -------------------------------------------- */
+  /*  Weather Settings                            */
+  /* -------------------------------------------- */
+
+  /** @type {string} Current weather state */
+  CURRENT_WEATHER: 'currentWeather',
+
+  /** @type {string} Current climate zone */
+  CURRENT_CLIMATE: 'currentClimate',
+
+  /** @type {string} Whether to auto-generate weather on day change */
+  WEATHER_AUTO_GENERATE: 'weatherAutoGenerate',
+
+  /** @type {string} Custom weather presets created by the GM */
+  CUSTOM_WEATHER_PRESETS: 'customWeatherPresets'
 };
 
 /**
@@ -401,7 +417,14 @@ export const HOOKS = {
   IMPORT_COMPLETE: 'calendaria.importComplete',
 
   /** @type {string} Fired when an import operation fails */
-  IMPORT_FAILED: 'calendaria.importFailed'
+  IMPORT_FAILED: 'calendaria.importFailed',
+
+  /* -------------------------------------------- */
+  /*  Weather Hooks                               */
+  /* -------------------------------------------- */
+
+  /** @type {string} Fired when weather changes */
+  WEATHER_CHANGE: 'calendaria.weatherChange'
 };
 
 /**
@@ -467,5 +490,8 @@ export const SOCKET_TYPES = {
   NOTE_UPDATE: 'noteUpdate',
 
   /** @type {string} Calendar switch message */
-  CALENDAR_SWITCH: 'calendarSwitch'
+  CALENDAR_SWITCH: 'calendarSwitch',
+
+  /** @type {string} Weather change message */
+  WEATHER_CHANGE: 'weatherChange'
 };

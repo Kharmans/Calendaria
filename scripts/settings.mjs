@@ -179,6 +179,55 @@ export function registerSettings() {
   // Primary GM setting registered in registerReadySettings() when users are available
 
   // ========================================//
+  //  Weather System                         //
+  // ========================================//
+
+  /** Current weather state */
+  game.settings.register(MODULE.ID, SETTINGS.CURRENT_WEATHER, {
+    name: 'Current Weather',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: null
+  });
+
+  /** Current climate zone */
+  game.settings.register(MODULE.ID, SETTINGS.CURRENT_CLIMATE, {
+    name: 'CALENDARIA.Settings.CurrentClimate.Name',
+    hint: 'CALENDARIA.Settings.CurrentClimate.Hint',
+    scope: 'world',
+    config: true,
+    type: new foundry.data.fields.StringField({
+      choices: {
+        tropical: 'CALENDARIA.Weather.Climate.Tropical',
+        subtropical: 'CALENDARIA.Weather.Climate.Subtropical',
+        temperate: 'CALENDARIA.Weather.Climate.Temperate',
+        polar: 'CALENDARIA.Weather.Climate.Polar'
+      },
+      initial: 'temperate'
+    })
+  });
+
+  /** Auto-generate weather on day change */
+  game.settings.register(MODULE.ID, SETTINGS.WEATHER_AUTO_GENERATE, {
+    name: 'CALENDARIA.Settings.WeatherAutoGenerate.Name',
+    hint: 'CALENDARIA.Settings.WeatherAutoGenerate.Hint',
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: false
+  });
+
+  /** Custom weather presets */
+  game.settings.register(MODULE.ID, SETTINGS.CUSTOM_WEATHER_PRESETS, {
+    name: 'Custom Weather Presets',
+    scope: 'world',
+    config: false,
+    type: Array,
+    default: []
+  });
+
+  // ========================================//
   //  Technical                              //
   // ========================================//
 

@@ -29,6 +29,7 @@ import { preLocalizeCalendar } from './scripts/calendar/calendar-utils.mjs';
 import { CalendarEditor } from './scripts/applications/calendar-editor.mjs';
 import { ThemeEditor } from './scripts/applications/settings/theme-editor.mjs';
 import { getCalendarDefaults } from './scripts/calendar/data/calendar-defaults.mjs';
+import WeatherManager from './scripts/weather/weather-manager.mjs';
 
 Hooks.once('init', async () => {
   // Fire calendaria.init hook for other modules to prepare
@@ -147,6 +148,9 @@ Hooks.once('ready', async () => {
   // Initialize custom theme colors
   ThemeEditor.initialize();
 
+  // Initialize weather system
+  await WeatherManager.initialize();
+
   // Set initial world time if it's at 0 (new world)
   if (game.user.isGM && game.time.worldTime === 0) {
     log(3, 'Initializing world time to default Renescarran date...');
@@ -208,6 +212,7 @@ globalThis['CALENDARIA'] = {
   ThemeEditor,
   TimeKeeper,
   TimeKeeperHUD,
+  WeatherManager,
   toggleCalendarVisibility,
   api: CalendariaAPI
 };

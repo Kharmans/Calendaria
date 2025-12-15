@@ -46,6 +46,7 @@ import { MODULE, SETTINGS, SYSTEM, SOCKET_TYPES, HOOKS } from '../constants.mjs'
 import { log } from './logger.mjs';
 import CalendarManager from '../calendar/calendar-manager.mjs';
 import NoteManager from '../notes/note-manager.mjs';
+import WeatherManager from '../weather/weather-manager.mjs';
 
 /**
  * Socket manager for handling multiplayer synchronization.
@@ -242,6 +243,10 @@ export class CalendariaSocket {
         this.#handleCalendarSwitch(data);
         break;
 
+      case SOCKET_TYPES.WEATHER_CHANGE:
+        this.#handleWeatherChange(data);
+        break;
+
       default:
         log(1, `Unknown socket message type: ${type}`);
     }
@@ -364,6 +369,21 @@ export class CalendariaSocket {
 
     // Emit hook for TimeKeeper or other modules to respond
     Hooks.callAll('calendaria.clockUpdate', { running, ratio });
+  }
+
+  /**
+   * Handle remote weather change messages.
+   * Syncs the weather state across all clients.
+   * @private
+   *
+   * @param {Object} data - The weather change data
+   * @param {Object} data.weather - The new weather state
+   * @returns {void}
+   */
+  static #handleWeatherChange(data) {
+    const { weather } = data;
+    log(3, `Handling remote weather change: ${weather?.id ?? 'cleared'}`);
+    WeatherManager.handleRemoteWeatherChange(data);
   }
 
   /* -------------------------------------------- */
