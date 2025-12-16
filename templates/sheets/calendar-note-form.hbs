@@ -254,6 +254,20 @@
     </fieldset>
   </div>
 
+  {{!-- Row 4: Macro --}}
+  <div class="form-row-4">
+    <fieldset class="macro-fieldset">
+      <legend>Macro</legend>
+      <select name="system.macro" data-tooltip="CALENDARIA.UI.MacroTooltip">
+        <option value="">None</option>
+        {{#each availableMacros}}
+          <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+        {{/each}}
+      </select>
+      <p class="hint">Execute when this event triggers or each day of multi-day events.</p>
+    </fieldset>
+  </div>
+
   {{!-- Bottom row: ProseMirror Editor --}}
   <fieldset class="editor-fieldset">
     <legend>Note Content</legend>

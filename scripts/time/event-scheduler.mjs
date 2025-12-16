@@ -288,9 +288,10 @@ export default class EventScheduler {
    * Execute the macro attached to a note.
    *
    * @param {Object} note - The note stub
+   * @param {Object} [context={}] - Additional context to pass to the macro
    * @private
    */
-  static #executeMacro(note) {
+  static #executeMacro(note, context = {}) {
     const macroId = note.flagData.macro;
     if (!macroId) return;
 
@@ -298,7 +299,18 @@ export default class EventScheduler {
     if (!macro) return;
 
     log(3, `Executing macro for event ${note.name}: ${macro.name}`);
-    macro.execute();
+
+    // Build scope object with event data and context
+    const scope = {
+      event: {
+        id: note.id,
+        name: note.name,
+        flagData: note.flagData
+      },
+      ...context
+    };
+
+    macro.execute(scope);
   }
 
   /* -------------------------------------------- */
@@ -594,5 +606,11 @@ export default class EventScheduler {
 
     // Fire hook for multi-day progress
     Hooks.callAll(HOOKS.EVENT_DAY_CHANGED, { id: note.id, name: note.name, progress });
+
+    // Execute macro for multi-day events (fires daily)
+    this.#executeMacro(note, {
+      trigger: 'multiDayProgress',
+      progress
+    });
   }
 }

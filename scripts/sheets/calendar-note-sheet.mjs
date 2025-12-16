@@ -368,6 +368,14 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
       selected: selectedCategories.includes(cat.id)
     }));
 
+    // Prepare available macros for selection
+    const currentMacro = this.document.system.macro || '';
+    context.availableMacros = game.macros.contents.map((m) => ({
+      id: m.id,
+      name: m.name,
+      selected: m.id === currentMacro
+    }));
+
     // View mode specific context
     context.isViewMode = this.isViewMode;
     context.isEditMode = this.isEditMode;

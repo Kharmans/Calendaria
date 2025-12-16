@@ -123,7 +123,14 @@ export const SETTINGS = {
   WEATHER_AUTO_GENERATE: 'weatherAutoGenerate',
 
   /** @type {string} Custom weather presets created by the GM */
-  CUSTOM_WEATHER_PRESETS: 'customWeatherPresets'
+  CUSTOM_WEATHER_PRESETS: 'customWeatherPresets',
+
+  /* -------------------------------------------- */
+  /*  Macro Triggers                              */
+  /* -------------------------------------------- */
+
+  /** @type {string} Macro trigger configuration object */
+  MACRO_TRIGGERS: 'macroTriggers'
 };
 
 /**
@@ -366,6 +373,9 @@ export const HOOKS = {
 
   /** @type {string} Fired when midday passes */
   MIDDAY: 'calendaria.midday',
+
+  /** @type {string} Fired when any moon's phase changes */
+  MOON_PHASE_CHANGE: 'calendaria.moonPhaseChange',
 
   /* -------------------------------------------- */
   /*  Clock Hooks                                 */

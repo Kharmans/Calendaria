@@ -11,6 +11,7 @@ import { ThemeEditor } from './applications/settings/theme-editor.mjs';
 import { CalendarEditor } from './applications/calendar-editor.mjs';
 import { TimeKeeperHUD } from './applications/time-keeper-hud.mjs';
 import { ImporterApp } from './applications/importer-app.mjs';
+import { MacroTriggerConfig } from './applications/settings/macro-trigger-config.mjs';
 
 /**
  * Register all module settings with Foundry VTT.
@@ -228,6 +229,29 @@ export function registerSettings() {
   });
 
   // ========================================//
+  //  Macro Triggers                         //
+  // ========================================//
+
+  /** Macro trigger configuration - stores all trigger definitions */
+  game.settings.register(MODULE.ID, SETTINGS.MACRO_TRIGGERS, {
+    name: 'Macro Triggers',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {
+      global: {
+        dawn: '',
+        dusk: '',
+        midday: '',
+        midnight: '',
+        newDay: ''
+      },
+      season: [],
+      moonPhase: []
+    }
+  });
+
+  // ========================================//
   //  Technical                              //
   // ========================================//
 
@@ -307,6 +331,16 @@ export function registerSettings() {
     label: 'CALENDARIA.Settings.Importer.Label',
     icon: 'fas fa-file-import',
     type: ImporterApp,
+    restricted: true
+  });
+
+  /** Settings menu button to open macro trigger config */
+  game.settings.registerMenu(MODULE.ID, 'macroTriggers', {
+    name: 'CALENDARIA.Settings.MacroTriggers.Name',
+    hint: 'CALENDARIA.Settings.MacroTriggers.Hint',
+    label: 'CALENDARIA.Settings.MacroTriggers.Label',
+    icon: 'fas fa-bolt',
+    type: MacroTriggerConfig,
     restricted: true
   });
 
