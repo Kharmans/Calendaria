@@ -401,7 +401,7 @@ export function getDayContextMenuItems({ calendar, onSetDate, onCreateNote } = {
         const month = parseInt(target.dataset.month);
         const day = parseInt(target.dataset.day);
         const notes = getNotesOnDay(year, month, day);
-        if (notes.length === 1) notes[0].sheet.render(true);
+        if (notes.length === 1) notes[0].sheet.render(true, { mode: 'view' });
       }
     },
     // Delete Note (if day has exactly one note the user owns)

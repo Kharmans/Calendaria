@@ -179,12 +179,13 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       context.selectedDateLabel = this._formatSelectedDate();
     }
 
-    // Show view notes button if selected date has notes
+    // Show view notes button if selected date (or current day) has notes
     context.showViewNotes = false;
-    if (this._selectedDate) {
+    const checkDate = this._selectedDate || ViewUtils.getCurrentViewedDate(calendar);
+    if (checkDate) {
       const allNotes = ViewUtils.getCalendarNotes();
       const visibleNotes = ViewUtils.getVisibleNotes(allNotes);
-      const noteCount = this._countNotesOnDay(visibleNotes, this._selectedDate.year, this._selectedDate.month, this._selectedDate.day);
+      const noteCount = this._countNotesOnDay(visibleNotes, checkDate.year, checkDate.month, checkDate.day);
       context.showViewNotes = noteCount > 0;
     }
 
@@ -961,6 +962,10 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * Open the notes panel for the selected date.
    */
   static async _onViewNotes(event, target) {
+    if (!this._selectedDate) {
+      const today = ViewUtils.getCurrentViewedDate(this.calendar);
+      if (today) this._selectedDate = { year: today.year, month: today.month, day: today.day };
+    }
     if (!this._selectedDate) return;
     this.#notesPanelVisible = true;
     this.#sidebarLocked = true;
@@ -987,7 +992,7 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     const journalId = target.dataset.journalId;
     const journal = game.journal.get(journalId);
     const page = journal?.pages.get(pageId);
-    if (page) page.sheet.render(true);
+    if (page) page.sheet.render(true, { mode: 'view' });
   }
 
   /**
@@ -996,6 +1001,7 @@ export class CompactCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {HTMLElement} target - Element with data-page-id and data-journal-id
    */
   static _onEditNote(event, target) {
+    event.stopPropagation();
     const pageId = target.dataset.pageId;
     const journalId = target.dataset.journalId;
     const journal = game.journal.get(journalId);
