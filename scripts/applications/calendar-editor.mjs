@@ -1053,7 +1053,9 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       const moon = {
         name: data[`moons.${moonIdx}.name`] || '',
         cycleLength: parseInt(data[`moons.${moonIdx}.cycleLength`]) || 28,
+        cycleDayAdjust: this.#parseOptionalInt(data[`moons.${moonIdx}.cycleDayAdjust`]) ?? existingMoon?.cycleDayAdjust ?? 0,
         color: moonColor,
+        hidden: data[`moons.${moonIdx}.hidden`] === 'true' || data[`moons.${moonIdx}.hidden`] === true || existingMoon?.hidden || false,
         phases,
         referenceDate: {
           year: parseInt(data[`moons.${moonIdx}.referenceDate.year`]) || 0,
@@ -1456,7 +1458,7 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {HTMLElement} target - Target element
    */
   static async #onAddMoon(event, target) {
-    this.#calendarData.moons.push({ name: game.i18n.localize('CALENDARIA.Editor.Default.MoonName'), cycleLength: 28, phases: getDefaultMoonPhases(), referenceDate: { year: 0, month: 0, day: 1 } });
+    this.#calendarData.moons.push({ name: game.i18n.localize('CALENDARIA.Editor.Default.MoonName'), cycleLength: 28, cycleDayAdjust: 0, hidden: false, phases: getDefaultMoonPhases(), referenceDate: { year: 0, month: 0, day: 1 } });
     this.render();
   }
 

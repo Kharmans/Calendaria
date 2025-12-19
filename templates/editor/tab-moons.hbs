@@ -64,6 +64,16 @@
                   <input type="number" name="moons.{{this.index}}.referenceDate.day" value="{{this.referenceDate.day}}"
                     min="1" step="1">
                 </div>
+                <div class="form-group">
+                  <label data-tooltip="{{localize 'CALENDARIA.Editor.Tooltip.CycleDayAdjust'}}">{{localize "CALENDARIA.Editor.Field.CycleDayAdjust"}}</label>
+                  <input type="number" name="moons.{{this.index}}.cycleDayAdjust" value="{{this.cycleDayAdjust}}" step="1">
+                </div>
+                <div class="form-group checkbox-group">
+                  <label>
+                    <input type="checkbox" name="moons.{{this.index}}.hidden" value="true" {{#if this.hidden}}checked{{/if}}>
+                    {{localize "CALENDARIA.Editor.Field.Hidden"}}
+                  </label>
+                </div>
               </div>
             </fieldset>
 

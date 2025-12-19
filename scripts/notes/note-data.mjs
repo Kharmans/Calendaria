@@ -67,11 +67,9 @@ export function validateNoteData(noteData) {
   // Validate allDay
   if (noteData.allDay !== undefined && typeof noteData.allDay !== 'boolean') errors.push('allDay must be a boolean');
 
-  // Validate repeat - get choices from data model to avoid duplication
-  const validRepeatValues = foundry.documents.JournalEntryPage.TYPES['calendaria.calendarnote']?.schema?.getField('repeat')?.choices || [];
-  if (noteData.repeat && validRepeatValues.length > 0 && !validRepeatValues.includes(noteData.repeat)) {
-    errors.push(`repeat must be one of: ${validRepeatValues.join(', ')}`);
-  }
+  // Validate repeat - get choices from data model
+  const validRepeatValues = CONFIG.JournalEntryPage.dataModels['calendaria.calendarnote']._schema.fields.repeat.choices;
+  if (noteData.repeat && !validRepeatValues.includes(noteData.repeat)) errors.push(`repeat must be one of: ${validRepeatValues.join(', ')}`);
 
   // Validate weekday (for weekly recurrence)
   if (noteData.weekday !== undefined && noteData.weekday !== null) {
@@ -249,8 +247,7 @@ export function createNoteStub(page) {
  * @returns {object[]}  Array of { value, label, selected }
  */
 export function getRepeatOptions(selected = 'never') {
-  const schema = foundry.documents.JournalEntryPage.TYPES['calendaria.calendarnote']?.schema;
-  const choices = schema?.getField('repeat')?.choices;
+  const choices = CONFIG.JournalEntryPage.dataModels['calendaria.calendarnote']._schema.fields.repeat.choices;
   return choices.map((value) => ({ value, label: game.i18n.localize(`CALENDARIA.Repeat.${value}`), selected: value === selected }));
 }
 
