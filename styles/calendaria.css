@@ -3942,12 +3942,16 @@
 
 .calendaria.importer-app {
   max-height: 60vh;
+  overflow: hidden;
 
   .importer-content {
     display: flex;
     flex-direction: column;
+    flex: 1;
     gap: 0.75rem;
     padding: 0.5rem;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .no-importers {
@@ -3971,18 +3975,23 @@
     display: grid;
     grid-template-columns: 280px 1fr;
     gap: 0.75rem;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .importer-left {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    overflow-y: auto;
   }
 
   .importer-right {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
   }
 
   /* Source Section */
