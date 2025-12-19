@@ -775,17 +775,9 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
 
     // Check each season
     for (const season of this.seasons.values) {
-      // Handle both formats: dayStart/dayEnd OR monthStart/monthEnd
-      if (season.dayStart != null && season.dayEnd != null) {
-        // Day of year format (0-indexed)
-        if (season.dayStart <= season.dayEnd) {
-          // Normal range (e.g., Spring: 78-170)
-          if (dayOfYear >= season.dayStart && dayOfYear <= season.dayEnd) return season;
-        } else {
-          // Wrapping range (e.g., Winter: 354-77)
-          if (dayOfYear >= season.dayStart || dayOfYear <= season.dayEnd) return season;
-        }
-      } else if (season.monthStart != null && season.monthEnd != null) {
+      // Handle both formats: monthStart/monthEnd (preferred) OR dayStart/dayEnd (day-of-year)
+      // Prioritize month-based format when monthStart/monthEnd are set
+      if (season.monthStart != null && season.monthEnd != null) {
         // Month-based format (1-indexed months)
         const currentMonth = components.month + 1; // Convert to 1-indexed
         const startDay = season.dayStart ?? 1;
@@ -801,6 +793,15 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
           if (currentMonth > season.monthStart || currentMonth < season.monthEnd) return season;
           if (currentMonth === season.monthStart && components.dayOfMonth + 1 >= startDay) return season;
           if (currentMonth === season.monthEnd && components.dayOfMonth + 1 <= endDay) return season;
+        }
+      } else if (season.dayStart != null && season.dayEnd != null) {
+        // Day of year format (0-indexed) - only used when monthStart/monthEnd are not set
+        if (season.dayStart <= season.dayEnd) {
+          // Normal range (e.g., Spring: 78-170)
+          if (dayOfYear >= season.dayStart && dayOfYear <= season.dayEnd) return season;
+        } else {
+          // Wrapping range (e.g., Winter: 354-77)
+          if (dayOfYear >= season.dayStart || dayOfYear <= season.dayEnd) return season;
         }
       }
     }

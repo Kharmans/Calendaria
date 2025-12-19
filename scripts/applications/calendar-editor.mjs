@@ -943,6 +943,8 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       const season = {
         name: data[`seasons.${idx}.name`] || '',
         abbreviation: data[`seasons.${idx}.abbreviation`] || '',
+        icon: data[`seasons.${idx}.icon`] || '',
+        color: data[`seasons.${idx}.color`] || '',
         monthStart: parseInt(data[`seasons.${idx}.monthStart`]) || 1,
         monthEnd: parseInt(data[`seasons.${idx}.monthEnd`]) || 1,
         dayStart: this.#parseOptionalInt(data[`seasons.${idx}.dayStart`]),
