@@ -1813,7 +1813,8 @@
 /* ======================================== */
 
 .calendar-editor {
-  --editor-sidebar-width: 115px;
+  --editor-sidebar-min-width: 100px;
+  --editor-sidebar-max-width: 160px;
   --editor-footer-height: 3.5rem;
 
   /* Override standard-form gap */
@@ -1857,9 +1858,11 @@
     }
   }
 
-  /* Window content is the positioning context */
+  /* Window content uses grid for reactive sidebar width */
   .window-content {
-    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: 1fr var(--editor-footer-height);
     height: 100%;
     padding: 0; /* Override Foundry's default padding */
     gap: 0; /* Override Foundry's default gap */
@@ -1871,11 +1874,11 @@
     align-items: flex-start;
   }
 
-  /* Tab content - positioned to the right of sidebar, above footer */
+  /* Tab content - fills the main content area */
   section.tab {
     display: none;
-    position: absolute;
-    inset: 0 0 var(--editor-footer-height) var(--editor-sidebar-width);
+    grid-column: 2;
+    grid-row: 1;
     padding: 1rem;
     overflow-y: auto;
 
@@ -2687,10 +2690,10 @@
     color: var(--color-text-secondary);
   }
 
-  /* Footer Buttons - positioned at bottom */
+  /* Footer Buttons - spans full width at bottom */
   footer.form-footer {
-    position: absolute;
-    inset: auto 0 0;
+    grid-column: 1 / -1;
+    grid-row: 2;
     padding: 0.75rem 1rem;
     justify-content: center;
     background: var(--color-cool-5);
@@ -2720,18 +2723,21 @@
 
   /* Vertical tab navigation sidebar */
   nav.sheet-tabs {
-    position: absolute;
-    inset: 0 auto var(--editor-footer-height) 0;
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
     flex-direction: column;
     justify-content: flex-start; /* Override Foundry's space-evenly */
     align-items: stretch;
-    width: var(--editor-sidebar-width);
+    min-width: var(--editor-sidebar-min-width);
+    max-width: var(--editor-sidebar-max-width);
+    width: max-content;
     padding: 0;
     border-top: none;
     border-right: 1px solid var(--color-cool-4);
     border-bottom: none;
     gap: 0.125rem;
-    overflow-y: auto;
+    overflow: hidden auto;
 
     /* Tab buttons - text then icon, aligned right */
     [data-tab] {
@@ -2744,8 +2750,15 @@
       border-radius: 0;
       border-left: 3px solid transparent;
       border-bottom: none;
-      white-space: nowrap;
       text-align: right;
+      max-width: 100%;
+
+      /* Text label gets ellipsis */
+      > span:not(.notification-pip) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
 
       i {
         width: 1.25em;
