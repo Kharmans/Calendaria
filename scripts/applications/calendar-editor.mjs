@@ -75,7 +75,8 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       addZone: CalendarEditor.#onAddZone,
       editZone: CalendarEditor.#onEditZone,
       deleteZone: CalendarEditor.#onDeleteZone,
-      toggleCategorySelectAll: CalendarEditor.#onToggleCategorySelectAll
+      toggleCategorySelectAll: CalendarEditor.#onToggleCategorySelectAll,
+      createNew: CalendarEditor.#onCreateNew
     }
   };
 
@@ -1927,6 +1928,16 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Create a new blank calendar.
+   */
+  static #onCreateNew() {
+    this.#initializeBlankCalendar();
+    this.#calendarId = null;
+    this.#isEditing = false;
+    this.render();
+  }
+
+  /**
    * Load a calendar for editing or as a template.
    * @param {Event} event - Click event
    * @param {HTMLElement} target - Target element
@@ -1952,8 +1963,13 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     // Build dialog buttons
     const buttons = [];
 
-    if (isCustom) buttons.push({ action: 'edit', label: localize('CALENDARIA.Editor.EditCalendar'), icon: 'fas fa-edit', default: true });
-    buttons.push({ action: 'template', label: localize('CALENDARIA.Editor.UseAsTemplate'), icon: 'fas fa-copy', default: !isCustom });
+    if (isCustom) {
+      buttons.push({ action: 'edit', label: localize('CALENDARIA.Editor.EditCalendar'), icon: 'fas fa-edit', default: true });
+      buttons.push({ action: 'template', label: localize('CALENDARIA.Editor.UseAsTemplate'), icon: 'fas fa-copy' });
+    } else {
+      // Default calendar - can't edit directly, offer to create copy
+      buttons.push({ action: 'editCopy', label: localize('CALENDARIA.Editor.EditAsCopy'), icon: 'fas fa-copy', default: true });
+    }
     buttons.push({ action: 'cancel', label: localize('CALENDARIA.UI.Cancel'), icon: 'fas fa-times' });
 
     const result = await foundry.applications.api.DialogV2.wait({
@@ -1966,8 +1982,8 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       // Close this builder and open new one for editing
       await this.close();
       CalendarEditor.edit(calendarId);
-    } else if (result === 'template') {
-      // Load as template (copy data)
+    } else if (result === 'template' || result === 'editCopy') {
+      // Load as template/copy (copy data)
       this.#calendarData = calendar.toObject();
       preLocalizeCalendar(this.#calendarData);
 
@@ -1983,7 +1999,12 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
         delete this.#calendarData.metadata.isCustom;
       }
 
-      ui.notifications.info(format('CALENDARIA.Editor.TemplateLoaded', { name: calendarName }));
+      // Reset editing state - this is now a NEW calendar
+      this.#calendarId = null;
+      this.#isEditing = false;
+
+      const messageKey = result === 'editCopy' ? 'CALENDARIA.Editor.DefaultCopied' : 'CALENDARIA.Editor.TemplateLoaded';
+      ui.notifications.info(format(messageKey, { name: calendarName }));
       this.render();
     }
   }
