@@ -18,13 +18,21 @@ import { log } from './utils/logger.mjs';
 const { ArrayField, ObjectField, BooleanField, NumberField, StringField } = foundry.data.fields;
 
 /**
+ * Convert kebab-case ID to PascalCase for localization keys.
+ * @param {string} id - Calendar ID (e.g., 'forbidden-lands')
+ * @returns {string} PascalCase key (e.g., 'ForbiddenLands')
+ */
+function toPascalCase(id) {
+  return id.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('');
+}
+
+/**
  * Build calendar choices for the active calendar dropdown.
  * @returns {Object<string, string>} Map of calendar ID to display name
  */
 function buildCalendarChoices() {
   const choices = BUNDLED_CALENDARS.reduce((acc, id) => {
-    const key = id.charAt(0).toUpperCase() + id.slice(1);
-    acc[id] = `CALENDARIA.Calendar.${key}.Name`;
+    acc[id] = `CALENDARIA.Calendar.${toPascalCase(id)}.Name`;
     return acc;
   }, {});
   const customCalendars = game.settings.get(MODULE.ID, SETTINGS.CUSTOM_CALENDARS) || {};
@@ -57,9 +65,9 @@ export function registerSettings() {
     type: new BooleanField({ initial: false })
   });
 
-  /** Saved position for the compact calendar */
-  game.settings.register(MODULE.ID, SETTINGS.COMPACT_CALENDAR_POSITION, {
-    name: 'Compact Calendar Position',
+  /** Saved position for the MiniCalendar */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CALENDAR_POSITION, {
+    name: 'MiniCalendar Position',
     scope: 'user',
     config: false,
     type: new ObjectField({ nullable: true, initial: null })
@@ -73,18 +81,18 @@ export function registerSettings() {
     type: new ObjectField({ nullable: true, initial: null })
   });
 
-  /** Delay before auto-hiding compact calendar controls */
-  game.settings.register(MODULE.ID, SETTINGS.COMPACT_CONTROLS_DELAY, {
-    name: 'CALENDARIA.Settings.CompactControlsDelay.Name',
-    hint: 'CALENDARIA.Settings.CompactControlsDelay.Hint',
+  /** Delay before auto-hiding MiniCalendar controls */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CALENDAR_CONTROLS_DELAY, {
+    name: 'CALENDARIA.Settings.MiniCalendarControlsDelay.Name',
+    hint: 'CALENDARIA.Settings.MiniCalendarControlsDelay.Hint',
     scope: 'user',
     config: false,
     type: new NumberField({ min: 1, max: 10, step: 1, integer: true, initial: 3 })
   });
 
-  /** Sticky states for compact calendar */
-  game.settings.register(MODULE.ID, SETTINGS.COMPACT_STICKY_STATES, {
-    name: 'Compact Calendar Sticky States',
+  /** Sticky states for MiniCalendar */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CALENDAR_STICKY_STATES, {
+    name: 'MiniCalendar Sticky States',
     scope: 'user',
     config: false,
     type: new ObjectField({ initial: { timeControls: false, sidebar: false, position: false } })
@@ -131,10 +139,10 @@ export function registerSettings() {
     }
   });
 
-  /** Show Compact Calendar on world load */
-  game.settings.register(MODULE.ID, SETTINGS.SHOW_COMPACT_CALENDAR, {
-    name: 'CALENDARIA.Settings.ShowCompactCalendar.Name',
-    hint: 'CALENDARIA.Settings.ShowCompactCalendar.Hint',
+  /** Show MiniCalendar on world load */
+  game.settings.register(MODULE.ID, SETTINGS.SHOW_MINI_CALENDAR, {
+    name: 'CALENDARIA.Settings.ShowMiniCalendar.Name',
+    hint: 'CALENDARIA.Settings.ShowMiniCalendar.Hint',
     scope: 'user',
     config: false,
     type: new BooleanField({ initial: true })
@@ -199,6 +207,14 @@ export function registerSettings() {
     type: new ObjectField({ initial: {} })
   });
 
+  /** Current theme mode (dark, highContrast, custom) */
+  game.settings.register(MODULE.ID, SETTINGS.THEME_MODE, {
+    name: 'Theme Mode',
+    scope: 'user',
+    config: false,
+    type: new StringField({ initial: 'dark', choices: ['dark', 'highContrast', 'custom'] })
+  });
+
   /** Stored calendar configurations and active calendar state */
   game.settings.register(MODULE.ID, SETTINGS.CALENDARS, {
     name: 'Calendar Configurations',
@@ -221,7 +237,7 @@ export function registerSettings() {
     hint: 'CALENDARIA.Settings.ActiveCalendar.Hint',
     scope: 'world',
     config: true,
-    type: new StringField({ choices: buildCalendarChoices(), initial: 'gregorian' }),
+    type: new StringField({ choices: buildCalendarChoices(), initial: 'gregorian', blank: true }),
     requiresReload: true
   });
 
@@ -287,8 +303,8 @@ export function registerSettings() {
       initial: {
         hudDate: { gm: 'ordinal', player: 'ordinal' },
         hudTime: { gm: 'time', player: 'time' },
-        compactHeader: { gm: 'MMMM [era]', player: 'MMMM [era]' },
-        compactTime: { gm: 'time', player: 'time' },
+        miniCalendarHeader: { gm: 'MMMM [era]', player: 'MMMM [era]' },
+        miniCalendarTime: { gm: 'time', player: 'time' },
         fullCalendarHeader: { gm: 'MMMM [era]', player: 'MMMM [era]' },
         chatTimestamp: { gm: 'short', player: 'short' }
       }
@@ -312,6 +328,15 @@ export function registerSettings() {
   game.settings.register(MODULE.ID, SETTINGS.ADVANCE_TIME_ON_COMBAT, {
     name: 'CALENDARIA.Settings.AdvanceTimeOnCombat.Name',
     hint: 'CALENDARIA.Settings.AdvanceTimeOnCombat.Hint',
+    scope: 'world',
+    config: false,
+    type: new BooleanField({ initial: false })
+  });
+
+  /** Whether to sync clock pause with game pause */
+  game.settings.register(MODULE.ID, SETTINGS.SYNC_CLOCK_PAUSE, {
+    name: 'CALENDARIA.Settings.SyncClockPause.Name',
+    hint: 'CALENDARIA.Settings.SyncClockPause.Hint',
     scope: 'world',
     config: false,
     type: new BooleanField({ initial: false })
