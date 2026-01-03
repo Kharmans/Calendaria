@@ -170,7 +170,12 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     context.currentTime = calendar ? formatForLocation(calendar, { ...components, year: components.year + yearZero, dayOfMonth: (components.dayOfMonth ?? 0) + 1 }, 'miniCalendarTime') : TimeKeeper.getFormattedTime();
     context.currentDate = TimeKeeper.getFormattedDate();
     context.increments = Object.entries(getTimeIncrements()).map(([key, seconds]) => ({ key, label: this.#formatIncrementLabel(key), seconds, selected: key === TimeKeeper.incrementKey }));
-    if (calendar) context.calendarData = this._generateMiniCalendarData(calendar, viewedDate);
+
+    // Fetch notes once and reuse for calendar data and note count
+    const allNotes = ViewUtils.getCalendarNotes();
+    const visibleNotes = ViewUtils.getVisibleNotes(allNotes);
+
+    if (calendar) context.calendarData = this._generateMiniCalendarData(calendar, viewedDate, visibleNotes);
     context.showSetCurrentDate = false;
     if (game.user.isGM && this._selectedDate) {
       const today = ViewUtils.getCurrentViewedDate(calendar);
@@ -187,15 +192,13 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     context.stickyPosition = this.#stickyPosition;
     context.hasAnyStickyMode = this.#stickyTimeControls || this.#stickySidebar || this.#stickyPosition;
     if (this.#notesPanelVisible && this._selectedDate) {
-      context.selectedDateNotes = this._getSelectedDateNotes();
+      context.selectedDateNotes = this._getSelectedDateNotes(visibleNotes);
       context.selectedDateLabel = this._formatSelectedDate();
     }
 
     context.showViewNotes = false;
     const checkDate = this._selectedDate || ViewUtils.getCurrentViewedDate(calendar);
     if (checkDate) {
-      const allNotes = ViewUtils.getCalendarNotes();
-      const visibleNotes = ViewUtils.getVisibleNotes(allNotes);
       const noteCount = this._countNotesOnDay(visibleNotes, checkDate.year, checkDate.month, checkDate.day);
       context.showViewNotes = noteCount > 0;
     }
@@ -237,9 +240,10 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * Generate simplified calendar data for the mini month grid.
    * @param {object} calendar - The calendar
    * @param {object} date - The viewed date
+   * @param {object[]} visibleNotes - Pre-fetched visible notes
    * @returns {object} Calendar grid data
    */
-  _generateMiniCalendarData(calendar, date) {
+  _generateMiniCalendarData(calendar, date, visibleNotes) {
     const { year, month } = date;
     const monthData = calendar.months?.values?.[month];
     if (!monthData) return null;
@@ -247,8 +251,6 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     const daysInWeek = calendar.days?.values?.length || 7;
     const weeks = [];
     let currentWeek = [];
-    const allNotes = ViewUtils.getCalendarNotes();
-    const visibleNotes = ViewUtils.getVisibleNotes(allNotes);
     const hasFixedStart = monthData?.startingWeekday != null;
     const startDayOfWeek = hasFixedStart ? monthData.startingWeekday : dayOfWeek({ year, month, day: 1 });
     if (startDayOfWeek > 0) {
@@ -389,12 +391,32 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Get notes for the selected date, sorted by time (all-day first, then by start time).
+   * @param {object[]} visibleNotes - Pre-fetched visible notes
    * @returns {object[]} Array of note objects for the selected date
    */
-  _getSelectedDateNotes() {
+  _getSelectedDateNotes(visibleNotes) {
     if (!this._selectedDate) return [];
     const { year, month, day } = this._selectedDate;
-    const notes = ViewUtils.getNotesOnDay(year, month, day);
+    const targetDate = { year, month, day };
+    const notes = visibleNotes.filter((page) => {
+      const noteData = {
+        startDate: page.system.startDate,
+        endDate: page.system.endDate,
+        repeat: page.system.repeat,
+        repeatInterval: page.system.repeatInterval,
+        repeatEndDate: page.system.repeatEndDate,
+        maxOccurrences: page.system.maxOccurrences,
+        moonConditions: page.system.moonConditions,
+        randomConfig: page.system.randomConfig,
+        cachedRandomOccurrences: page.flags?.[MODULE.ID]?.randomOccurrences,
+        linkedEvent: page.system.linkedEvent,
+        weekday: page.system.weekday,
+        weekNumber: page.system.weekNumber,
+        seasonalConfig: page.system.seasonalConfig,
+        conditions: page.system.conditions
+      };
+      return isRecurringMatch(noteData, targetDate);
+    });
     return notes
       .map((page) => {
         const start = page.system.startDate;
@@ -587,6 +609,11 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
 
     this.#hooks.push({ name: HOOKS.WEATHER_CHANGE, id: Hooks.on(HOOKS.WEATHER_CHANGE, () => debouncedRender()) });
     this.#hooks.push({ name: 'calendaria.displayFormatsChanged', id: Hooks.on('calendaria.displayFormatsChanged', () => this.render()) });
+  }
+
+  /** @override - Disable animation to avoid 1000ms _awaitTransition timeout */
+  async close(options = {}) {
+    return super.close({ animate: false, ...options });
   }
 
   /** @override */
