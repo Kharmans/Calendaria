@@ -33,11 +33,10 @@ function seededRandom(seed, year, dayOfYear) {
  */
 function getDayOfYear(date) {
   const calendar = CalendarManager.getActiveCalendar();
-  if (!calendar?.months?.values) return date.day;
+  if (!calendar) return date.day;
   let dayOfYear = 0;
   for (let m = 0; m < date.month; m++) {
-    const monthData = calendar.months.values[m];
-    dayOfYear += monthData?.days ?? 30;
+    dayOfYear += calendar.getDaysInMonth(m, date.year);
   }
   return dayOfYear + date.day;
 }
@@ -1058,10 +1057,9 @@ function matchesYearly(startDate, targetDate, interval) {
  * @returns {number}  Last day of month
  */
 function getLastDayOfMonth(date) {
-  const calendar = game.time?.calendar;
+  const calendar = CalendarManager.getActiveCalendar();
   if (!calendar) return 30;
-  const monthData = calendar.months?.[date.month];
-  return monthData?.days ?? 30;
+  return calendar.getDaysInMonth(date.month, date.year);
 }
 
 /**
@@ -1181,10 +1179,8 @@ function getTotalDaysInYear(year) {
  */
 function findWeekdayInMonth(year, month, weekday, weekNumber) {
   const calendar = CalendarManager.getActiveCalendar();
-  const months = calendar?.months?.values || [];
-  const monthData = months[month];
-  if (!monthData) return null;
-  const daysInMonth = monthData.days || 30;
+  if (!calendar) return null;
+  const daysInMonth = calendar.getDaysInMonth(month, year);
   const occurrences = [];
   for (let day = 1; day <= daysInMonth; day++) {
     const date = { year, month, day };

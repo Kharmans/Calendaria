@@ -203,8 +203,7 @@ export function addMonths(date, months) {
     newYear--;
   }
 
-  const monthData = calendar.months?.values?.[newMonth];
-  const maxDays = monthData?.days ?? 30;
+  const maxDays = calendar.getDaysInMonth(newMonth, newYear);
   const newDay = Math.min(date.day, maxDays);
   return { year: newYear, month: newMonth, day: newDay, hour: date.hour, minute: date.minute };
 }
@@ -219,8 +218,7 @@ export function addYears(date, years) {
   const calendar = CalendarManager.getActiveCalendar();
   if (!calendar) return date;
   const newYear = date.year + years;
-  const monthData = calendar.months?.values?.[date.month];
-  const maxDays = monthData?.days ?? 30;
+  const maxDays = calendar.getDaysInMonth(date.month, newYear);
   const newDay = Math.min(date.day, maxDays);
   return { year: newYear, month: date.month, day: newDay, hour: date.hour, minute: date.minute };
 }
@@ -249,8 +247,7 @@ export function isValidDate(date) {
   const calendar = CalendarManager.getActiveCalendar();
   if (!calendar) return true;
   if (date.month < 0 || date.month >= calendar.months.length) return false;
-  const monthData = calendar.months[date.month];
-  const maxDays = monthData?.days ?? 30;
+  const maxDays = calendar.getDaysInMonth(date.month, date.year);
   if (date.day < 1 || date.day > maxDays) return false;
   if (date.hour !== undefined) {
     const hoursPerDay = calendar.hours ?? 24;
