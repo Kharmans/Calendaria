@@ -30,7 +30,7 @@ Registered as `calendaria.darknessSync` (boolean, default `true`).
 
 ### Per-Scene Override
 
-A dropdown is injected into the Scene Configuration sheet (Ambiance tab):
+A dropdown is injected into the Scene Configuration sheet (Lighting tab):
 
 | Value | Behavior |
 |-------|----------|

@@ -1737,7 +1737,7 @@
   "CALENDARIA.Scene.DarknessSync.Choices.Default": "Use Global Setting",
   "CALENDARIA.Scene.DarknessSync.Choices.Disabled": "Disabled",
   "CALENDARIA.Scene.DarknessSync.Choices.Enabled": "Enabled",
-  "CALENDARIA.Scene.DarknessSync.Hint": "Override the global setting to sync this scene's darkness level with the position of the sun.",
+  "CALENDARIA.Scene.DarknessSync.Hint": "Allow Calendaria to override the global setting to sync this scene's darkness level with the position of the sun.",
   "CALENDARIA.Scene.DarknessSync.Name": "Sync Darkness with Time",
   "CALENDARIA.Search.GMOnly": "GM Only",
   "CALENDARIA.Search.NoResults": "No results found",
