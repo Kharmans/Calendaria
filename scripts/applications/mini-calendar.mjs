@@ -167,7 +167,9 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     context.running = TimeKeeper.running;
     const components = game.time.components;
     const yearZero = calendar?.years?.yearZero ?? 0;
-    context.currentTime = calendar ? formatForLocation(calendar, { ...components, year: components.year + yearZero, dayOfMonth: (components.dayOfMonth ?? 0) + 1 }, 'miniCalendarTime') : TimeKeeper.getFormattedTime();
+    context.currentTime = calendar
+      ? formatForLocation(calendar, { ...components, year: components.year + yearZero, dayOfMonth: (components.dayOfMonth ?? 0) + 1 }, 'miniCalendarTime')
+      : TimeKeeper.getFormattedTime();
     context.currentDate = TimeKeeper.getFormattedDate();
     context.increments = Object.entries(getTimeIncrements()).map(([key, seconds]) => ({ key, label: this.#formatIncrementLabel(key), seconds, selected: key === TimeKeeper.incrementKey }));
 
@@ -350,13 +352,13 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     // Fill remaining slots with next month days (either completing partial week or starting fresh after intercalary)
-    const lastRegularWeek = weeks.filter(w => !w.isIntercalaryRow).pop();
+    const lastRegularWeek = weeks.filter((w) => !w.isIntercalaryRow).pop();
     const needsNextMonth = intercalaryDays.length > 0 || (lastRegularWeek && lastRegularWeek.length < daysInWeek);
 
     if (needsNextMonth) {
       const totalMonths = calendar.months?.values?.length ?? 12;
       // For intercalary, fill a complete row; otherwise fill remaining slots
-      let remainingSlots = intercalaryDays.length > 0 ? daysInWeek : (daysInWeek - (lastRegularWeek?.length || 0));
+      let remainingSlots = intercalaryDays.length > 0 ? daysInWeek : daysInWeek - (lastRegularWeek?.length || 0);
       let checkMonth = month;
       let checkYear = year;
       let dayInMonth = 1;
@@ -573,6 +575,15 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!this.#hooks.some((h) => h.name === HOOKS.CLOCK_START_STOP)) this.#hooks.push({ name: HOOKS.CLOCK_START_STOP, id: Hooks.on(HOOKS.CLOCK_START_STOP, this.#onClockStateChange.bind(this)) });
     const container = this.element.querySelector('.mini-calendar-container');
     const sidebar = this.element.querySelector('.mini-sidebar');
+
+    // Double-click on container opens full CalendarApplication
+    container?.addEventListener('dblclick', (e) => {
+      if (e.target.closest('button, a, input, select, [data-action]')) return;
+      e.preventDefault();
+      MiniCalendar.hide();
+      new CalendarApplication().render(true);
+    });
+
     if (container && sidebar) {
       container.addEventListener('mouseenter', () => {
         clearTimeout(this.#sidebarTimeout);
@@ -681,16 +692,15 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#hooks.push({ name: 'calendaria.displayFormatsChanged', id: Hooks.on('calendaria.displayFormatsChanged', () => this.render()) });
 
     // Right-click context menu for close
-    new foundry.applications.ux.ContextMenu.implementation(this.element, '.mini-calendar-container', [
-      {
-        name: 'CALENDARIA.Common.Close',
-        icon: '<i class="fas fa-times"></i>',
-        callback: () => MiniCalendar.hide()
-      }
-    ], { fixed: true, jQuery: false });
+    new foundry.applications.ux.ContextMenu.implementation(
+      this.element,
+      '.mini-calendar-container',
+      [{ name: 'CALENDARIA.Common.Close', icon: '<i class="fas fa-times"></i>', callback: () => MiniCalendar.hide() }],
+      { fixed: true, jQuery: false }
+    );
   }
 
-  /** @override - Disable animation to avoid 1000ms _awaitTransition timeout */
+  /** @override */
   async close(options = {}) {
     // Prevent non-GMs from closing if force display is enabled
     if (!game.user.isGM && game.settings.get(MODULE.ID, SETTINGS.FORCE_MINI_CALENDAR)) {
@@ -1461,6 +1471,6 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * Called when settings change externally (e.g., from settings panel).
    */
   static refreshStickyStates() {
-    this._instance?.#restoreStickyStates();
+    this._instance.#restoreStickyStates();
   }
 }

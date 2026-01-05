@@ -316,6 +316,14 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     this._resizeHandler = this.#onWindowResize.bind(this);
     window.addEventListener('resize', this._resizeHandler);
 
+    // Double-click on bar toggles compact/fullsize mode
+    const bar = this.element.querySelector('.calendaria-hud-bar');
+    bar?.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      const newMode = this.isCompact ? 'fullsize' : 'compact';
+      game.settings.set(MODULE.ID, SETTINGS.CALENDAR_HUD_MODE, newMode);
+    });
+
     // Right-click context menu for close (on bar area)
     new foundry.applications.ux.ContextMenu.implementation(this.element, '.calendaria-hud-bar', [
       {

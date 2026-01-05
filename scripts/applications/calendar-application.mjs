@@ -814,6 +814,13 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     super._onRender(context, options);
     this.element.classList.remove('view-month', 'view-week', 'view-year');
     this.element.classList.add(`view-${this._displayMode}`);
+    const content = this.element.querySelector('.window-content');
+    content?.addEventListener('dblclick', (e) => {
+      if (e.target.closest('button, a, input, select, [data-action], .calendar-day, .note-item, .event-block, .multi-day-event')) return;
+      e.preventDefault();
+      this.close();
+      MiniCalendar.show();
+    });
     const searchInput = this.element.querySelector('.search-input');
     if (searchInput) {
       if (this._searchOpen) searchInput.focus();
