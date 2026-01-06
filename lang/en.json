@@ -1318,6 +1318,7 @@
   "CALENDARIA.Format.Months": "months",
   "CALENDARIA.Format.PlayerFormat": "Player Format",
   "CALENDARIA.Format.Preset.ApproxDate": "Approximate Date (Early Spring)",
+  "CALENDARIA.Format.Preset.CalendarDefault": "{calendar} Default",
   "CALENDARIA.Format.Preset.ApproxTime": "Approximate Time (Noon, Dusk)",
   "CALENDARIA.Format.Preset.Custom": "Custom...",
   "CALENDARIA.Format.Preset.DateTime": "Date + Time 24h",

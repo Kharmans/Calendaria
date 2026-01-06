@@ -9,7 +9,7 @@ import { BUNDLED_CALENDARS } from '../../calendar/calendar-loader.mjs';
 import CalendarManager from '../../calendar/calendar-manager.mjs';
 import { MODULE, SETTINGS, TEMPLATES } from '../../constants.mjs';
 import TimeKeeper, { getTimeIncrements } from '../../time/time-keeper.mjs';
-import { localize } from '../../utils/localization.mjs';
+import { format, localize } from '../../utils/localization.mjs';
 import { log } from '../../utils/logger.mjs';
 import { COLOR_CATEGORIES, COLOR_DEFINITIONS, COMPONENT_CATEGORIES, DEFAULT_COLORS, applyCustomColors, applyPreset } from '../../utils/theme-utils.mjs';
 import WeatherManager from '../../weather/weather-manager.mjs';
@@ -377,7 +377,21 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   async #prepareFormatsContext(context) {
     const displayFormats = game.settings.get(MODULE.ID, SETTINGS.DISPLAY_FORMATS);
+
+    // Get active calendar name for "Calendar Default" option
+    const calendar = CalendarManager.getActiveCalendar();
+    const calendarName = calendar?.metadata?.id
+      ? localize(
+          `CALENDARIA.Calendar.${calendar.metadata.id
+            .split('-')
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+            .join('')}.Name`
+        )
+      : localize('CALENDARIA.Common.Calendar');
+    const calendarDefaultLabel = format('CALENDARIA.Format.Preset.CalendarDefault', { calendar: calendarName });
+
     const presetOptions = [
+      { value: 'calendarDefault', label: calendarDefaultLabel },
       { value: 'short', label: localize('CALENDARIA.Format.Preset.Short') },
       { value: 'long', label: localize('CALENDARIA.Format.Preset.Long') },
       { value: 'full', label: localize('CALENDARIA.Format.Preset.Full') },
@@ -408,15 +422,11 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
 
     context.formatLocations = locations.map((loc) => {
       const formats = displayFormats[loc.id] || { gm: 'long', player: 'long' };
-      const knownPresets = ['off', 'short', 'long', 'full', 'ordinal', 'fantasy', 'time', 'time12', 'approxTime', 'approxDate', 'datetime', 'datetime12'];
+      const knownPresets = ['off', 'calendarDefault', 'short', 'long', 'full', 'ordinal', 'fantasy', 'time', 'time12', 'approxTime', 'approxDate', 'datetime', 'datetime12'];
       const isCustomGM = !knownPresets.includes(formats.gm);
       const isCustomPlayer = !knownPresets.includes(formats.player);
-
-      // Build preset options, adding "Off" for supported locations
       let locationPresets = [...presetOptions];
-      if (supportsOff.includes(loc.id)) {
-        locationPresets = [{ value: 'off', label: localize('CALENDARIA.Format.Preset.Off') }, ...locationPresets];
-      }
+      if (supportsOff.includes(loc.id)) locationPresets = [{ value: 'off', label: localize('CALENDARIA.Format.Preset.Off') }, ...locationPresets];
 
       return {
         ...loc,

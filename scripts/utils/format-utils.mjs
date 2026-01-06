@@ -55,8 +55,8 @@ export function dateFormattingParts(calendar, components) {
   const displayYear = year;
   const isMonthless = calendar?.isMonthless ?? false;
   const monthData = isMonthless ? null : calendar?.months?.values?.[month];
-  const monthName = isMonthless ? '' : (monthData ? localize(monthData.name) : `Month ${month + 1}`);
-  const monthAbbr = isMonthless ? '' : (monthData?.abbreviation ? localize(monthData.abbreviation) : monthName.slice(0, 3));
+  const monthName = isMonthless ? '' : monthData ? localize(monthData.name) : `Month ${month + 1}`;
+  const monthAbbr = isMonthless ? '' : monthData?.abbreviation ? localize(monthData.abbreviation) : monthName.slice(0, 3);
   const weekdays = calendar?.days?.values || [];
   const daysInMonthsBefore = isMonthless ? 0 : (calendar?.months?.values || []).slice(0, month).reduce((sum, m) => sum + (m.days || 0), 0);
   const dayOfYear = isMonthless ? dayOfMonth : daysInMonthsBefore + dayOfMonth;
@@ -670,6 +670,21 @@ export const DEFAULT_FORMAT_PRESETS = {
 /* -------------------------------------------- */
 
 /**
+ * Map location IDs to their corresponding calendar dateFormat key.
+ * Used for "Calendar Default" preset resolution.
+ */
+const LOCATION_FORMAT_KEYS = {
+  hudDate: 'long',
+  hudTime: 'time',
+  timekeeperDate: 'long',
+  timekeeperTime: 'time',
+  miniCalendarHeader: 'long',
+  miniCalendarTime: 'time',
+  fullCalendarHeader: 'full',
+  chatTimestamp: 'long'
+};
+
+/**
  * Get the format string/preset for a specific display location.
  * Automatically selects GM or player format based on user role.
  * @param {string} locationId - Location identifier
@@ -692,6 +707,18 @@ export function getDisplayFormat(locationId) {
 }
 
 /**
+ * Resolve "calendarDefault" preset to the actual format string from calendar data.
+ * @param {object} calendar - Calendar data with dateFormats
+ * @param {string} locationId - Location identifier to map to format key
+ * @returns {string} - Resolved format string or fallback preset name
+ */
+function resolveCalendarDefault(calendar, locationId) {
+  const formatKey = LOCATION_FORMAT_KEYS[locationId] || 'long';
+  const calendarFormat = calendar?.dateFormats?.[formatKey];
+  return calendarFormat || formatKey;
+}
+
+/**
  * Format date/time for a specific display location.
  * Automatically handles GM vs player format selection.
  * @param {object} calendar - Calendar data
@@ -700,14 +727,9 @@ export function getDisplayFormat(locationId) {
  * @returns {string} - Formatted date/time string
  */
 export function formatForLocation(calendar, components, locationId) {
-  const formatSetting = getDisplayFormat(locationId);
-
-  // Check if it's a preset name with a dedicated formatter
-  if (PRESET_FORMATTERS[formatSetting]) {
-    return PRESET_FORMATTERS[formatSetting](calendar, components);
-  }
-
-  // Custom format string - use token-based formatting
+  let formatSetting = getDisplayFormat(locationId);
+  if (formatSetting === 'calendarDefault') formatSetting = resolveCalendarDefault(calendar, locationId);
+  if (PRESET_FORMATTERS[formatSetting]) return PRESET_FORMATTERS[formatSetting](calendar, components);
   return formatCustom(calendar, components, formatSetting);
 }
 
