@@ -13,6 +13,7 @@ import TimeKeeper, { getTimeIncrements } from '../time/time-keeper.mjs';
 import { formatForLocation } from '../utils/format-utils.mjs';
 import { localize } from '../utils/localization.mjs';
 import { log } from '../utils/logger.mjs';
+import * as StickyZones from '../utils/sticky-zones.mjs';
 import WeatherManager from '../weather/weather-manager.mjs';
 import { openWeatherPicker } from '../weather/weather-picker.mjs';
 import { CalendarApplication } from './calendar-application.mjs';
@@ -89,6 +90,12 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** @type {boolean} Whether combat is currently active */
   #inCombat = false;
+
+  /** @type {object|null} Currently active sticky zone during drag */
+  #activeSnapZone = null;
+
+  /** @type {string|null} ID of zone HUD is currently snapped to */
+  #snappedZoneId = null;
 
   /** @override */
   static DEFAULT_OPTIONS = {
@@ -193,17 +200,12 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
     context.time = this.#formatTime(components);
     context.dateDisplay = this.#formatDateDisplay(components);
-
-    // Block visibility settings
     const showWeatherBlock = game.settings.get(MODULE.ID, SETTINGS.HUD_SHOW_WEATHER);
     const showSeasonBlock = game.settings.get(MODULE.ID, SETTINGS.HUD_SHOW_SEASON);
     const showEraBlock = game.settings.get(MODULE.ID, SETTINGS.HUD_SHOW_ERA);
     const isCompact = this.isCompact;
-
-    // Compact mode forces icon-only display
     const weatherDisplayMode = isCompact ? 'icon' : game.settings.get(MODULE.ID, SETTINGS.HUD_WEATHER_DISPLAY_MODE);
     const seasonDisplayMode = isCompact ? 'icon' : game.settings.get(MODULE.ID, SETTINGS.HUD_SEASON_DISPLAY_MODE);
-
     const season = calendar?.getCurrentSeason?.();
     context.currentSeason = showSeasonBlock && season ? { name: localize(season.name), color: season.color || '#888', icon: season.icon || 'fas fa-sun' } : null;
     context.showSeasonIcon = seasonDisplayMode === 'full' || seasonDisplayMode === 'icon';
@@ -211,9 +213,7 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const era = calendar?.getCurrentEra?.();
     context.currentEra = showEraBlock && era ? { name: localize(era.name), abbreviation: localize(era.abbreviation || era.name) } : null;
     const cycleData = calendar?.getCycleValues?.();
-    context.cycleText = showEraBlock ? (cycleData?.text || null) : null;
-
-    // Weather with display mode
+    context.cycleText = showEraBlock ? cycleData?.text || null : null;
     const weatherData = this.#getWeatherContext();
     context.weather = showWeatherBlock ? weatherData : null;
     context.showWeatherBlock = showWeatherBlock;
@@ -227,22 +227,12 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     context.firstEventColor = this.#liveEvents[0]?.color || null;
     context.currentEvent = this.#liveEvents.length > 0 ? this.#liveEvents[0] : null;
     context.increments = Object.entries(getTimeIncrements()).map(([key, seconds]) => ({ key, label: this.#formatIncrementLabel(key), seconds, selected: key === appSettings.incrementKey }));
-
-    // Custom time jump buttons for current increment
     const customJumps = game.settings.get(MODULE.ID, SETTINGS.CUSTOM_TIME_JUMPS) || {};
     const currentJumps = customJumps[appSettings.incrementKey] || {};
-    context.customJumps = {
-      dec2: currentJumps.dec2 || null,
-      dec1: currentJumps.dec1 || null,
-      inc1: currentJumps.inc1 || null,
-      inc2: currentJumps.inc2 || null
-    };
-
+    context.customJumps = { dec2: currentJumps.dec2 || null, dec1: currentJumps.dec1 || null, inc1: currentJumps.inc1 || null, inc2: currentJumps.inc2 || null };
     context.searchOpen = this.#searchOpen;
     context.searchTerm = this.#searchTerm;
     context.searchResults = this.#searchResults || [];
-
-    // Dial mode - dome vs slice
     context.useSliceMode = this.useSliceMode;
     context.inCombat = this.#inCombat;
     return context;
@@ -253,8 +243,10 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     super._onRender(context, options);
     this.element.classList.toggle('compact', this.isCompact);
     this.element.classList.toggle('slice-mode', this.useSliceMode);
-    this.#restorePosition();
-    this.#enableDragging();
+    if (options.isFirstRender) {
+      this.#restorePosition();
+      this.#enableDragging();
+    }
     this.#updateCelestialDisplay();
     this.#updateDomeVisibility();
     this.#setupEventListeners();
@@ -275,10 +267,6 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       id: Hooks.on('updateJournalEntryPage', (page) => {
         if (page.type === 'calendaria.calendarnote') debouncedRender();
       })
-    });
-    this.#hooks.push({
-      name: 'collapseSidebar',
-      id: Hooks.on('collapseSidebar', () => this.#clampToViewport())
     });
     this.#hooks.push({
       name: 'calendaria.displayFormatsChanged',
@@ -325,7 +313,6 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       Hooks.off('updateWorldTime', this.#timeHookId);
       this.#timeHookId = null;
     }
-    if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
     if (this.#clickOutsideHandler) {
       document.removeEventListener('mousedown', this.#clickOutsideHandler);
       this.#clickOutsideHandler = null;
@@ -334,6 +321,9 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       this.#searchPanelEl.remove();
       this.#searchPanelEl = null;
     }
+    StickyZones.unregisterFromZoneUpdates(this);
+    StickyZones.unpinFromZone(this.element);
+    StickyZones.cleanupSnapIndicator();
     this.#hooks.forEach((hook) => Hooks.off(hook.name, hook.id));
     this.#hooks = [];
     await super._onClose(options);
@@ -378,9 +368,6 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     }
 
-    this._resizeHandler = this.#onWindowResize.bind(this);
-    window.addEventListener('resize', this._resizeHandler);
-
     // Double-click on bar toggles compact/fullsize mode
     const bar = this.element.querySelector('.calendaria-hud-bar');
     bar?.addEventListener('dblclick', (e) => {
@@ -390,21 +377,12 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     });
 
     // Right-click context menu for close (on bar area)
-    new foundry.applications.ux.ContextMenu.implementation(this.element, '.calendaria-hud-bar', [
-      {
-        name: 'CALENDARIA.Common.Close',
-        icon: '<i class="fas fa-times"></i>',
-        callback: () => CalendariaHUD.hide()
-      }
-    ], { fixed: true, jQuery: false });
-  }
-
-  /**
-   * Handle window resize events.
-   */
-  #onWindowResize() {
-    this.#updateDomeVisibility();
-    this.#clampToViewport();
+    new foundry.applications.ux.ContextMenu.implementation(
+      this.element,
+      '.calendaria-hud-bar',
+      [{ name: 'CALENDARIA.Common.Close', icon: '<i class="fas fa-times"></i>', callback: () => CalendariaHUD.hide() }],
+      { fixed: true, jQuery: false }
+    );
   }
 
   /* -------------------------------------------- */
@@ -485,6 +463,22 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   #restorePosition() {
     const savedPos = game.settings.get(MODULE.ID, SETTINGS.CALENDAR_HUD_POSITION);
     if (savedPos && typeof savedPos.top === 'number' && typeof savedPos.left === 'number') {
+      this.#snappedZoneId = savedPos.zoneId || null;
+      if (this.#snappedZoneId && StickyZones.restorePinnedState(this.element, this.#snappedZoneId)) {
+        StickyZones.registerForZoneUpdates(this, this.#snappedZoneId);
+        return;
+      }
+
+      if (this.#snappedZoneId) {
+        const rect = this.element.getBoundingClientRect();
+        const zonePos = StickyZones.getRestorePosition(this.#snappedZoneId, rect.width, rect.height);
+        if (zonePos) {
+          this.setPosition({ left: zonePos.left, top: zonePos.top });
+          StickyZones.registerForZoneUpdates(this, this.#snappedZoneId);
+          return;
+        }
+      }
+
       this.setPosition({ left: savedPos.left, top: savedPos.top });
     } else {
       const rect = this.element.getBoundingClientRect();
@@ -496,7 +490,7 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Clamp position to viewport, accounting for sidebar.
+   * Clamp position to viewport.
    */
   #clampToViewport() {
     const rect = this.element.getBoundingClientRect();
@@ -519,13 +513,16 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     let dragStartY = 0;
     let elementStartLeft = 0;
     let elementStartTop = 0;
+    let previousZoneId = null;
     const originalMouseDown = drag._onDragMouseDown.bind(drag);
     drag._onDragMouseDown = (event) => {
       if (this.isLocked) return;
       if (this.#searchOpen) this.#closeSearch();
+      previousZoneId = this.#snappedZoneId;
       const rect = this.element.getBoundingClientRect();
       elementStartLeft = rect.left;
       elementStartTop = rect.top;
+      this.setPosition({ left: elementStartLeft, top: elementStartTop });
       dragStartX = event.clientX;
       dragStartY = event.clientY;
       dragHandle.classList.add('dragging');
@@ -549,6 +546,7 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       newTop = Math.max(0, Math.min(newTop, window.innerHeight - rect.height));
       this.setPosition({ left: newLeft, top: newTop });
       this.#updateDomeVisibility();
+      this.#activeSnapZone = StickyZones.checkStickyZones(dragHandle, newLeft, newTop, rect.width, rect.height);
     };
 
     drag._onDragMouseUp = async (event) => {
@@ -556,7 +554,13 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       window.removeEventListener(...drag.handlers.dragMove);
       window.removeEventListener(...drag.handlers.dragUp);
       dragHandle.classList.remove('dragging');
-      await game.settings.set(MODULE.ID, SETTINGS.CALENDAR_HUD_POSITION, { left: this.position.left, top: this.position.top });
+      const rect = this.element.getBoundingClientRect();
+      const result = StickyZones.finalizeDrag(dragHandle, this.#activeSnapZone, this, rect.width, rect.height, previousZoneId);
+      this.#snappedZoneId = result.zoneId;
+      StickyZones.registerForZoneUpdates(this, this.#snappedZoneId);
+      this.#activeSnapZone = null;
+      previousZoneId = null;
+      await game.settings.set(MODULE.ID, SETTINGS.CALENDAR_HUD_POSITION, { left: this.position.left, top: this.position.top, zoneId: this.#snappedZoneId });
     };
   }
 

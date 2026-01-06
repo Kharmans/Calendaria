@@ -14,6 +14,7 @@ import { MODULE, SETTINGS } from './constants.mjs';
 import { migrateCustomCalendars, migrateIntercalaryFestivals } from './utils/format-utils.mjs';
 import { localize } from './utils/localization.mjs';
 import { log } from './utils/logger.mjs';
+import * as StickyZones from './utils/sticky-zones.mjs';
 
 const { ArrayField, ObjectField, BooleanField, NumberField, StringField } = foundry.data.fields;
 
@@ -220,6 +221,15 @@ export function registerSettings() {
   game.settings.register(MODULE.ID, SETTINGS.HUD_COMBAT_COMPACT, {
     name: 'CALENDARIA.Settings.HUDCombatCompact.Name',
     hint: 'CALENDARIA.Settings.HUDCombatCompact.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true })
+  });
+
+  /** Calendar HUD sticky zones enabled */
+  game.settings.register(MODULE.ID, SETTINGS.HUD_STICKY_ZONES_ENABLED, {
+    name: 'CALENDARIA.Settings.HUDStickyZones.Name',
+    hint: 'CALENDARIA.Settings.HUDStickyZones.Hint',
     scope: 'user',
     config: false,
     type: new BooleanField({ initial: true })
@@ -572,7 +582,11 @@ export function registerSettings() {
     name: 'Dev Mode',
     scope: 'world',
     config: false,
-    type: new BooleanField({ initial: false })
+    type: new BooleanField({ initial: false }),
+    onChange: (enabled) => {
+      if (enabled) StickyZones.showDebugZones();
+      else StickyZones.hideDebugZones();
+    }
   });
 
   /** Logging level configuration for debug output */

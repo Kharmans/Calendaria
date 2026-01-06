@@ -162,6 +162,14 @@
   <fieldset>
     <legend>{{localize "CALENDARIA.SettingsPanel.Section.Position"}}</legend>
 
+    <div class="form-group">
+      <label>{{localize "CALENDARIA.Settings.HUDStickyZones.Name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="hudStickyZonesEnabled" {{#if hudStickyZonesEnabled}}checked{{/if}}>
+      </div>
+      <p class="hint">{{localize "CALENDARIA.Settings.HUDStickyZones.Hint"}}</p>
+    </div>
+
     <div class="button-row">
       <button type="button" data-action="resetPosition" data-target="hud">
         <i class="fas fa-undo"></i>

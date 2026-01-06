@@ -10,6 +10,7 @@ import { HOOKS, MODULE, SETTINGS, TEMPLATES } from '../constants.mjs';
 import TimeKeeper, { getTimeIncrements } from '../time/time-keeper.mjs';
 import { formatForLocation, getDisplayFormat } from '../utils/format-utils.mjs';
 import { localize } from '../utils/localization.mjs';
+import * as StickyZones from '../utils/sticky-zones.mjs';
 import { SettingsPanel } from './settings/settings-panel.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -24,19 +25,19 @@ export class TimeKeeperHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @type {number|null} Hook ID for clock state changes */
   #clockHookId = null;
 
+  /** @type {object|null} Currently active sticky zone during drag */
+  #activeSnapZone = null;
+
+  /** @type {string|null} ID of zone HUD is currently snapped to */
+  #snappedZoneId = null;
+
   /** @override */
   static DEFAULT_OPTIONS = {
     id: 'time-keeper-hud',
     classes: ['calendaria', 'time-keeper-hud'],
     position: { width: 200, height: 'auto', zIndex: 100 },
     window: { frame: false, positioned: true },
-    actions: {
-      dec2: TimeKeeperHUD.#onDec2,
-      dec1: TimeKeeperHUD.#onDec1,
-      inc1: TimeKeeperHUD.#onInc1,
-      inc2: TimeKeeperHUD.#onInc2,
-      toggle: TimeKeeperHUD.#onToggle
-    }
+    actions: { dec2: TimeKeeperHUD.#onDec2, dec1: TimeKeeperHUD.#onDec1, inc1: TimeKeeperHUD.#onInc1, inc2: TimeKeeperHUD.#onInc2, toggle: TimeKeeperHUD.#onToggle }
   };
 
   /** @override */
@@ -67,8 +68,10 @@ export class TimeKeeperHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   _onRender(context, options) {
     super._onRender(context, options);
-    this.#restorePosition();
-    this.#enableDragging();
+    if (options.isFirstRender) {
+      this.#restorePosition();
+      this.#enableDragging();
+    }
     this.element.querySelector('[data-action="increment"]')?.addEventListener('change', (e) => {
       TimeKeeper.setIncrement(e.target.value);
       this.#updateJumpTooltips();
@@ -93,8 +96,41 @@ export class TimeKeeperHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   #restorePosition() {
     const savedPos = game.settings.get(MODULE.ID, SETTINGS.TIME_KEEPER_POSITION);
-    if (savedPos && typeof savedPos.top === 'number' && typeof savedPos.left === 'number') this.setPosition({ left: savedPos.left, top: savedPos.top });
-    else this.setPosition({ left: 120, top: 120 });
+    if (savedPos && typeof savedPos.top === 'number' && typeof savedPos.left === 'number') {
+      this.#snappedZoneId = savedPos.zoneId || null;
+
+      if (this.#snappedZoneId && StickyZones.restorePinnedState(this.element, this.#snappedZoneId)) {
+        StickyZones.registerForZoneUpdates(this, this.#snappedZoneId);
+        return;
+      }
+
+      if (this.#snappedZoneId) {
+        const rect = this.element.getBoundingClientRect();
+        const zonePos = StickyZones.getRestorePosition(this.#snappedZoneId, rect.width, rect.height);
+        if (zonePos) {
+          this.setPosition({ left: zonePos.left, top: zonePos.top });
+          StickyZones.registerForZoneUpdates(this, this.#snappedZoneId);
+          return;
+        }
+      }
+
+      this.setPosition({ left: savedPos.left, top: savedPos.top });
+    } else {
+      this.setPosition({ left: 120, top: 120 });
+    }
+    this.#clampToViewport();
+  }
+
+  /**
+   * Clamp position to viewport bounds.
+   * @private
+   */
+  #clampToViewport() {
+    const rect = this.element.getBoundingClientRect();
+    let { left, top } = this.position;
+    left = Math.max(0, Math.min(left, window.innerWidth - rect.width));
+    top = Math.max(0, Math.min(top, window.innerHeight - rect.height));
+    this.setPosition({ left, top });
   }
 
   /**
@@ -109,8 +145,10 @@ export class TimeKeeperHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     let dragStartY = 0;
     let elementStartLeft = 0;
     let elementStartTop = 0;
+    let previousZoneId = null;
     const originalMouseDown = drag._onDragMouseDown.bind(drag);
     drag._onDragMouseDown = (event) => {
+      previousZoneId = this.#snappedZoneId;
       const rect = this.element.getBoundingClientRect();
       elementStartLeft = rect.left;
       elementStartTop = rect.top;
@@ -133,20 +171,30 @@ export class TimeKeeperHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - rect.width));
       newTop = Math.max(0, Math.min(newTop, window.innerHeight - rect.height));
       this.setPosition({ left: newLeft, top: newTop });
+      this.#activeSnapZone = StickyZones.checkStickyZones(dragHandle, newLeft, newTop, rect.width, rect.height);
     };
 
     drag._onDragMouseUp = async (event) => {
       event.preventDefault();
       window.removeEventListener(...drag.handlers.dragMove);
       window.removeEventListener(...drag.handlers.dragUp);
-      await game.settings.set(MODULE.ID, SETTINGS.TIME_KEEPER_POSITION, { left: this.position.left, top: this.position.top });
+      const rect = this.element.getBoundingClientRect();
+      const result = StickyZones.finalizeDrag(dragHandle, this.#activeSnapZone, this, rect.width, rect.height, previousZoneId);
+      this.#snappedZoneId = result.zoneId;
+      StickyZones.registerForZoneUpdates(this, this.#snappedZoneId);
+      this.#activeSnapZone = null;
+      previousZoneId = null;
+      await game.settings.set(MODULE.ID, SETTINGS.TIME_KEEPER_POSITION, { left: this.position.left, top: this.position.top, zoneId: this.#snappedZoneId });
     };
   }
 
   /** @override */
   _onClose(options) {
     const pos = this.position;
-    if (pos.top != null && pos.left != null) game.settings.set(MODULE.ID, SETTINGS.TIME_KEEPER_POSITION, { top: pos.top, left: pos.left });
+    if (pos.top != null && pos.left != null) game.settings.set(MODULE.ID, SETTINGS.TIME_KEEPER_POSITION, { top: pos.top, left: pos.left, zoneId: this.#snappedZoneId });
+    StickyZones.unregisterFromZoneUpdates(this);
+    StickyZones.unpinFromZone(this.element);
+    StickyZones.cleanupSnapIndicator();
     super._onClose(options);
     if (this.#timeHookId) {
       Hooks.off('updateWorldTime', this.#timeHookId);

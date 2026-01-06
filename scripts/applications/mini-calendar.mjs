@@ -14,6 +14,7 @@ import SearchManager from '../search/search-manager.mjs';
 import TimeKeeper, { getTimeIncrements } from '../time/time-keeper.mjs';
 import { formatForLocation } from '../utils/format-utils.mjs';
 import { localize } from '../utils/localization.mjs';
+import * as StickyZones from '../utils/sticky-zones.mjs';
 import WeatherManager from '../weather/weather-manager.mjs';
 import { openWeatherPicker } from '../weather/weather-picker.mjs';
 import { CalendarApplication } from './calendar-application.mjs';
@@ -70,6 +71,12 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** @type {boolean} Notes panel visibility state */
   #notesPanelVisible = false;
+
+  /** @type {object|null} Currently active sticky zone during drag */
+  #activeSnapZone = null;
+
+  /** @type {string|null} ID of zone HUD is currently snapped to */
+  #snappedZoneId = null;
 
   /** @type {boolean} Whether sidebar is locked due to notes panel */
   #sidebarLocked = false;
@@ -566,8 +573,10 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   _onRender(context, options) {
     super._onRender(context, options);
-    this.#restorePosition();
-    this.#enableDragging();
+    if (options.isFirstRender) {
+      this.#restorePosition();
+      this.#enableDragging();
+    }
     this.element.querySelector('[data-action="increment"]')?.addEventListener('change', (event) => {
       TimeKeeper.setIncrement(event.target.value);
     });
@@ -722,6 +731,9 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       document.removeEventListener('mousedown', this.#clickOutsideHandler);
       this.#clickOutsideHandler = null;
     }
+    StickyZones.unregisterFromZoneUpdates(this);
+    StickyZones.unpinFromZone(this.element);
+    StickyZones.cleanupSnapIndicator();
     await super._onClose(options);
   }
 
@@ -735,6 +747,22 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   #restorePosition() {
     const savedPos = game.settings.get(MODULE.ID, SETTINGS.MINI_CALENDAR_POSITION);
     if (savedPos && typeof savedPos.top === 'number' && typeof savedPos.left === 'number') {
+      this.#snappedZoneId = savedPos.zoneId || null;
+      if (this.#snappedZoneId && StickyZones.restorePinnedState(this.element, this.#snappedZoneId)) {
+        StickyZones.registerForZoneUpdates(this, this.#snappedZoneId);
+        return;
+      }
+
+      if (this.#snappedZoneId) {
+        const rect = this.element.getBoundingClientRect();
+        const zonePos = StickyZones.getRestorePosition(this.#snappedZoneId, rect.width, rect.height);
+        if (zonePos) {
+          this.setPosition({ left: zonePos.left, top: zonePos.top });
+          StickyZones.registerForZoneUpdates(this, this.#snappedZoneId);
+          return;
+        }
+      }
+
       this.setPosition({ left: savedPos.left, top: savedPos.top });
     } else {
       const rect = this.element.getBoundingClientRect();
@@ -744,6 +772,18 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       const top = playersTop - rect.height - 16;
       this.setPosition({ left, top });
     }
+    this.#clampToViewport();
+  }
+
+  /**
+   * Clamp position to viewport bounds.
+   */
+  #clampToViewport() {
+    const rect = this.element.getBoundingClientRect();
+    let { left, top } = this.position;
+    left = Math.max(0, Math.min(left, window.innerWidth - rect.width));
+    top = Math.max(0, Math.min(top, window.innerHeight - rect.height));
+    this.setPosition({ left, top });
   }
 
   /**
@@ -793,9 +833,11 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     let dragStartY = 0;
     let elementStartLeft = 0;
     let elementStartTop = 0;
+    let previousZoneId = null;
     const originalMouseDown = drag._onDragMouseDown.bind(drag);
     drag._onDragMouseDown = (event) => {
       if (this.#stickyPosition) return;
+      previousZoneId = this.#snappedZoneId;
       const rect = this.element.getBoundingClientRect();
       elementStartLeft = rect.left;
       elementStartTop = rect.top;
@@ -818,13 +860,20 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - rect.width));
       newTop = Math.max(0, Math.min(newTop, window.innerHeight - rect.height));
       this.setPosition({ left: newLeft, top: newTop });
+      this.#activeSnapZone = StickyZones.checkStickyZones(dragHandle, newLeft, newTop, rect.width, rect.height);
     };
 
     drag._onDragMouseUp = async (event) => {
       event.preventDefault();
       window.removeEventListener(...drag.handlers.dragMove);
       window.removeEventListener(...drag.handlers.dragUp);
-      await game.settings.set(MODULE.ID, SETTINGS.MINI_CALENDAR_POSITION, { left: this.position.left, top: this.position.top });
+      const rect = this.element.getBoundingClientRect();
+      const result = StickyZones.finalizeDrag(dragHandle, this.#activeSnapZone, this, rect.width, rect.height, previousZoneId);
+      this.#snappedZoneId = result.zoneId;
+      StickyZones.registerForZoneUpdates(this, this.#snappedZoneId);
+      this.#activeSnapZone = null;
+      previousZoneId = null;
+      await game.settings.set(MODULE.ID, SETTINGS.MINI_CALENDAR_POSITION, { left: this.position.left, top: this.position.top, zoneId: this.#snappedZoneId });
     };
   }
 

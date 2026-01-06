@@ -5212,6 +5212,67 @@
   border-color: var(--event-glow, rgb(238 136 136));
 }
 
+/* Wobble animation for sticky zone detection */
+@keyframes calendaria-wobble {
+  0%,
+  100% {
+    transform: rotate(-1.5deg);
+  }
+  50% {
+    transform: rotate(1.5deg);
+  }
+}
+
+.calendaria-hud-bar.near-snap,
+.time-keeper-hud .time-display.near-snap,
+.mini-calendar .mini-top-row.near-snap {
+  animation: calendaria-wobble 0.15s ease-in-out infinite;
+  border-color: var(--calendaria-primary);
+  box-shadow:
+    0 0 10px var(--calendaria-shadow),
+    0 0 8px var(--calendaria-primary);
+}
+
+/* Snap indicator ghost preview */
+.calendaria-snap-indicator {
+  position: fixed;
+  z-index: 59;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 2px dashed var(--calendaria-primary);
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  background: color-mix(in srgb, var(--calendaria-primary) 15%, transparent);
+  transition: opacity 0.15s ease;
+}
+
+.calendaria-snap-indicator.visible {
+  opacity: 1;
+}
+
+.calendaria-snap-indicator::before {
+  content: '';
+  display: block;
+  width: 60px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--calendaria-primary);
+  opacity: 0.5;
+}
+
+/* DOM-parented pinned state */
+.calendaria-pinned {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  margin-bottom: 8px;
+}
+
+
 /* ======================================== */
 /* HUD Sections                             */
 /* ======================================== */

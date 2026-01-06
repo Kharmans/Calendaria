@@ -28,6 +28,7 @@ import TimeTracker from './scripts/time/time-tracker.mjs';
 import { registerKeybindings, toggleCalendarVisibility } from './scripts/utils/keybinds.mjs';
 import { initializeLogger, log } from './scripts/utils/logger.mjs';
 import { CalendariaSocket } from './scripts/utils/socket.mjs';
+import * as StickyZones from './scripts/utils/sticky-zones.mjs';
 import { initializeTheme } from './scripts/utils/theme-utils.mjs';
 import { migrateCustomCalendars } from './scripts/utils/format-utils.mjs';
 import WeatherManager from './scripts/weather/weather-manager.mjs';
@@ -84,6 +85,10 @@ Hooks.once('ready', async () => {
     }
   }
   if (game.settings.get(MODULE.ID, SETTINGS.SHOW_CALENDAR_HUD)) CalendariaHUD.show();
+  if (game.settings.get(MODULE.ID, SETTINGS.DEV_MODE)) StickyZones.showDebugZones();
+
+  // Update below-controls zone when scene controls re-render
+  Hooks.on('renderSceneControls', () => StickyZones.updateZonePositions('below-controls'));
 
   Hooks.callAll(HOOKS.READY, { api: CalendariaAPI, calendar: CalendarManager.getActiveCalendar(), version: game.modules.get('calendaria')?.version });
 });

@@ -333,6 +333,7 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
       { value: 'slice', label: localize('CALENDARIA.Settings.HUDDialStyle.Slice'), selected: dialStyle === 'slice' }
     ];
     context.hudCombatCompact = game.settings.get(MODULE.ID, SETTINGS.HUD_COMBAT_COMPACT);
+    context.hudStickyZonesEnabled = game.settings.get(MODULE.ID, SETTINGS.HUD_STICKY_ZONES_ENABLED);
 
     // Block visibility settings
     context.hudShowWeather = game.settings.get(MODULE.ID, SETTINGS.HUD_SHOW_WEATHER);
@@ -685,6 +686,7 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
 
     if ('hudStickySection' in data) await game.settings.set(MODULE.ID, SETTINGS.HUD_STICKY_STATES, { tray: !!data.hudStickyTray, position: !!data.hudStickyPosition });
     if ('calendarHUDLocked' in data) await game.settings.set(MODULE.ID, SETTINGS.CALENDAR_HUD_LOCKED, data.calendarHUDLocked);
+    if ('hudStickyZonesEnabled' in data) await game.settings.set(MODULE.ID, SETTINGS.HUD_STICKY_ZONES_ENABLED, data.hudStickyZonesEnabled);
 
     // Block visibility settings
     if ('hudShowWeather' in data) await game.settings.set(MODULE.ID, SETTINGS.HUD_SHOW_WEATHER, data.hudShowWeather);
