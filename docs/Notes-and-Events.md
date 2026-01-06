@@ -178,7 +178,7 @@ Available condition fields:
 | Season | season, seasonPercent, seasonDay, isLongestDay, isShortestDay, isSpringEquinox, isAutumnEquinox |
 | Moon | moonPhaseIndex, moonPhaseCountMonth, moonPhaseCountYear |
 | Cycle | cycle (if calendar has cycles) |
-| Era | era, eraYear (if calendar has eras) |
+| Era | era, yearInEra (if calendar has eras) |
 | Other | intercalary (for intercalary days) |
 
 Operators: `==`, `!=`, `>=`, `<=`, `>`, `<`, `%` (modulo)

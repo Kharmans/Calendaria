@@ -8,7 +8,7 @@ Reminders are configured in the note sheet under the **Reminder** fieldset:
 
 | Field | Description |
 |-------|-------------|
-| Offset | Minutes before the event to trigger the reminder (0 = disabled) |
+| Offset | Hours before the event to trigger the reminder (0 = disabled, max 720) |
 | Type | Notification method: toast, chat, or dialog |
 | Targets | Who receives the reminder |
 | Users | Specific user selection (when target is "specific") |
@@ -42,7 +42,7 @@ Modal dialog requiring acknowledgment. Includes "Open Note" and "Dismiss" button
 The `ReminderScheduler` class monitors world time and triggers reminders:
 
 1. Only runs on the GM client
-2. Checks for pending reminders every 5 minutes (300 seconds of game time)
+2. Checks for pending reminders periodically as game time advances
 3. Compares current time against each note's start time minus the offset
 4. Fires reminders when the current time falls within the reminder window (after offset time, before event time)
 5. Tracks fired reminders per day to prevent duplicates

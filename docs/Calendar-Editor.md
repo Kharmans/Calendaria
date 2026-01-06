@@ -244,11 +244,11 @@ Define historical periods for your calendar.
 | **Format** | How years display: Before/After, prefix, suffix, etc. |
 
 ### Era Template
-<!-- TODO: Convert to new formatting system -->
+
 - **Template** — Custom format string for year display using placeholders:
-    - `{{year}}` — The year number
-    - `{{abbreviation}}` — Era abbreviation
-    - Example: `{{year}} {{abbreviation}}` → "1492 DR"
+    - `[year]` — The year number
+    - `[abbreviation]` — Era abbreviation
+    - Example: `[year] [abbreviation]` → "1492 DR"
 - **Preview** — Live preview of the template output
 
 ### Era Controls
@@ -329,12 +329,12 @@ Define the phases of the lunar cycle. Each phase covers a percentage range of th
 ---
 
 ## Cycles Tab
-<!-- TODO: Convert to new formatting system -->
+
 Create repeating patterns like zodiac signs, elemental weeks, or numbered years.
 
 ### Cycle Format
 
-- **Cycle Format** — Template string for displaying cycle values using placeholders like `{{CycleName}}`
+- **Cycle Format** — Template string for displaying cycle values using placeholders like `[1]`, `[2]`, etc.
 
 ### Cycle Fields
 

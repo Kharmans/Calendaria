@@ -29,16 +29,16 @@ Custom templates support these placeholders:
 
 | Placeholder | Description |
 |-------------|-------------|
-| `{{year}}` | Absolute display year |
-| `{{yearInEra}}` | Year within the current era |
-| `{{short}}` / `{{abbreviation}}` | Era abbreviation |
-| `{{era}}` / `{{name}}` | Full era name |
+| `[year]` | Absolute display year |
+| `[yearInEra]` | Year within the current era |
+| `[short]` / `[abbreviation]` | Era abbreviation |
+| `[era]` / `[name]` | Full era name |
 
 Examples:
 
-- `{{year}} {{short}}` produces "1492 DR"
-- `{{short}} {{yearInEra}}` produces "DR 5"
-- `Year {{yearInEra}} of the {{era}}` produces "Year 5 of the Third Age"
+- `[year] [short]` produces "1492 DR"
+- `[short] [yearInEra]` produces "DR 5"
+- `Year [yearInEra] of the [era]` produces "Year 5 of the Third Age"
 
 When no template is set, the `format` field controls output:
 
@@ -64,7 +64,7 @@ Cycles are repeating sequences (zodiac signs, elemental weeks, etc.). Each cycle
 | Value | Description |
 |-------|-------------|
 | `year` | Calendar year (with yearZero applied) |
-| `eraYear` | Year within current era |
+| `yearInEra` | Year within current era |
 | `month` | Month index (0-based) |
 | `monthDay` | Day of month |
 | `day` | Absolute day count from epoch |
@@ -90,10 +90,10 @@ const normalizedIndex = ((cycleIndex % cycle.entries.length) + cycle.entries.len
 
 The `cycleFormat` field controls how cycles appear. Placeholders:
 
-- `{{1}}`, `{{2}}`, etc. - current entry name for each cycle
-- `{{n}}` - line break
+- `[1]`, `[2]`, etc. - current entry name for each cycle
+- `[n]` - line break
 
-Example: `{{1}} - Week of {{2}}`
+Example: `[1] - Week of [2]`
 
 ---
 
