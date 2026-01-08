@@ -62,6 +62,16 @@ export default class ReminderScheduler {
     const currentDate = getCurrentDate();
     if (!currentDate) return;
     if (!NoteManager.isInitialized()) return;
+
+    // Backwards time movement - reset all state and check immediately
+    if (worldTime < this.#lastCheckTime) {
+      this.#firedToday.clear();
+      this.#lastCheckTime = worldTime;
+      this.#checkReminders(worldTime, currentDate);
+      this.#lastDate = { ...currentDate };
+      return;
+    }
+
     if (this.#lastDate && this.#hasDateChanged(this.#lastDate, currentDate)) this.#firedToday.clear();
     if (worldTime - this.#lastCheckTime >= this.CHECK_INTERVAL) {
       this.#checkReminders(worldTime, currentDate);
@@ -88,7 +98,7 @@ export default class ReminderScheduler {
     const allNotes = NoteManager.getAllNotes();
     log(3, `Checking ${allNotes.length} notes for reminders at ${currentDate.year}-${currentDate.month}-${currentDate.day} ${currentDate.hour}:${currentDate.minute}`);
     for (const note of allNotes) {
-      if (note.flagData.calendarId && note.flagData.calendarId !== activeCalendarId) continue;
+      if (note.calendarId && note.calendarId !== activeCalendarId) continue;
       if (!note.flagData.reminderOffset || note.flagData.reminderOffset <= 0) continue;
       if (note.flagData.silent) continue;
       const reminderKey = `${note.id}:${currentDate.year}-${currentDate.month}-${currentDate.day}`;
