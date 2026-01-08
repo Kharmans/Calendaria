@@ -29,6 +29,8 @@ export const SETTINGS = {
   CUSTOM_TIME_JUMPS: 'customTimeJumps',
   CUSTOM_WEATHER_PRESETS: 'customWeatherPresets',
   DARKNESS_SYNC: 'darknessSync',
+  AMBIENCE_SYNC: 'ambienceSync',
+  DEFAULT_BRIGHTNESS_MULTIPLIER: 'defaultBrightnessMultiplier',
   DEFAULT_OVERRIDES: 'defaultOverrides',
   DEV_MODE: 'devMode',
   DISPLAY_FORMATS: 'displayFormats',
@@ -86,7 +88,8 @@ export const DISPLAY_LOCATIONS = {
 
 /** @enum {string} Scene flags for scene-specific configuration */
 export const SCENE_FLAGS = {
-  DARKNESS_SYNC: 'darknessSync'
+  DARKNESS_SYNC: 'darknessSync',
+  BRIGHTNESS_MULTIPLIER: 'brightnessMultiplier'
 };
 
 /** Template file paths for UI components */

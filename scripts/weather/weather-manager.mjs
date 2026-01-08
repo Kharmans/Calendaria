@@ -98,6 +98,9 @@ export default class WeatherManager {
       color: preset.color,
       category: preset.category,
       temperature,
+      darknessPenalty: preset.darknessPenalty ?? 0,
+      environmentBase: preset.environmentBase ?? null,
+      environmentDark: preset.environmentDark ?? null,
       setAt: game.time.worldTime,
       setBy: game.user.id
     };
@@ -131,6 +134,9 @@ export default class WeatherManager {
       color: weatherData.color || '#888888',
       category: 'custom',
       temperature: weatherData.temperature ?? null,
+      darknessPenalty: weatherData.darknessPenalty ?? 0,
+      environmentBase: weatherData.environmentBase ?? null,
+      environmentDark: weatherData.environmentDark ?? null,
       setAt: game.time.worldTime,
       setBy: game.user.id
     };
@@ -218,6 +224,7 @@ export default class WeatherManager {
       color: result.preset.color,
       category: result.preset.category,
       temperature: result.temperature,
+      darknessPenalty: result.preset.darknessPenalty ?? 0,
       setAt: game.time.worldTime,
       setBy: game.user.id,
       generated: true

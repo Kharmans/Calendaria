@@ -7,6 +7,7 @@
 import { MODULE, SCENE_FLAGS, SETTINGS, TEMPLATES } from './constants.mjs';
 import TimeKeeper from './time/time-keeper.mjs';
 import { log } from './utils/logger.mjs';
+import WeatherManager from './weather/weather-manager.mjs';
 
 /** @type {number|null} Last hour we calculated darkness for */
 let lastHour = null;
@@ -57,6 +58,81 @@ export function getCurrentDarkness() {
 }
 
 /**
+ * Calculate adjusted darkness with scene, climate, and weather modifiers.
+ * @param {number} baseDarkness - Base darkness from time of day (0-1)
+ * @param {object} scene - The scene to get modifiers from
+ * @returns {number} Adjusted darkness level (0-1)
+ */
+export function calculateAdjustedDarkness(baseDarkness, scene) {
+  const defaultMult = game.settings.get(MODULE.ID, SETTINGS.DEFAULT_BRIGHTNESS_MULTIPLIER) ?? 1.0;
+  const sceneFlag = scene?.getFlag(MODULE.ID, SCENE_FLAGS.BRIGHTNESS_MULTIPLIER);
+  const sceneBrightnessMult = sceneFlag ?? defaultMult;
+  const activeZone = WeatherManager.getActiveZone?.();
+  const climateBrightnessMult = activeZone?.brightnessMultiplier ?? 1.0;
+  const currentWeather = WeatherManager.getCurrentWeather?.();
+  const weatherDarknessPenalty = currentWeather?.darknessPenalty ?? 0;
+  const brightness = 1 - baseDarkness;
+  const adjustedBrightness = brightness * sceneBrightnessMult * climateBrightnessMult;
+  let adjustedDarkness = 1 - adjustedBrightness;
+  adjustedDarkness += weatherDarknessPenalty;
+  return Math.max(0, Math.min(1, adjustedDarkness));
+}
+
+/**
+ * Calculate environment lighting overrides from climate zone and weather.
+ * Weather overrides climate zone values when both are set.
+ * @returns {{base: {hue: number|null, saturation: number|null}, dark: {hue: number|null, saturation: number|null}}|null} - environment config
+ */
+export function calculateEnvironmentLighting() {
+  const activeZone = WeatherManager.getActiveZone?.();
+  const currentWeather = WeatherManager.getCurrentWeather?.();
+  let baseHue = activeZone?.environmentBase?.hue ?? null;
+  let baseSaturation = activeZone?.environmentBase?.saturation ?? null;
+  let darkHue = activeZone?.environmentDark?.hue ?? null;
+  let darkSaturation = activeZone?.environmentDark?.saturation ?? null;
+  if (currentWeather?.environmentBase?.hue != null) baseHue = currentWeather.environmentBase.hue;
+  if (currentWeather?.environmentBase?.saturation != null) baseSaturation = currentWeather.environmentBase.saturation;
+  if (currentWeather?.environmentDark?.hue != null) darkHue = currentWeather.environmentDark.hue;
+  if (currentWeather?.environmentDark?.saturation != null) darkSaturation = currentWeather.environmentDark.saturation;
+  if (baseHue === null && baseSaturation === null && darkHue === null && darkSaturation === null) return null;
+  return {
+    base: { hue: baseHue, saturation: baseSaturation },
+    dark: { hue: darkHue, saturation: darkSaturation }
+  };
+}
+
+/**
+ * Apply environment lighting to a scene.
+ * Only updates values that are explicitly set (non-null).
+ * Hue values are stored as degrees (0-360) but Foundry uses normalized (0-1).
+ * Saturation in presets is 0-1, Foundry uses -1 to 1 (we map 0-1 to appropriate range).
+ * @param {object} scene - The scene to update
+ * @param {{base: {hue: number|null, saturation: number|null}, dark: {hue: number|null, saturation: number|null}}|null} lighting - Lighting overrides
+ */
+async function applyEnvironmentLighting(scene, lighting) {
+  if (!lighting || !game.user.isGM) return;
+  const ambienceSync = game.settings.get(MODULE.ID, SETTINGS.AMBIENCE_SYNC);
+  if (!ambienceSync) return;
+  const intensityData = {};
+  if (lighting.base.hue !== null) intensityData['environment.base.intensity'] = 0.5;
+  if (lighting.dark.hue !== null) intensityData['environment.dark.intensity'] = 0.5;
+  if (Object.keys(intensityData).length > 0) {
+    await scene.update(intensityData);
+    log(3, 'Set environment intensity:', intensityData);
+  }
+
+  const updateData = {};
+  if (lighting.base.hue !== null) updateData['environment.base.hue'] = lighting.base.hue / 360;
+  if (lighting.base.saturation !== null) updateData['environment.base.saturation'] = lighting.base.saturation * 2 - 1;
+  if (lighting.dark.hue !== null) updateData['environment.dark.hue'] = lighting.dark.hue / 360;
+  if (lighting.dark.saturation !== null) updateData['environment.dark.saturation'] = lighting.dark.saturation * 2 - 1;
+  if (Object.keys(updateData).length > 0) {
+    await scene.update(updateData);
+    log(3, 'Applied environment lighting:', updateData);
+  }
+}
+
+/**
  * Update a scene's darkness level based on current time.
  * Only GM can update scene darkness.
  * @param {object} scene - The scene to update
@@ -65,7 +141,8 @@ export function getCurrentDarkness() {
 export async function updateSceneDarkness(scene) {
   if (!game.user.isGM) return;
   if (!scene) return;
-  const darkness = getCurrentDarkness();
+  const baseDarkness = getCurrentDarkness();
+  const darkness = calculateAdjustedDarkness(baseDarkness, scene);
 
   try {
     await scene.update({ 'environment.darknessLevel': darkness });
@@ -86,10 +163,24 @@ export async function onRenderSceneConfig(app, html, _data) {
   let value = 'default';
   if (flagValue === true || flagValue === 'enabled') value = 'enabled';
   else if (flagValue === false || flagValue === 'disabled') value = 'disabled';
-  const formGroup = await foundry.applications.handlebars.renderTemplate(TEMPLATES.PARTIALS.SCENE_DARKNESS_SYNC, { moduleId: MODULE.ID, flagName: SCENE_FLAGS.DARKNESS_SYNC, value });
+  const brightnessMultiplier = app.document.getFlag(MODULE.ID, SCENE_FLAGS.BRIGHTNESS_MULTIPLIER) ?? 1.0;
+  const formGroup = await foundry.applications.handlebars.renderTemplate(TEMPLATES.PARTIALS.SCENE_DARKNESS_SYNC, {
+    moduleId: MODULE.ID,
+    flagName: SCENE_FLAGS.DARKNESS_SYNC,
+    brightnessFlag: SCENE_FLAGS.BRIGHTNESS_MULTIPLIER,
+    value,
+    brightnessMultiplier
+  });
   const ambientLightField = html.querySelector('[name="environment.globalLight.enabled"]')?.closest('.form-group');
   if (ambientLightField) ambientLightField.insertAdjacentHTML('afterend', formGroup);
   else log(2, 'Could not find ambiance section to inject darkness sync setting');
+  const rangeInput = html.querySelector(`[name="flags.${MODULE.ID}.${SCENE_FLAGS.BRIGHTNESS_MULTIPLIER}"]`);
+  if (rangeInput) {
+    rangeInput.addEventListener('input', (event) => {
+      const display = event.target.parentElement.querySelector('.range-value');
+      if (display) display.textContent = `${event.target.value}x`;
+    });
+  }
 }
 
 /**
@@ -108,7 +199,8 @@ export async function onUpdateWorldTime(worldTime, _dt) {
   const currentHour = components?.hour ?? 0;
   if (lastHour !== null && lastHour === currentHour) return;
   lastHour = currentHour;
-  const newTargetDarkness = calculateDarknessFromTime(currentHour, 0);
+  const baseDarkness = calculateDarknessFromTime(currentHour, 0);
+  const newTargetDarkness = calculateAdjustedDarkness(baseDarkness, activeScene);
   startDarknessTransition(activeScene, newTargetDarkness);
   log(3, `Hour changed: ${lastHour} → ${currentHour}`);
 }
@@ -173,4 +265,23 @@ function shouldSyncSceneDarkness(scene) {
   if (sceneFlag === false || sceneFlag === 'disabled') return false;
   const globalSetting = game.settings.get(MODULE.ID, SETTINGS.DARKNESS_SYNC);
   return globalSetting;
+}
+
+/**
+ * Handle weather change to update scene darkness and environment lighting.
+ * Recalculates darkness with new weather penalty and applies lighting overrides.
+ */
+export async function onWeatherChange() {
+  if (!game.user.isGM) return;
+  const activeScene = game.scenes.active;
+  if (!activeScene) return;
+  if (!shouldSyncSceneDarkness(activeScene)) return;
+  const components = game.time.components;
+  const currentHour = components?.hour ?? 0;
+  const baseDarkness = calculateDarknessFromTime(currentHour, 0);
+  const newTargetDarkness = calculateAdjustedDarkness(baseDarkness, activeScene);
+  startDarknessTransition(activeScene, newTargetDarkness);
+  const lighting = calculateEnvironmentLighting();
+  await applyEnvironmentLighting(activeScene, lighting);
+  log(3, `Weather changed, updating darkness to ${newTargetDarkness.toFixed(3)}`);
 }

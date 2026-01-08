@@ -7,9 +7,9 @@
 
 import { MiniCalendar } from './applications/mini-calendar.mjs';
 import CalendarManager from './calendar/calendar-manager.mjs';
-import { MODULE, SETTINGS } from './constants.mjs';
 import { onPreCreateChatMessage, onRenderAnnouncementMessage, onRenderChatMessageHTML } from './chat/chat-timestamp.mjs';
-import { onRenderSceneConfig, onUpdateWorldTime } from './darkness.mjs';
+import { HOOKS, MODULE, SETTINGS } from './constants.mjs';
+import { onRenderSceneConfig, onUpdateWorldTime, onWeatherChange } from './darkness.mjs';
 import { onLongRest, onPreRest } from './integrations/rest-time.mjs';
 import NoteManager from './notes/note-manager.mjs';
 import EventScheduler from './time/event-scheduler.mjs';
@@ -45,12 +45,13 @@ export function registerHooks() {
   Hooks.on('updateWorldTime', ReminderScheduler.onUpdateWorldTime.bind(ReminderScheduler));
   Hooks.on('updateWorldTime', TimeTracker.onUpdateWorldTime.bind(TimeTracker));
   Hooks.on('getSceneControlButtons', onGetSceneControlButtons);
+  Hooks.on(HOOKS.WEATHER_CHANGE, onWeatherChange);
   log(3, 'Hooks registered');
 }
 
 /**
  * Add Calendaria button to scene controls.
- * @param {Object} controls - Scene controls object (V13 style)
+ * @param {object} controls - Scene controls object (V13 style)
  */
 function onGetSceneControlButtons(controls) {
   if (!controls.notes?.tools) return;

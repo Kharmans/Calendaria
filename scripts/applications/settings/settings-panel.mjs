@@ -63,6 +63,7 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
       addSeasonTrigger: SettingsPanel.#onAddSeasonTrigger,
       removeSeasonTrigger: SettingsPanel.#onRemoveSeasonTrigger,
       addWeatherPreset: SettingsPanel.#onAddWeatherPreset,
+      editWeatherPreset: SettingsPanel.#onEditWeatherPreset,
       removeWeatherPreset: SettingsPanel.#onRemoveWeatherPreset
     }
   };
@@ -251,6 +252,7 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   async #prepareTimeContext(context) {
     context.darknessSync = game.settings.get(MODULE.ID, SETTINGS.DARKNESS_SYNC);
+    context.ambienceSync = game.settings.get(MODULE.ID, SETTINGS.AMBIENCE_SYNC);
     context.advanceTimeOnRest = game.settings.get(MODULE.ID, SETTINGS.ADVANCE_TIME_ON_REST);
     context.syncClockPause = game.settings.get(MODULE.ID, SETTINGS.SYNC_CLOCK_PAUSE);
     context.roundTimeDisabled = CONFIG.time.roundTime === 0;
@@ -488,6 +490,7 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
       { value: 'celsius', label: localize('CALENDARIA.Settings.TemperatureUnit.Celsius'), selected: tempUnit === 'celsius' },
       { value: 'fahrenheit', label: localize('CALENDARIA.Settings.TemperatureUnit.Fahrenheit'), selected: tempUnit === 'fahrenheit' }
     ];
+    context.defaultBrightnessMultiplier = game.settings.get(MODULE.ID, SETTINGS.DEFAULT_BRIGHTNESS_MULTIPLIER) ?? 1.0;
     context.customWeatherPresets = game.settings.get(MODULE.ID, SETTINGS.CUSTOM_WEATHER_PRESETS) || [];
     const zones = WeatherManager.getCalendarZones() || [];
     const activeZone = WeatherManager.getActiveZone();
@@ -658,6 +661,7 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
     if ('hudWidthScale' in data) await game.settings.set(MODULE.ID, SETTINGS.HUD_WIDTH_SCALE, Number(data.hudWidthScale));
     if ('miniCalendarControlsDelay' in data) await game.settings.set(MODULE.ID, SETTINGS.MINI_CALENDAR_CONTROLS_DELAY, Number(data.miniCalendarControlsDelay));
     if ('darknessSync' in data) await game.settings.set(MODULE.ID, SETTINGS.DARKNESS_SYNC, data.darknessSync);
+    if ('ambienceSync' in data) await game.settings.set(MODULE.ID, SETTINGS.AMBIENCE_SYNC, data.ambienceSync);
     if ('advanceTimeOnRest' in data) await game.settings.set(MODULE.ID, SETTINGS.ADVANCE_TIME_ON_REST, data.advanceTimeOnRest);
     if ('syncClockPause' in data) await game.settings.set(MODULE.ID, SETTINGS.SYNC_CLOCK_PAUSE, data.syncClockPause);
     if ('chatTimestampMode' in data) await game.settings.set(MODULE.ID, SETTINGS.CHAT_TIMESTAMP_MODE, data.chatTimestampMode);
@@ -743,21 +747,9 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
       await game.settings.set(MODULE.ID, SETTINGS.CUSTOM_CATEGORIES, validCategories);
     }
 
-    // Weather presets
-    if (data.weatherPresets) {
-      const validPresets = Object.values(data.weatherPresets)
-        .filter((p) => p && p.id && p.label?.trim())
-        .map((p) => ({
-          id: p.id,
-          label: p.label.trim(),
-          icon: p.icon?.trim() || 'fa-cloud',
-          color: p.color || '#888888',
-          category: 'custom',
-          tempMin: p.tempMin != null ? Number(p.tempMin) : 10,
-          tempMax: p.tempMax != null ? Number(p.tempMax) : 25,
-          description: p.description || ''
-        }));
-      await game.settings.set(MODULE.ID, SETTINGS.CUSTOM_WEATHER_PRESETS, validPresets);
+    // Default brightness multiplier
+    if (data.defaultBrightnessMultiplier != null) {
+      await game.settings.set(MODULE.ID, SETTINGS.DEFAULT_BRIGHTNESS_MULTIPLIER, Number(data.defaultBrightnessMultiplier));
     }
 
     // Macro triggers
@@ -1125,22 +1117,157 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Open weather preset dialog for adding or editing.
+   * @param {object|null} preset - Existing preset to edit, or null for new
+   * @returns {Promise<object|null>} The preset data or null if cancelled
+   */
+  static async #openWeatherPresetDialog(preset = null) {
+    const isNew = !preset;
+    const data = preset || { label: '', icon: 'fa-cloud', color: '#888888', tempMin: 10, tempMax: 25, darknessPenalty: 0, environmentBase: null, environmentDark: null };
+    const envBase = data.environmentBase ?? {};
+    const envDark = data.environmentDark ?? {};
+
+    const content = `
+      <form class="weather-preset-dialog">
+        <div class="form-group">
+          <label>${localize('CALENDARIA.SettingsPanel.WeatherPresets.NamePlaceholder')}</label>
+          <input type="text" name="label" value="${data.label}" placeholder="${localize('CALENDARIA.SettingsPanel.WeatherPresets.NamePlaceholder')}" autofocus>
+        </div>
+        <div class="form-group">
+          <label>${localize('CALENDARIA.SettingsPanel.WeatherPresets.Icon')}</label>
+          <input type="text" name="icon" value="${data.icon}" placeholder="fa-cloud">
+          <p class="hint">${localize('CALENDARIA.SettingsPanel.WeatherPresets.IconTooltip')}</p>
+        </div>
+        <div class="form-group">
+          <label>${localize('CALENDARIA.SettingsPanel.WeatherPresets.Color')}</label>
+          <input type="color" name="color" value="${data.color}">
+        </div>
+        <div class="form-group">
+          <label>${localize('CALENDARIA.SettingsPanel.WeatherPresets.TempRange')}</label>
+          <div class="form-fields">
+            <input type="number" name="tempMin" value="${data.tempMin}" placeholder="0">
+            <span>–</span>
+            <input type="number" name="tempMax" value="${data.tempMax}" placeholder="25">
+            <span>°C</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>${localize('CALENDARIA.SettingsPanel.WeatherPresets.DarknessPenalty')}</label>
+          <input type="number" name="darknessPenalty" value="${data.darknessPenalty}" step="0.05" min="-0.5" max="0.5">
+          <p class="hint">${localize('CALENDARIA.SettingsPanel.WeatherPresets.DarknessPenaltyTooltip')}</p>
+        </div>
+        <fieldset>
+          <legend>${localize('CALENDARIA.SettingsPanel.WeatherPresets.EnvironmentLighting')}</legend>
+          <p class="hint">${localize('CALENDARIA.SettingsPanel.WeatherPresets.EnvironmentLightingHint')}</p>
+          <div class="form-group">
+            <label>${localize('CALENDARIA.SettingsPanel.WeatherPresets.BaseHue')}</label>
+            <div class="form-fields">
+              <input type="number" name="baseHue" min="0" max="360" step="1" value="${envBase.hue ?? ''}" placeholder="${localize('CALENDARIA.Common.Default')}">
+              <span>°</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>${localize('CALENDARIA.SettingsPanel.WeatherPresets.BaseSaturation')}</label>
+            <div class="form-fields">
+              <input type="number" name="baseSaturation" min="0" max="1" step="0.1" value="${envBase.saturation ?? ''}" placeholder="${localize('CALENDARIA.Common.Default')}">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>${localize('CALENDARIA.SettingsPanel.WeatherPresets.DarkHue')}</label>
+            <div class="form-fields">
+              <input type="number" name="darkHue" min="0" max="360" step="1" value="${envDark.hue ?? ''}" placeholder="${localize('CALENDARIA.Common.Default')}">
+              <span>°</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>${localize('CALENDARIA.SettingsPanel.WeatherPresets.DarkSaturation')}</label>
+            <div class="form-fields">
+              <input type="number" name="darkSaturation" min="0" max="1" step="0.1" value="${envDark.saturation ?? ''}" placeholder="${localize('CALENDARIA.Common.Default')}">
+            </div>
+          </div>
+        </fieldset>
+      </form>
+    `;
+
+    const title = isNew ? localize('CALENDARIA.SettingsPanel.WeatherPresets.Add') : localize('CALENDARIA.SettingsPanel.WeatherPresets.Edit');
+    return foundry.applications.api.DialogV2.prompt({
+      window: { title },
+      position: { width: 'auto', height: 'auto' },
+      content,
+      ok: {
+        callback: (_event, button, _dialog) => {
+          const form = button.form;
+          const baseHue = form.elements.baseHue.value ? parseFloat(form.elements.baseHue.value) : null;
+          const baseSat = form.elements.baseSaturation.value ? parseFloat(form.elements.baseSaturation.value) : null;
+          const darkHue = form.elements.darkHue.value ? parseFloat(form.elements.darkHue.value) : null;
+          const darkSat = form.elements.darkSaturation.value ? parseFloat(form.elements.darkSaturation.value) : null;
+          return {
+            label: form.elements.label.value.trim(),
+            icon: form.elements.icon.value.trim() || 'fa-cloud',
+            color: form.elements.color.value || '#888888',
+            tempMin: Number(form.elements.tempMin.value) || 10,
+            tempMax: Number(form.elements.tempMax.value) || 25,
+            darknessPenalty: Number(form.elements.darknessPenalty.value) || 0,
+            environmentBase: baseHue !== null || baseSat !== null ? { hue: baseHue, saturation: baseSat } : null,
+            environmentDark: darkHue !== null || darkSat !== null ? { hue: darkHue, saturation: darkSat } : null
+          };
+        }
+      }
+    });
+  }
+
+  /**
    * Add a custom weather preset.
    * @param {PointerEvent} _event - The click event
    * @param {HTMLElement} _target - The clicked element
    */
   static async #onAddWeatherPreset(_event, _target) {
+    const result = await SettingsPanel.#openWeatherPresetDialog();
+    if (!result || !result.label) return;
+
     const currentPresets = game.settings.get(MODULE.ID, SETTINGS.CUSTOM_WEATHER_PRESETS) || [];
     currentPresets.push({
       id: foundry.utils.randomID(),
-      label: localize('CALENDARIA.SettingsPanel.WeatherPresets.NewName'),
-      icon: 'fa-cloud',
-      color: '#888888',
+      label: result.label,
+      icon: result.icon,
+      color: result.color,
       category: 'custom',
-      tempMin: 10,
-      tempMax: 25,
+      tempMin: result.tempMin,
+      tempMax: result.tempMax,
+      darknessPenalty: result.darknessPenalty,
+      environmentBase: result.environmentBase,
+      environmentDark: result.environmentDark,
       description: ''
     });
+    await game.settings.set(MODULE.ID, SETTINGS.CUSTOM_WEATHER_PRESETS, currentPresets);
+    this.render({ parts: ['weather'] });
+  }
+
+  /**
+   * Edit an existing custom weather preset.
+   * @param {PointerEvent} _event - The click event
+   * @param {HTMLElement} target - The clicked element
+   */
+  static async #onEditWeatherPreset(_event, target) {
+    const presetId = target.dataset.presetId;
+    if (!presetId) return;
+
+    const currentPresets = game.settings.get(MODULE.ID, SETTINGS.CUSTOM_WEATHER_PRESETS) || [];
+    const preset = currentPresets.find((p) => p.id === presetId);
+    if (!preset) return;
+
+    const result = await SettingsPanel.#openWeatherPresetDialog(preset);
+    if (!result || !result.label) return;
+
+    preset.label = result.label;
+    preset.icon = result.icon;
+    preset.color = result.color;
+    preset.tempMin = result.tempMin;
+    preset.tempMax = result.tempMax;
+    preset.darknessPenalty = result.darknessPenalty;
+    preset.environmentBase = result.environmentBase;
+    preset.environmentDark = result.environmentDark;
+
     await game.settings.set(MODULE.ID, SETTINGS.CUSTOM_WEATHER_PRESETS, currentPresets);
     this.render({ parts: ['weather'] });
   }
@@ -1254,6 +1381,17 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
         };
         hudModeSelect.addEventListener('change', updateCompactState);
         updateCompactState();
+      }
+    }
+
+    // Weather tab brightness multiplier range slider
+    if (partId === 'weather') {
+      const rangeInput = htmlElement.querySelector('input[name="defaultBrightnessMultiplier"]');
+      const rangeValue = rangeInput?.parentElement?.querySelector('.range-value');
+      if (rangeInput && rangeValue) {
+        rangeInput.addEventListener('input', (e) => {
+          rangeValue.textContent = `${e.target.value}x`;
+        });
       }
     }
 

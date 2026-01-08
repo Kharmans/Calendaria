@@ -71,7 +71,9 @@ export const CLIMATE_ZONE_TEMPLATES = {
       summer: { clear: 3, 'partly-cloudy': 3, snow: 3, blizzard: 2, windy: 3, fog: 1 },
       winter: { blizzard: 6, snow: 5, overcast: 2, windy: 4 },
       default: { snow: 5, blizzard: 4, overcast: 3, windy: 3, clear: 1 }
-    }
+    },
+    environmentBase: { hue: 200, saturation: 0.6 },
+    environmentDark: { hue: 210, saturation: 0.5 }
   },
 
   subarctic: {
@@ -83,7 +85,9 @@ export const CLIMATE_ZONE_TEMPLATES = {
       summer: { clear: 4, 'partly-cloudy': 4, rain: 3, snow: 1, mist: 2 },
       winter: { snow: 6, blizzard: 4, overcast: 3, windy: 3 },
       default: { snow: 4, cloudy: 3, overcast: 3, windy: 2, clear: 2 }
-    }
+    },
+    environmentBase: { hue: 200, saturation: 0.7 },
+    environmentDark: null
   },
 
   temperate: {
@@ -97,7 +101,9 @@ export const CLIMATE_ZONE_TEMPLATES = {
       spring: { rain: 4, drizzle: 3, 'partly-cloudy': 3, clear: 2, mist: 2 },
       autumn: { cloudy: 4, rain: 3, fog: 3, 'partly-cloudy': 2, windy: 2 },
       default: { rain: 3, cloudy: 3, mist: 2, drizzle: 2, clear: 3 }
-    }
+    },
+    environmentBase: null,
+    environmentDark: null
   },
 
   subtropical: {
@@ -109,7 +115,9 @@ export const CLIMATE_ZONE_TEMPLATES = {
       summer: { clear: 5, 'partly-cloudy': 4, rain: 5, drizzle: 2, thunderstorm: 3, sunshower: 1 },
       winter: { clear: 2, cloudy: 4, rain: 3, mist: 2, fog: 1 },
       default: { clear: 4, 'partly-cloudy': 5, cloudy: 3, rain: 2 }
-    }
+    },
+    environmentBase: null,
+    environmentDark: null
   },
 
   tropical: {
@@ -117,7 +125,9 @@ export const CLIMATE_ZONE_TEMPLATES = {
     name: 'CALENDARIA.Weather.Climate.Tropical',
     description: 'CALENDARIA.Weather.Climate.TropicalDesc',
     temperatures: { Spring: { min: 24, max: 32 }, Summer: { min: 26, max: 35 }, Autumn: { min: 24, max: 32 }, Winter: { min: 22, max: 30 }, _default: { min: 24, max: 35 } },
-    weather: { default: { clear: 8, 'partly-cloudy': 5, rain: 7, thunderstorm: 3, fog: 2, sunshower: 1 } }
+    weather: { default: { clear: 8, 'partly-cloudy': 5, rain: 7, thunderstorm: 3, fog: 2, sunshower: 1 } },
+    environmentBase: { hue: 40, saturation: 0.9 },
+    environmentDark: null
   },
 
   arid: {
@@ -129,7 +139,9 @@ export const CLIMATE_ZONE_TEMPLATES = {
       summer: { clear: 10, 'partly-cloudy': 3, sandstorm: 2, windy: 1 },
       winter: { clear: 6, 'partly-cloudy': 4, cloudy: 2, drizzle: 1 },
       default: { clear: 8, 'partly-cloudy': 4, sandstorm: 1, windy: 1 }
-    }
+    },
+    environmentBase: { hue: 35, saturation: 0.8 },
+    environmentDark: null
   },
 
   polar: {
@@ -141,7 +153,9 @@ export const CLIMATE_ZONE_TEMPLATES = {
       summer: { clear: 4, 'partly-cloudy': 3, windy: 2, mist: 1, snow: 2 },
       winter: { blizzard: 6, snow: 5, overcast: 2, windy: 3 },
       default: { snow: 4, overcast: 3, blizzard: 2, windy: 2, clear: 1 }
-    }
+    },
+    environmentBase: { hue: 210, saturation: 0.5 },
+    environmentDark: { hue: 220, saturation: 0.4 }
   }
 };
 
@@ -203,7 +217,17 @@ export function getDefaultZoneConfig(templateId, seasonNames = ['CALENDARIA.Seas
     seasonOverrides[season] = { temperatures: seasonTemp ? { min: seasonTemp.min, max: seasonTemp.max } : null, presets: seasonPresets };
   }
 
-  return { id: template.id, name: template.name, description: template.description ?? '', temperatures, presets, seasonOverrides: Object.keys(seasonOverrides).length > 0 ? seasonOverrides : {} };
+  return {
+    id: template.id,
+    name: template.name,
+    description: template.description ?? '',
+    brightnessMultiplier: 1.0,
+    environmentBase: template.environmentBase ?? null,
+    environmentDark: template.environmentDark ?? null,
+    temperatures,
+    presets,
+    seasonOverrides: Object.keys(seasonOverrides).length > 0 ? seasonOverrides : {}
+  };
 }
 
 /**

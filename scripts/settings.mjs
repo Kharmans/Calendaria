@@ -101,6 +101,24 @@ export function registerSettings() {
     type: new BooleanField({ initial: true })
   });
 
+  /** Sync scene ambience (hue/saturation) with weather and climate */
+  game.settings.register(MODULE.ID, SETTINGS.AMBIENCE_SYNC, {
+    name: 'CALENDARIA.Settings.AmbienceSync.Name',
+    hint: 'CALENDARIA.Settings.AmbienceSync.Hint',
+    scope: 'world',
+    config: false,
+    type: new BooleanField({ initial: true })
+  });
+
+  /** Default brightness multiplier for all scenes */
+  game.settings.register(MODULE.ID, SETTINGS.DEFAULT_BRIGHTNESS_MULTIPLIER, {
+    name: 'CALENDARIA.Settings.DefaultBrightnessMultiplier.Name',
+    hint: 'CALENDARIA.Settings.DefaultBrightnessMultiplier.Hint',
+    scope: 'world',
+    config: false,
+    type: new NumberField({ initial: 1.0, min: 0.5, max: 1.5, step: 0.1 })
+  });
+
   /** Show moon phases on the calendar UI */
   game.settings.register(MODULE.ID, SETTINGS.SHOW_MOON_PHASES, {
     name: 'CALENDARIA.Settings.ShowMoonPhases.Name',

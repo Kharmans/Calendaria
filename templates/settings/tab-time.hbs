@@ -31,6 +31,14 @@
     </div>
 
     <div class="form-group">
+      <label>{{localize "CALENDARIA.Settings.AmbienceSync.Name"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" name="ambienceSync" {{#if ambienceSync}}checked{{/if}}>
+      </div>
+      <p class="hint">{{localize "CALENDARIA.Settings.AmbienceSync.Hint"}}</p>
+    </div>
+
+    <div class="form-group">
       <label>{{localize "CALENDARIA.Settings.AdvanceTimeOnRest.Name"}}</label>
       <div class="form-fields">
         <input type="checkbox" name="advanceTimeOnRest" {{#if advanceTimeOnRest}}checked{{/if}}>

@@ -1818,6 +1818,9 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       })
       .join('');
 
+    const brightnessMultiplier = zone.brightnessMultiplier ?? 1.0;
+    const envBase = zone.environmentBase ?? {};
+    const envDark = zone.environmentDark ?? {};
     const content = `
       <form>
         <div class="form-group">
@@ -1828,6 +1831,44 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
           <label>${localize('CALENDARIA.Common.Description')}</label>
           <textarea name="description">${zone.description || ''}</textarea>
         </div>
+        <div class="form-group">
+          <label>${localize('CALENDARIA.Editor.Weather.Zone.BrightnessMultiplier')}</label>
+          <div class="form-fields">
+            <input type="range" name="brightnessMultiplier" min="0.5" max="1.5" step="0.1" value="${brightnessMultiplier}" oninput="this.nextElementSibling.textContent = this.value + 'x'">
+            <span>${brightnessMultiplier}x</span>
+          </div>
+          <p class="hint">${localize('CALENDARIA.Editor.Weather.Zone.BrightnessMultiplierHint')}</p>
+        </div>
+        <fieldset>
+          <legend>${localize('CALENDARIA.Editor.Weather.Zone.EnvironmentLighting')}</legend>
+          <p class="hint">${localize('CALENDARIA.Editor.Weather.Zone.EnvironmentLightingHint')}</p>
+          <div class="form-group">
+            <label>${localize('CALENDARIA.Editor.Weather.Zone.BaseHue')}</label>
+            <div class="form-fields">
+              <input type="number" name="baseHue" min="0" max="360" step="1" value="${envBase.hue ?? ''}" placeholder="${localize('CALENDARIA.Common.Default')}">
+              <span>°</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>${localize('CALENDARIA.Editor.Weather.Zone.BaseSaturation')}</label>
+            <div class="form-fields">
+              <input type="number" name="baseSaturation" min="0" max="1" step="0.1" value="${envBase.saturation ?? ''}" placeholder="${localize('CALENDARIA.Common.Default')}">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>${localize('CALENDARIA.Editor.Weather.Zone.DarkHue')}</label>
+            <div class="form-fields">
+              <input type="number" name="darkHue" min="0" max="360" step="1" value="${envDark.hue ?? ''}" placeholder="${localize('CALENDARIA.Common.Default')}">
+              <span>°</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>${localize('CALENDARIA.Editor.Weather.Zone.DarkSaturation')}</label>
+            <div class="form-fields">
+              <input type="number" name="darkSaturation" min="0" max="1" step="0.1" value="${envDark.saturation ?? ''}" placeholder="${localize('CALENDARIA.Common.Default')}">
+            </div>
+          </div>
+        </fieldset>
         <fieldset>
           <legend>${localize('CALENDARIA.Editor.Weather.Zone.Temperatures')}</legend>
           ${tempRows}
@@ -1837,11 +1878,23 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const result = await foundry.applications.api.DialogV2.prompt({
       window: { title: localize('CALENDARIA.Editor.Weather.Zone.Edit') },
+      position: { width: 'auto', height: 'auto' },
       content,
       ok: {
         callback: (_event, button, _dialog) => {
           const form = button.form;
-          const data = { name: form.elements.name.value, description: form.elements.description.value, temperatures: {} };
+          const baseHue = form.elements.baseHue.value ? parseFloat(form.elements.baseHue.value) : null;
+          const baseSat = form.elements.baseSaturation.value ? parseFloat(form.elements.baseSaturation.value) : null;
+          const darkHue = form.elements.darkHue.value ? parseFloat(form.elements.darkHue.value) : null;
+          const darkSat = form.elements.darkSaturation.value ? parseFloat(form.elements.darkSaturation.value) : null;
+          const data = {
+            name: form.elements.name.value,
+            description: form.elements.description.value,
+            brightnessMultiplier: parseFloat(form.elements.brightnessMultiplier.value) || 1.0,
+            environmentBase: baseHue !== null || baseSat !== null ? { hue: baseHue, saturation: baseSat } : null,
+            environmentDark: darkHue !== null || darkSat !== null ? { hue: darkHue, saturation: darkSat } : null,
+            temperatures: {}
+          };
           for (const season of seasonNames) {
             const minVal = parseInt(form.elements[`temp_${season}_min`].value) || 0;
             const maxVal = parseInt(form.elements[`temp_${season}_max`].value) || 20;
@@ -1856,6 +1909,9 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!result) return;
     zone.name = result.name;
     zone.description = result.description;
+    zone.brightnessMultiplier = result.brightnessMultiplier;
+    zone.environmentBase = result.environmentBase;
+    zone.environmentDark = result.environmentDark;
     zone.temperatures = result.temperatures;
     this.render();
   }

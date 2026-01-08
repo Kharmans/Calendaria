@@ -20,6 +20,21 @@
 
   {{#if isGM}}
     <fieldset>
+      <legend>{{localize "CALENDARIA.SettingsPanel.Section.Darkness"}}</legend>
+
+      <div class="form-group">
+        <label>{{localize "CALENDARIA.Settings.DefaultBrightnessMultiplier.Name"}}</label>
+        <div class="form-fields range-field">
+          <input type="range" name="defaultBrightnessMultiplier" min="0.5" max="1.5" step="0.1" value="{{defaultBrightnessMultiplier}}">
+          <span class="range-value">{{defaultBrightnessMultiplier}}x</span>
+        </div>
+        <p class="hint">{{localize "CALENDARIA.Settings.DefaultBrightnessMultiplier.Hint"}}</p>
+      </div>
+    </fieldset>
+  {{/if}}
+
+  {{#if isGM}}
+    <fieldset>
       <legend>{{localize "CALENDARIA.SettingsPanel.Section.Climate"}}</legend>
 
       {{#if hasZones}}
@@ -52,28 +67,34 @@
       <legend>{{localize "CALENDARIA.SettingsPanel.Section.WeatherPresets"}}</legend>
       <p class="hint section-hint">{{localize "CALENDARIA.SettingsPanel.WeatherPresets.Hint"}}</p>
 
-      <div class="weather-presets-list">
+      <div class="weather-presets-grid">
+        {{#if customWeatherPresets.length}}
+        <div class="weather-presets-header">
+          <span></span>
+          <span></span>
+          <span>{{localize "CALENDARIA.SettingsPanel.WeatherPresets.NamePlaceholder"}}</span>
+          <span>{{localize "CALENDARIA.SettingsPanel.WeatherPresets.TempRange"}}</span>
+          <span>{{localize "CALENDARIA.SettingsPanel.WeatherPresets.DarknessPenalty"}}</span>
+          <span></span>
+        </div>
+        {{/if}}
         {{#each customWeatherPresets}}
         <div class="weather-preset-row" data-preset-id="{{this.id}}">
-          <input type="hidden" name="weatherPresets.{{@index}}.id" value="{{this.id}}">
-          <input type="color" name="weatherPresets.{{@index}}.color" value="{{this.color}}" class="preset-color">
-          <input type="text" name="weatherPresets.{{@index}}.icon" value="{{this.icon}}"
-            placeholder="fa-cloud" class="preset-icon-input"
-            data-tooltip="{{localize 'CALENDARIA.SettingsPanel.WeatherPresets.IconTooltip'}}">
-          <input type="text" name="weatherPresets.{{@index}}.label" value="{{this.label}}"
-            placeholder="{{localize 'CALENDARIA.SettingsPanel.WeatherPresets.NamePlaceholder'}}" class="preset-name">
-          <div class="preset-temp-range">
-            <input type="number" name="weatherPresets.{{@index}}.tempMin" value="{{this.tempMin}}"
-              placeholder="0" class="preset-temp">
-            <span class="temp-separator">–</span>
-            <input type="number" name="weatherPresets.{{@index}}.tempMax" value="{{this.tempMax}}"
-              placeholder="25" class="preset-temp">
-            <span class="temp-unit">°C</span>
-          </div>
-          <button type="button" data-action="removeWeatherPreset" data-preset-id="{{this.id}}"
-            class="icon-button danger" data-tooltip="{{localize 'CALENDARIA.Common.Delete'}}">
-            <i class="fas fa-trash"></i>
-          </button>
+          <span class="preset-color-swatch" style="background-color: {{this.color}}"></span>
+          <i class="fas {{this.icon}} preset-icon-display"></i>
+          <span class="preset-label">{{this.label}}</span>
+          <span class="preset-temp-display">{{this.tempMin}}° – {{this.tempMax}}°</span>
+          <span class="preset-darkness-display">{{this.darknessPenalty}}</span>
+          <span class="preset-actions">
+            <button type="button" data-action="editWeatherPreset" data-preset-id="{{this.id}}"
+              class="icon-button" data-tooltip="{{localize 'CALENDARIA.Common.Edit'}}">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button type="button" data-action="removeWeatherPreset" data-preset-id="{{this.id}}"
+              class="icon-button danger" data-tooltip="{{localize 'CALENDARIA.Common.Delete'}}">
+              <i class="fas fa-trash"></i>
+            </button>
+          </span>
         </div>
         {{else}}
         <p class="empty-message">{{localize "CALENDARIA.SettingsPanel.WeatherPresets.None"}}</p>
