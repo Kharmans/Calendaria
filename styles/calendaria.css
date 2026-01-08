@@ -5246,6 +5246,57 @@
   box-shadow: 0 0 10px var(--calendaria-shadow);
 }
 
+/* Width scale for fullsize mode - prevents content-driven resizing */
+.calendaria-hud-wrapper:not(.compact) .calendaria-hud-bar {
+  display: grid;
+  width: calc(800px * var(--hud-width-scale, 1));
+  box-sizing: border-box;
+}
+
+.calendaria-hud-wrapper:not(.compact) .calendaria-hud-section {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.calendaria-hud-wrapper:not(.compact) .calendaria-hud-indicators {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1 1 0;
+  flex-shrink: 1;
+}
+
+.calendaria-hud-wrapper:not(.compact) .calendaria-hud-indicators .weather-indicator {
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.calendaria-hud-wrapper:not(.compact) .calendaria-hud-indicators .weather-label,
+.calendaria-hud-wrapper:not(.compact) .calendaria-hud-indicators .season-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendaria-hud-wrapper:not(.compact) .calendaria-hud-tray {
+  max-width: calc(800px * var(--hud-width-scale, 1));
+  box-sizing: border-box;
+  gap: clamp(3px, calc(6px * var(--hud-width-scale, 1)), 6px);
+  padding: clamp(4px, calc(6px * var(--hud-width-scale, 1)), 6px) clamp(6px, calc(10px * var(--hud-width-scale, 1)), 10px);
+}
+
+.calendaria-hud-wrapper:not(.compact) .calendaria-hud-tray .calendaria-hud-time-btn {
+  width: clamp(18px, calc(26px * var(--hud-width-scale, 1)), 26px);
+  height: clamp(18px, calc(26px * var(--hud-width-scale, 1)), 26px);
+  font-size: clamp(0.5rem, calc(0.75rem * var(--hud-width-scale, 1)), 0.75rem);
+}
+
+.calendaria-hud-wrapper:not(.compact) .calendaria-hud-tray .calendaria-hud-select {
+  height: clamp(18px, calc(26px * var(--hud-width-scale, 1)), 26px);
+  font-size: clamp(0.5rem, calc(0.6875rem * var(--hud-width-scale, 1)), 0.6875rem);
+  padding: 0 clamp(4px, calc(8px * var(--hud-width-scale, 1)), 8px);
+  line-height: clamp(18px, calc(26px * var(--hud-width-scale, 1)), 26px);
+}
+
 .calendaria-hud-bar.dragging {
   cursor: grabbing;
 }
@@ -5534,7 +5585,6 @@
 
 .calendaria-hud-time {
   padding: 0 8px;
-  width: 140px;
   text-align: center;
   color: var(--calendaria-text);
   font-size: var(--font-size-14, 0.875rem);

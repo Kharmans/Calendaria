@@ -329,6 +329,8 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
       { value: 'slice', label: localize('CALENDARIA.Settings.HUDDialStyle.Slice'), selected: dialStyle === 'slice' }
     ];
     context.hudCombatCompact = game.settings.get(MODULE.ID, SETTINGS.HUD_COMBAT_COMPACT);
+    context.hudWidthScale = game.settings.get(MODULE.ID, SETTINGS.HUD_WIDTH_SCALE);
+    context.hudWidthScalePixels = Math.round(context.hudWidthScale * 800);
     context.hudStickyZonesEnabled = game.settings.get(MODULE.ID, SETTINGS.HUD_STICKY_ZONES_ENABLED);
 
     // Block visibility settings
@@ -653,6 +655,7 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
     if ('calendarHUDMode' in data) await game.settings.set(MODULE.ID, SETTINGS.CALENDAR_HUD_MODE, data.calendarHUDMode);
     if ('hudDialStyle' in data) await game.settings.set(MODULE.ID, SETTINGS.HUD_DIAL_STYLE, data.hudDialStyle);
     if ('hudCombatCompact' in data) await game.settings.set(MODULE.ID, SETTINGS.HUD_COMBAT_COMPACT, data.hudCombatCompact);
+    if ('hudWidthScale' in data) await game.settings.set(MODULE.ID, SETTINGS.HUD_WIDTH_SCALE, Number(data.hudWidthScale));
     if ('miniCalendarControlsDelay' in data) await game.settings.set(MODULE.ID, SETTINGS.MINI_CALENDAR_CONTROLS_DELAY, Number(data.miniCalendarControlsDelay));
     if ('darknessSync' in data) await game.settings.set(MODULE.ID, SETTINGS.DARKNESS_SYNC, data.darknessSync);
     if ('advanceTimeOnRest' in data) await game.settings.set(MODULE.ID, SETTINGS.ADVANCE_TIME_ON_REST, data.advanceTimeOnRest);
@@ -1206,6 +1209,20 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
       const weatherDisplayGroup = weatherDisplaySelect?.closest('.form-group');
       const seasonDisplaySelect = htmlElement.querySelector('select[name="hudSeasonDisplayMode"]');
       const seasonDisplayGroup = seasonDisplaySelect?.closest('.form-group');
+      const widthScaleInput = htmlElement.querySelector('input[name="hudWidthScale"]');
+      const widthScaleGroup = widthScaleInput?.closest('.form-group');
+      const widthScaleHint = widthScaleGroup?.querySelector('.hint');
+      const widthScaleValue = widthScaleGroup?.querySelector('.range-value');
+
+      // Width scale range slider value display
+      if (widthScaleInput && widthScaleValue) {
+        widthScaleInput.addEventListener('input', (e) => {
+          const scale = parseFloat(e.target.value);
+          const pixels = Math.round(scale * 800);
+          widthScaleValue.textContent = `${scale}x (${pixels}px)`;
+        });
+      }
+
       if (hudModeSelect) {
         const updateCompactState = () => {
           const isCompact = hudModeSelect.value === 'compact';
@@ -1226,6 +1243,13 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
             seasonDisplaySelect.disabled = isCompact;
             if (isCompact) seasonDisplaySelect.value = 'icon';
             seasonDisplayGroup?.classList.toggle('disabled', isCompact);
+          }
+          if (widthScaleInput) {
+            widthScaleInput.disabled = isCompact;
+            widthScaleGroup?.classList.toggle('disabled', isCompact);
+            if (widthScaleHint) {
+              widthScaleHint.textContent = isCompact ? game.i18n.localize('CALENDARIA.Settings.HUDWidthScale.DisabledHint') : game.i18n.localize('CALENDARIA.Settings.HUDWidthScale.Hint');
+            }
           }
         };
         hudModeSelect.addEventListener('change', updateCompactState);

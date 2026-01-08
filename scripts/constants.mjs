@@ -43,6 +43,7 @@ export const SETTINGS = {
   HUD_STICKY_STATES: 'hudStickyStates',
   HUD_STICKY_ZONES_ENABLED: 'hudStickyZonesEnabled',
   HUD_WEATHER_DISPLAY_MODE: 'hudWeatherDisplayMode',
+  HUD_WIDTH_SCALE: 'hudWidthScale',
   LOGGING_LEVEL: 'loggingLevel',
   MACRO_TRIGGERS: 'macroTriggers',
   MINI_CALENDAR_CONTROLS_DELAY: 'miniCalendarControlsDelay',

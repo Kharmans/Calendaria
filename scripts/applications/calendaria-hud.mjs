@@ -247,6 +247,15 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     super._onRender(context, options);
     this.element.classList.toggle('compact', this.isCompact);
     this.element.classList.toggle('slice-mode', this.useSliceMode);
+
+    // Apply width scale (fullsize mode only)
+    if (!this.isCompact) {
+      const widthScale = game.settings.get(MODULE.ID, SETTINGS.HUD_WIDTH_SCALE);
+      this.element.style.setProperty('--hud-width-scale', widthScale);
+    } else {
+      this.element.style.removeProperty('--hud-width-scale');
+    }
+
     if (options.isFirstRender) this.#restorePosition();
     this.#enableDragging();
     this.#updateCelestialDisplay();

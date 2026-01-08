@@ -226,6 +226,16 @@ export function registerSettings() {
     type: new BooleanField({ initial: true })
   });
 
+  /** Calendar HUD width scale (fullsize mode only) */
+  game.settings.register(MODULE.ID, SETTINGS.HUD_WIDTH_SCALE, {
+    name: 'CALENDARIA.Settings.HUDWidthScale.Name',
+    hint: 'CALENDARIA.Settings.HUDWidthScale.Hint',
+    scope: 'user',
+    config: false,
+    type: new NumberField({ initial: 1, min: 0.5, max: 2, step: 0.05 }),
+    onChange: () => foundry.applications.instances.get('calendaria-hud')?.render()
+  });
+
   /** Calendar HUD sticky zones enabled */
   game.settings.register(MODULE.ID, SETTINGS.HUD_STICKY_ZONES_ENABLED, {
     name: 'CALENDARIA.Settings.HUDStickyZones.Name',
