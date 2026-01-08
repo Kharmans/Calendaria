@@ -83,6 +83,25 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
   }
 
   /**
+   * Get the current date components based on world time.
+   * Computed dynamically for API consistency.
+   * @returns {{year: number, month: number, day: number, hour: number, minute: number}} Current date
+   */
+  get currentDate() {
+    const components = this.timeToComponents(game.time.worldTime);
+    return {
+      year: components.year + (this.years?.yearZero ?? 0),
+      month: components.month,
+      day: components.dayOfMonth + 1,
+      hour: components.hour,
+      minute: components.minute
+    };
+  }
+
+  /** No-op setter, computed dynamically. */
+  set currentDate(_value) {}
+
+  /**
    * Check if this calendar operates without named months (e.g., Traveller Imperial Calendar).
    * Monthless calendars use day-of-year numbering instead of month/day.
    * @returns {boolean} True if the calendar has no named months
@@ -1075,8 +1094,15 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
     for (let i = 0; i < components.month; i++) dayOfYear += this.months.values[i]?.days ?? 0;
     const totalDays = this._componentsToDays(components);
     let eraYear = displayYear;
-    const era = this.getCurrentEra({ year: components.year, month: components.month, dayOfMonth: components.dayOfMonth });
-    if (era) eraYear = era.yearInEra;
+    if (this.eras?.length) {
+      const sortedEras = [...this.eras].sort((a, b) => b.startYear - a.startYear);
+      for (const era of sortedEras) {
+        if (displayYear >= era.startYear && (era.endYear == null || displayYear <= era.endYear)) {
+          eraYear = displayYear - era.startYear + 1;
+          break;
+        }
+      }
+    }
     return { year: displayYear, eraYear, month: components.month, monthDay: components.dayOfMonth, day: totalDays, yearDay: dayOfYear };
   }
 
