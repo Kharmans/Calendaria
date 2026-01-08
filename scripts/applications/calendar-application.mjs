@@ -1050,6 +1050,8 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
       onCreateNote: () => this.render()
     });
     this._hooks = [];
+    const c = game.time.components;
+    this._lastDay = `${c.year}-${c.month}-${c.dayOfMonth}`;
     const debouncedRender = foundry.utils.debounce(() => this.render(), 100);
     this._hooks.push({
       name: 'updateJournalEntryPage',
@@ -1070,6 +1072,20 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
       })
     });
     this._hooks.push({ name: HOOKS.WEATHER_CHANGE, id: Hooks.on(HOOKS.WEATHER_CHANGE, () => debouncedRender()) });
+    this._hooks.push({ name: 'updateWorldTime', id: Hooks.on('updateWorldTime', this._onUpdateWorldTime.bind(this)) });
+  }
+
+  /**
+   * Handle world time updates - re-render if day changed.
+   */
+  _onUpdateWorldTime() {
+    if (!this.rendered) return;
+    const components = game.time.components;
+    const currentDay = `${components.year}-${components.month}-${components.dayOfMonth}`;
+    if (currentDay !== this._lastDay) {
+      this._lastDay = currentDay;
+      this.render();
+    }
   }
 
   /**
