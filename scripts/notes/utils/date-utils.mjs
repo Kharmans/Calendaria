@@ -59,13 +59,15 @@ export function daysBetween(startDate, endDate) {
   const calendar = CalendarManager.getActiveCalendar();
   if (!calendar) return 0;
   try {
-    const monthDays = calendar.months?.values || [];
+    const yearZero = calendar.years?.yearZero ?? 0;
+    const startInternalYear = startDate.year - yearZero;
+    const endInternalYear = endDate.year - yearZero;
     let startDayOfYear = (startDate.day ?? 1) - 1;
-    for (let i = 0; i < startDate.month && i < monthDays.length; i++) startDayOfYear += monthDays[i]?.days || 30;
+    for (let i = 0; i < startDate.month; i++) startDayOfYear += calendar.getDaysInMonth(i, startInternalYear);
     let endDayOfYear = (endDate.day ?? 1) - 1;
-    for (let i = 0; i < endDate.month && i < monthDays.length; i++) endDayOfYear += monthDays[i]?.days || 30;
-    const startComponents = { year: startDate.year, day: startDayOfYear, hour: 0, minute: 0, second: 0 };
-    const endComponents = { year: endDate.year, day: endDayOfYear, hour: 0, minute: 0, second: 0 };
+    for (let i = 0; i < endDate.month; i++) endDayOfYear += calendar.getDaysInMonth(i, endInternalYear);
+    const startComponents = { year: startInternalYear, day: startDayOfYear, hour: 0, minute: 0, second: 0 };
+    const endComponents = { year: endInternalYear, day: endDayOfYear, hour: 0, minute: 0, second: 0 };
     const startTime = calendar.componentsToTime(startComponents);
     const endTime = calendar.componentsToTime(endComponents);
     const hoursPerDay = calendar.days?.hoursPerDay ?? 24;
@@ -148,10 +150,11 @@ export function addDays(date, days) {
   if (!calendar) return date;
 
   try {
+    const yearZero = calendar.years?.yearZero ?? 0;
+    const internalYear = date.year - yearZero;
     let dayOfYear = date.day - 1;
-    const monthDays = calendar.months?.values || [];
-    for (let i = 0; i < date.month && i < monthDays.length; i++) dayOfYear += monthDays[i]?.days || 30;
-    const components = { year: date.year, day: dayOfYear, hour: date.hour ?? 0, minute: date.minute ?? 0, second: 0 };
+    for (let i = 0; i < date.month; i++) dayOfYear += calendar.getDaysInMonth(i, internalYear);
+    const components = { year: internalYear, day: dayOfYear, hour: date.hour ?? 0, minute: date.minute ?? 0, second: 0 };
     const time = calendar.componentsToTime(components);
     const hoursPerDay = calendar.days?.hoursPerDay ?? 24;
     const minutesPerHour = calendar.days?.minutesPerHour ?? 60;
@@ -159,7 +162,7 @@ export function addDays(date, days) {
     const secondsPerDay = hoursPerDay * minutesPerHour * secondsPerMinute;
     const newTime = time + days * secondsPerDay;
     const newComponents = calendar.timeToComponents(newTime);
-    return { year: newComponents.year, month: newComponents.month, day: newComponents.dayOfMonth + 1, hour: newComponents.hour, minute: newComponents.minute };
+    return { year: newComponents.year + yearZero, month: newComponents.month, day: newComponents.dayOfMonth + 1, hour: newComponents.hour, minute: newComponents.minute };
   } catch (error) {
     log(1, 'Error adding days to date:', error);
     return date;

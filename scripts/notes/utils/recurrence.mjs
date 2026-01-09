@@ -248,11 +248,18 @@ function evaluateConditions(conditions, date) {
  */
 function getTotalDaysSinceEpoch(date) {
   const calendar = CalendarManager.getActiveCalendar();
-  const daysPerYear = getTotalDaysInYear(date.year);
-  const yearZero = calendar?.years?.yearZero ?? 0;
-  const yearsFromEpoch = date.year - yearZero;
-  const dayOfYear = getDayOfYear(date);
-  return yearsFromEpoch * daysPerYear + dayOfYear;
+  if (!calendar) return 0;
+  const yearZero = calendar.years?.yearZero ?? 0;
+  const internalYear = date.year - yearZero;
+  let dayOfYear = date.day - 1;
+  for (let m = 0; m < date.month; m++) dayOfYear += calendar.getDaysInMonth(m, internalYear);
+  const components = { year: internalYear, day: dayOfYear, hour: 0, minute: 0, second: 0 };
+  const time = calendar.componentsToTime(components);
+  const hoursPerDay = calendar.days?.hoursPerDay ?? 24;
+  const minutesPerHour = calendar.days?.minutesPerHour ?? 60;
+  const secondsPerMinute = calendar.days?.secondsPerMinute ?? 60;
+  const secondsPerDay = hoursPerDay * minutesPerHour * secondsPerMinute;
+  return Math.floor(time / secondsPerDay);
 }
 
 /**
