@@ -35,9 +35,7 @@ function processMoonPhases(phases) {
   if (phases.length <= MAX_VISIBLE_MOONS) return { visible: phases, overflow: [], overflowTooltip: '' };
   const visible = phases.slice(0, MAX_VISIBLE_MOONS);
   const overflow = phases.slice(MAX_VISIBLE_MOONS);
-  const overflowTooltip = overflow
-    .map((m) => `<div class='moon-tooltip-row'><img src='${m.icon}'><span>${m.moonName}: ${m.phaseName}</span></div>`)
-    .join('');
+  const overflowTooltip = overflow.map((m) => `<div class='moon-tooltip-row'><img src='${m.icon}'><span>${m.moonName}: ${m.phaseName}</span></div>`).join('');
   return { visible, overflow, overflowTooltip };
 }
 
@@ -315,53 +313,48 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
       }
     }
 
-    // Push any remaining days from current month before intercalary
+    const lastRegularWeekLength = currentWeek.length;
     if (currentWeek.length > 0) {
       weeks.push(currentWeek);
       currentWeek = [];
     }
 
-    // Insert intercalary row if there are intercalary days
     if (intercalaryDays.length > 0) {
       weeks.push({ isIntercalaryRow: true, days: intercalaryDays });
       currentWeek = [];
     }
 
-    // Fill remaining slots with next month days
     const lastRegularWeek = weeks.filter((w) => !w.isIntercalaryRow).pop();
     const needsNextMonth = intercalaryDays.length > 0 || (lastRegularWeek && lastRegularWeek.length < daysInWeek);
-
     if (needsNextMonth) {
       const totalMonths = calendar.months?.values?.length ?? 12;
-      let remainingSlots = intercalaryDays.length > 0 ? daysInWeek : daysInWeek - (lastRegularWeek?.length || 0);
+      const startPosition = intercalaryDays.length > 0 ? lastRegularWeekLength : lastRegularWeek?.length || 0;
+      let remainingSlots = daysInWeek - startPosition;
       let checkMonth = month;
       let checkYear = year;
       let dayInMonth = 1;
-
       checkMonth = checkMonth === totalMonths - 1 ? 0 : checkMonth + 1;
       if (checkMonth === 0) checkYear++;
-
+      if (intercalaryDays.length > 0 && startPosition > 0) for (let i = 0; i < startPosition; i++) currentWeek.push({ empty: true });
       while (remainingSlots > 0) {
-        const checkMonthDays = calendar.months?.values?.[checkMonth]?.days ?? 30;
-        const daysToTake = Math.min(remainingSlots, checkMonthDays - dayInMonth + 1);
-        for (let d = dayInMonth; d < dayInMonth + daysToTake; d++) {
-          currentWeek.push({ day: d, year: checkYear, month: checkMonth, isFromOtherMonth: true, isToday: this._isToday(checkYear, checkMonth, d) });
+        const checkMonthDays = calendar.getDaysInMonth(checkMonth, checkYear - yearZero);
+        const festivalDay = calendar.findFestivalDay({ year: checkYear - yearZero, month: checkMonth, dayOfMonth: dayInMonth - 1 });
+        const isIntercalary = festivalDay?.countsForWeekday === false;
+        if (!isIntercalary) {
+          currentWeek.push({ day: dayInMonth, year: checkYear, month: checkMonth, isFromOtherMonth: true, isToday: this._isToday(checkYear, checkMonth, dayInMonth) });
+          remainingSlots--;
         }
-        dayInMonth += daysToTake;
-        remainingSlots -= daysToTake;
 
-        if (remainingSlots > 0 && dayInMonth > checkMonthDays) {
+        dayInMonth++;
+        if (dayInMonth > checkMonthDays && remainingSlots > 0) {
           checkMonth = checkMonth === totalMonths - 1 ? 0 : checkMonth + 1;
           if (checkMonth === 0) checkYear++;
           dayInMonth = 1;
         }
       }
 
-      if (intercalaryDays.length > 0) {
-        weeks.push(currentWeek);
-      } else if (lastRegularWeek) {
-        lastRegularWeek.push(...currentWeek);
-      }
+      if (intercalaryDays.length > 0) weeks.push(currentWeek);
+      else if (lastRegularWeek) lastRegularWeek.push(...currentWeek);
     }
     const allMultiDayEvents = this._findMultiDayEvents(notes, year, month, startDayOfWeek, daysInWeek, daysInMonth);
     weeks.forEach((week, weekIndex) => {

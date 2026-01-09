@@ -341,34 +341,29 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       }
     }
 
-    // Push any remaining days from current month before intercalary
+    const lastRegularWeekLength = currentWeek.length;
     if (currentWeek.length > 0) {
       weeks.push(currentWeek);
       currentWeek = [];
     }
 
-    // Insert intercalary row if there are intercalary days
     if (intercalaryDays.length > 0) {
       weeks.push({ isIntercalaryRow: true, days: intercalaryDays });
-      // After intercalary, start fresh row for next month preview
       currentWeek = [];
     }
 
-    // Fill remaining slots with next month days (either completing partial week or starting fresh after intercalary)
     const lastRegularWeek = weeks.filter((w) => !w.isIntercalaryRow).pop();
     const needsNextMonth = intercalaryDays.length > 0 || (lastRegularWeek && lastRegularWeek.length < daysInWeek);
-
     if (needsNextMonth) {
       const totalMonths = calendar.months?.values?.length ?? 12;
-      // For intercalary, fill a complete row; otherwise fill remaining slots
-      let remainingSlots = intercalaryDays.length > 0 ? daysInWeek : daysInWeek - (lastRegularWeek?.length || 0);
+      const startPosition = intercalaryDays.length > 0 ? lastRegularWeekLength : lastRegularWeek?.length || 0;
+      let remainingSlots = daysInWeek - startPosition;
       let checkMonth = month;
       let checkYear = year;
       let dayInMonth = 1;
-
-      // Move to next month
       checkMonth = checkMonth === totalMonths - 1 ? 0 : checkMonth + 1;
       if (checkMonth === 0) checkYear++;
+      if (intercalaryDays.length > 0 && startPosition > 0) for (let i = 0; i < startPosition; i++) currentWeek.push({ empty: true });
 
       while (remainingSlots > 0) {
         const checkMonthDays = calendar.getDaysInMonth(checkMonth, checkYear - yearZero);
@@ -388,20 +383,13 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
         }
       }
 
-      // If we had intercalary, push the new week; otherwise merge with last week
-      if (intercalaryDays.length > 0) {
-        weeks.push(currentWeek);
-      } else if (lastRegularWeek) {
-        // Merge with last regular week
-        lastRegularWeek.push(...currentWeek);
-      }
+      if (intercalaryDays.length > 0) weeks.push(currentWeek);
+      else if (lastRegularWeek) lastRegularWeek.push(...currentWeek);
     }
     const viewedComponents = { month, dayOfMonth: Math.floor(daysInMonth / 2) };
     const currentSeason = ViewUtils.enrichSeasonData(calendar.getCurrentSeason?.(viewedComponents));
     const currentEra = calendar.getCurrentEra?.();
     const monthWeekdays = calendar.getWeekdaysForMonth?.(month) ?? calendar.days?.values ?? [];
-
-    // Format header using display settings
     const headerComponents = { year, month, dayOfMonth: date.day };
     const formattedHeader = formatForLocation(calendar, headerComponents, 'miniCalendarHeader');
 
