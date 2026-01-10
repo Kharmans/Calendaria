@@ -1,38 +1,36 @@
 # Macros
 
-Calendaria supports macro automation through two mechanisms: **Trigger Configuration** and **Event-Attached Macros**.
+Calendaria supports macro automation through **Trigger Configuration** and **Event-Attached Macros**.
 
 ---
 
 ## Macro Triggers
 
-Configure macros to execute automatically when calendar events occur. Access via **Settings Panel > Macros** tab (GM only).
+Configure macros to execute automatically when calendar events occur. Access via **Settings Panel > Macros tab** (GM only).
 
 ### Global Triggers
-
-Time-based triggers that fire when thresholds are crossed:
 
 | Trigger | Description |
 |---------|-------------|
 | Dawn | Fires at sunrise |
 | Dusk | Fires at sunset |
-| Midday | Fires at noon (12:00) |
-| Midnight | Fires at midnight (00:00) |
+| Midday | Fires at noon |
+| Midnight | Fires at midnight |
 | New Day | Fires when the day changes |
 
 ### Season Triggers
 
-Execute macros when seasons change. Options:
+Execute macros when seasons change:
+
 - **Specific season**: Fires when entering that season
-- **All seasons**: Fires on any season change
+- **All Seasons**: Fires on any season change
 
 ### Moon Phase Triggers
 
-Execute macros when moon phases change. Configure:
+Execute macros when moon phases change:
+
 - **Moon**: Specific moon or "All Moons"
 - **Phase**: Specific phase or "All Phases"
-
-Wildcard combinations allow broad triggers (e.g., "All Moons + Full Moon" fires for any full moon).
 
 ---
 
@@ -42,13 +40,24 @@ Calendar notes can have an attached macro that executes when the event triggers.
 
 ### Trigger Conditions
 
-Macros attached to notes execute when:
-- The event's start time is reached
-- Multi-day events progress (fires daily with progress data)
+- Event's start time is reached
+- Multi-day events fire daily with progress data
+
+> Notes with the **Silent** flag will not trigger macros or notifications.
+
+### The Scope Parameter
+
+When Calendaria triggers a macro, it passes context data through Foundry's `scope` parameter. This is a standard Foundry feature—when macros are executed programmatically (rather than manually clicked), the caller can provide a `scope` object containing relevant data.
+
+Inside your macro, access this data by destructuring from `scope`:
+
+```javascript
+const { event, trigger } = scope;
+```
+
+The `scope` variable is automatically available in your macro code—you don't need to define or import it.
 
 ### Context Data
-
-Macros receive context via the `scope` parameter:
 
 ```javascript
 // Event trigger context
@@ -88,17 +97,21 @@ console.log(components);   // { year, month, dayOfMonth, hour, minute, ... }
 ```javascript
 const { trigger, previous, current, calendar } = scope;
 console.log(trigger);         // "newDay"
-console.log(previous.year);   // Previous year
-console.log(current.year);    // Current year
+console.log(previous.year);   // Previous date components
+console.log(current.year);    // Current date components
+console.log(calendar);        // Active calendar object
 ```
 
 ### Season Change Trigger
 
 ```javascript
-const { trigger, previousSeason, currentSeason, calendar } = scope;
+const { trigger, previous, current, previousSeason, currentSeason, calendar } = scope;
 console.log(trigger);          // "seasonChange"
+console.log(previous);         // Previous date components
+console.log(current);          // Current date components
 console.log(previousSeason);   // Previous season object { name, ... }
 console.log(currentSeason);    // Current season object { name, ... }
+console.log(calendar);         // Active calendar object
 ```
 
 ### Moon Phase Trigger
@@ -116,7 +129,7 @@ console.log(moon.currentPhaseName);
 
 ---
 
-## Common Macro Examples
+## Example Macros
 
 ### Time Control
 
@@ -217,90 +230,8 @@ const forecast = await CALENDARIA.api.getWeatherForecast({ days: 7 });
 
 ---
 
-## Hooks
+## For Developers
 
-Listen for Calendaria events in world scripts or modules:
+See [API Reference](API-Reference) for all available methods.
 
-```javascript
-// Time thresholds
-Hooks.on("calendaria.sunrise", (data) => {
-  ChatMessage.create({ content: "<b>The sun rises.</b>" });
-});
-
-Hooks.on("calendaria.sunset", (data) => {
-  ChatMessage.create({ content: "<b>The sun sets.</b>" });
-});
-
-// Day/period changes
-Hooks.on("calendaria.dayChange", (data) => {
-  console.log("New day:", data.current);
-});
-
-Hooks.on("calendaria.seasonChange", (data) => {
-  console.log("Season changed to:", data.currentSeason?.name);
-});
-
-// Moon phases
-Hooks.on("calendaria.moonPhaseChange", (data) => {
-  for (const moon of data.moons) {
-    if (moon.currentPhaseName?.includes("Full")) {
-      ChatMessage.create({
-        content: `<b>${moon.moonName} is full!</b>`,
-        whisper: game.users.filter(u => u.isGM).map(u => u.id)
-      });
-    }
-  }
-});
-
-// Events
-Hooks.on("calendaria.eventTriggered", (data) => {
-  console.log("Event triggered:", data.name);
-});
-
-Hooks.on("calendaria.weatherChange", (data) => {
-  console.log("Weather changed:", data);
-});
-```
-
-### Available Hooks
-
-| Hook | Description |
-|------|-------------|
-| `calendaria.sunrise` | Sunrise threshold crossed |
-| `calendaria.sunset` | Sunset threshold crossed |
-| `calendaria.midnight` | Midnight threshold crossed |
-| `calendaria.midday` | Midday threshold crossed |
-| `calendaria.dayChange` | Day changed |
-| `calendaria.monthChange` | Month changed |
-| `calendaria.yearChange` | Year changed |
-| `calendaria.seasonChange` | Season changed |
-| `calendaria.moonPhaseChange` | Moon phase changed |
-| `calendaria.restDayChange` | Rest day status changed |
-| `calendaria.eventTriggered` | Calendar event triggered |
-| `calendaria.weatherChange` | Weather changed |
-| `calendaria.dateTimeChange` | Any time change |
-
----
-
-## API Reference
-
-Access via `CALENDARIA.api`. See [API Reference](API-Reference.md) for full documentation.
-
-### Key Methods
-
-| Method | Description |
-|--------|-------------|
-| `getCurrentDateTime()` | Get current time components |
-| `advanceTime(delta)` | Advance time by delta |
-| `setDateTime(components)` | Set absolute time |
-| `jumpToDate(options)` | Jump to specific date |
-| `advanceTimeToPreset(preset)` | Advance to sunrise/sunset/midday/midnight |
-| `formatDate(components, format)` | Format date string |
-| `getMoonPhase(index)` | Get moon phase |
-| `getCurrentSeason()` | Get current season |
-| `getCurrentWeather()` | Get current weather |
-| `isDaytime()` / `isNighttime()` | Check time of day |
-| `isRestDay()` | Check if rest day |
-| `isFestivalDay()` | Check if festival |
-| `createNote(options)` | Create calendar note |
-| `getNotesForDate(y, m, d)` | Get notes on date |
+See [Hooks](Hooks) for calendar events you can listen to in world scripts or modules.

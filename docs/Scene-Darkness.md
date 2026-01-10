@@ -4,19 +4,13 @@ Calendaria can automatically sync scene darkness levels with the time of day.
 
 ## How It Works
 
-The `calculateDarknessFromTime` function uses a cosine curve based on total minutes in the day:
+Darkness follows a smooth cosine curve throughout the day:
 
-```javascript
-const totalMinutes = hours * 60 + minutes;
-const dayProgress = totalMinutes / (24 * 60);
-const darkness = (Math.cos(dayProgress * 2 * Math.PI) + 1) / 2;
-```
+- **Midnight**: Maximum darkness (1.0)
+- **Noon**: Minimum darkness (0.0)
+- **Dawn/Dusk**: Gradual transitions
 
-- **Midnight (00:00)**: Maximum darkness (1.0)
-- **Noon (12:00)**: Minimum darkness (0.0)
-- **Dawn/Dusk**: Gradual cosine transitions
-
-Darkness updates trigger only when the hour changes. The transition uses eased animation via `requestAnimationFrame` over 500-3000ms depending on game time speed.
+Darkness updates when the hour changes, with smooth animated transitions. Only the GM can update scene darkness.
 
 ---
 
@@ -24,103 +18,66 @@ Darkness updates trigger only when the hour changes. The transition uses eased a
 
 ### Global Setting
 
-Located in **Settings Panel > Time Integration > Sync Scene Darkness with Time**.
+Enable via **Settings Panel > Time tab > Sync Scene Darkness with Time** (default: enabled).
 
-Registered as `calendaria.darknessSync` (boolean, default `true`).
+### Default Brightness Multiplier
+
+A global brightness multiplier applied to all scenes unless overridden. Configure in **Settings Panel > Weather tab** (range 0.5x-1.5x, default 1.0x).
 
 ### Per-Scene Override
 
-A dropdown is injected into the Scene Configuration sheet (Lighting tab):
+Override settings for individual scenes via **Scene Configuration > Ambiance tab**:
 
-| Value | Behavior |
-|-------|----------|
-| Use Global Setting | Follows the module setting |
-| Enabled | Always sync this scene |
-| Disabled | Never sync this scene |
-
-Stored as scene flag `calendaria.darknessSync` with values: `"default"`, `"enabled"`, or `"disabled"`.
+| Setting | Options |
+|---------|---------|
+| Darkness Sync | Use Global / Enabled / Disabled |
+| Brightness Multiplier | 0.5x - 1.5x slider |
 
 ---
 
-## Sunrise/Sunset Calculation
+## Dynamic Daylight
 
-The calendar provides sunrise and sunset times via dynamic daylight calculations. These are used by the API but **not** by the darkness sync itself.
-
-If `calendar.daylight.enabled` is true, daylight hours vary throughout the year using solstice configuration:
-
-```javascript
-// Cosine interpolation between winter and summer solstices
-const cosineProgress = (1 - Math.cos(progress * Math.PI)) / 2;
-return shortestDay + (longestDay - shortestDay) * cosineProgress;
-```
-
-Sunrise and sunset are calculated symmetrically around midday:
-
-```javascript
-sunrise = midday - daylightHours / 2;
-sunset = midday + daylightHours / 2;
-```
+When **Enable Dynamic Daylight** is enabled in Calendar Editor, daylight hours vary throughout the year based on solstice configuration. Sunrise and sunset times shift to reflect longer summer days and shorter winter days.
 
 ---
 
-## API
+## Darkness Modifiers
 
-### Sunrise and Sunset
+The final darkness value combines multiple factors:
 
-```javascript
-// Sunrise time in hours (e.g., 6.5 = 6:30)
-CALENDARIA.api.getSunrise();
-
-// Sunset time in hours (e.g., 18.5 = 18:30)
-CALENDARIA.api.getSunset();
-
-// Hours of daylight
-CALENDARIA.api.getDaylightHours();
+```text
+Base darkness (from time of day)
+  × Scene brightness multiplier
+  × Climate zone brightness multiplier
+  + Weather darkness penalty
+= Final darkness (clamped 0-1)
 ```
 
-### Day/Night Progress
+### Weather Darkness Penalty
 
-```javascript
-// Progress through daylight period (0 = sunrise, 1 = sunset)
-CALENDARIA.api.getProgressDay();
+Weather conditions add darkness:
 
-// Progress through night period (0 = sunset, 1 = sunrise)
-CALENDARIA.api.getProgressNight();
-```
+| Condition | Penalty |
+|-----------|---------|
+| Clear | 0 |
+| Overcast | +0.1 |
+| Heavy Rain | +0.2 |
+| Thunderstorm | +0.3 |
 
-### Time Until Events
+### Climate Zone Brightness
 
-Returns `{ hours, minutes, seconds }`:
-
-```javascript
-CALENDARIA.api.getTimeUntilSunrise();
-CALENDARIA.api.getTimeUntilSunset();
-CALENDARIA.api.getTimeUntilMidnight();
-CALENDARIA.api.getTimeUntilMidday();
-```
-
-### Day/Night Checks
-
-```javascript
-// True if between sunrise and sunset
-CALENDARIA.api.isDaytime();
-
-// True if before sunrise or after sunset
-CALENDARIA.api.isNighttime();
-```
+Climate zones can define a brightness multiplier that scales overall scene brightness.
 
 ---
 
-## Hooks
+## Environment Lighting
 
-Darkness updates are triggered by the `updateWorldTime` hook. The module listens for hour changes and initiates smooth transitions when detected.
+When **Sync Scene Ambience with Weather** is enabled (default), scene hue and saturation also sync with weather and climate settings.
 
 ---
 
-## Source Files
+## For Developers
 
-- `scripts/darkness.mjs` - Core darkness calculation and scene updates
-- `scripts/constants.mjs` - `SETTINGS.DARKNESS_SYNC` and `SCENE_FLAGS.DARKNESS_SYNC`
-- `scripts/settings.mjs` - Setting registration
-- `scripts/calendar/data/calendaria-calendar.mjs` - Sunrise/sunset/daylight methods
-- `templates/partials/scene-darkness-sync.hbs` - Scene config dropdown
+See [API Reference](API-Reference#daynight--sun-position) for sunrise/sunset methods, day/night checks, and time-until calculations.
+
+See [Hooks](Hooks) for `updateWorldTime` and `calendaria.weatherChange` hooks that trigger darkness updates.

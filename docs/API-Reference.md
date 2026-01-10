@@ -2,6 +2,9 @@
 
 Calendaria exposes a public API at `CALENDARIA.api` for macros and module integration.
 
+> [!IMPORTANT]
+> Methods marked "GM only" will fail silently or show a warning when called by non-GM users.
+
 ---
 
 ## Time Management
@@ -94,20 +97,6 @@ await CALENDARIA.api.advanceTimeToPreset('midnight');
 | `preset` | `string` | `'sunrise'`, `'midday'`, `'noon'`, `'sunset'`, or `'midnight'` |
 
 **Returns:** `Promise<number>` - New world time in seconds.
-
----
-
-### skipNextHooks()
-
-Skip hook triggers for the next time change. Useful for timepoint jumps where you don't want to re-trigger events that already fired. GM only.
-
-```javascript
-CALENDARIA.api.skipNextHooks();
-await CALENDARIA.api.setDateTime({ year: 1492, month: 5, day: 15 });
-// No hooks fire for this change
-```
-
-**Returns:** `void`
 
 ---
 
@@ -236,40 +225,6 @@ const cycles = CALENDARIA.api.getCycleValues();
 ```
 
 **Returns:** `object|null` - Current cycle values.
-
----
-
-### getCycleName(cycleIndex)
-
-Get the current entry name for a specific cycle.
-
-```javascript
-const name = CALENDARIA.api.getCycleName(0);
-// Returns: "Gemini"
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `cycleIndex` | `number` | Index of the cycle (default: 0) |
-
-**Returns:** `string|null` - Current cycle entry name.
-
----
-
-### getDaysInYear(year)
-
-Get the total number of days in a year. Useful for monthless calendars.
-
-```javascript
-const days = CALENDARIA.api.getDaysInYear(1492);
-// Returns: 365
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `year` | `number` | The year to check (defaults to current year) |
-
-**Returns:** `number` - Total days in the year.
 
 ---
 
@@ -516,7 +471,7 @@ const relative = CALENDARIA.api.timeSince({ year: 1492, month: 5, dayOfMonth: 15
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `targetDate` | `object` | Target date `{ year, month, dayOfMonth }` |
-| `currentDate` | `object|null` | Current date (defaults to current time) |
+| `currentDate` | `object` or `null` | Current date (defaults to current time) |
 
 **Returns:** `string` - Relative time string.
 
@@ -528,10 +483,10 @@ Get available format tokens and their descriptions.
 
 ```javascript
 const tokens = CALENDARIA.api.getFormatTokens();
-// Returns: [{ token, description, type }, ...]
+// Returns: [{ token, descriptionKey, type }, ...]
 ```
 
-**Returns:** `Array<object>` - Available format tokens.
+**Returns:** `Array<{token: string, descriptionKey: string, type: string}>` - Available format tokens.
 
 ---
 
@@ -1140,6 +1095,19 @@ await CALENDARIA.api.removeWeatherPreset("acid-rain");
 
 ---
 
+### getClimateZoneTemplates()
+
+Get all available climate zone templates for creating new zones.
+
+```javascript
+const templates = CALENDARIA.api.getClimateZoneTemplates();
+// Returns array of template objects
+```
+
+**Returns:** `Array<object>` - Climate zone templates with id, name, temperatures, and weather weights.
+
+---
+
 ## Multiplayer & Permissions
 
 ### isPrimaryGM()
@@ -1220,6 +1188,7 @@ const hooks = CALENDARIA.api.hooks;
 | `calendaria.noteDeleted` | Note deleted |
 | `calendaria.eventTriggered` | Scheduled event triggered |
 | `calendaria.eventDayChanged` | Event day changed |
+| `calendaria.reminderReceived` | Reminder notification received |
 | `calendaria.preRenderCalendar` | Before calendar render |
 | `calendaria.renderCalendar` | After calendar render |
 | `calendaria.importStarted` | Import started |

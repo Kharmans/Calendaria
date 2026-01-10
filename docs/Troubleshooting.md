@@ -17,7 +17,7 @@ Common issues and solutions for Calendaria.
 
 1. **Settings** > **Module Settings** > **Calendaria** > **Settings Panel**
 2. Navigate to **Advanced** tab
-3. Set **Logging Level** to **Verbose**
+3. Set **Logging Level** to **Verbose (All)**
 4. Console will show detailed `CALENDARIA |` prefixed messages
 
 ---
@@ -36,7 +36,8 @@ These errors appear when a non-GM user attempts GM-only actions:
 | `Only GMs can update notes` | Player tried to modify a note |
 | `Only GMs can edit calendars` | Player tried to access Calendar Editor |
 
-**Solution:** Only GM users can modify time and calendar data.
+> [!TIP]
+> Only GM users can modify time and calendar data. Players receive these errors when attempting GM-only actions.
 
 ---
 
@@ -45,7 +46,7 @@ These errors appear when a non-GM user attempts GM-only actions:
 ### "Calendar not found" / "No active calendar"
 
 - The configured calendar ID doesn't exist in the registry
-- **Solution:** Switch to a valid calendar in **Settings** > **Calendaria** > **Active Calendar**
+- **Solution:** Switch to a valid calendar in **Settings Panel** > **Calendar** tab
 
 ### "Cannot remove the active calendar"
 
@@ -82,6 +83,16 @@ These errors appear when a non-GM user attempts GM-only actions:
 2. Check that increment/multiplier isn't set to zero
 3. Confirm you're the Primary GM
 
+### "Only the GM can control time"
+
+- Non-GM user attempted to use TimeKeeper controls
+- **Solution:** Only GMs can start/stop or adjust the clock
+
+### "Clock blocked while game is paused or combat is active"
+
+- The real-time clock pauses during combat or when the game is paused
+- **Solution:** End combat or unpause the game to resume clock
+
 ---
 
 ## Calendar Editor Issues
@@ -113,14 +124,23 @@ Common import errors and solutions:
 |-------|----------|
 | `Invalid Calendarium export format` | File must contain `calendars` array with `static.months` and `static.weekdays` |
 | `Invalid Fantasy-Calendar export format` | File must contain `static_data` and `dynamic_data` fields |
-| `Simple Calendar module is not installed or active` | Install and enable the Simple Calendar module first |
+| `Simple Calendar module is not installed or active` | Enable the Simple Calendar module first |
 | `No calendars found in Simple Calendar module settings` | Configure a calendar in Simple Calendar before importing |
+| `Seasons & Stars module is not installed or active` | Enable the Seasons & Stars module first |
+| `No active calendar found in Seasons & Stars module settings` | Configure a calendar in Seasons & Stars before importing |
+| `Simple Timekeeping module is not installed or active` | Enable the Simple Timekeeping module first |
+| `No configuration found in Simple Timekeeping module settings` | Configure calendar settings in Simple Timekeeping before importing |
 | `No calendars found` | Source module has no calendar data configured |
 
 ### "No data loaded"
 
 - No file uploaded or module data loaded
 - **Solution:** Upload a valid JSON file or click "Import from Installed Module"
+
+### "Select an import source first"
+
+- No import source selected from dropdown
+- **Solution:** Choose an import source before attempting to load data
 
 ### Data Missing After Import
 
@@ -148,6 +168,11 @@ Common import errors and solutions:
 - Referenced preset ID doesn't exist
 - **Solution:** Select a valid preset from the weather picker
 
+### "No climate zones"
+
+- Weather tab requires at least one climate zone configured
+- **Solution:** Add a climate zone in Calendar Editor > Weather tab
+
 ---
 
 ## Note Issues
@@ -167,6 +192,63 @@ Common import errors and solutions:
 - The folder contains all calendar journals
 - **Solution:** This folder is protected by design
 
+### "Cannot delete calendar folder"
+
+- Attempting to delete a calendar-specific subfolder
+- **Solution:** This folder contains all notes for this calendar and is protected
+
+---
+
+## UI Issues
+
+### "This window cannot be closed"
+
+- GM has enabled force display for this UI element
+- **Solution:** Ask the GM to disable force display in Settings Panel
+
+---
+
+## Calendar Management Errors
+
+### "Calendar already exists"
+
+- Attempting to add a calendar with an ID that already exists
+- **Solution:** Use a different calendar ID or edit the existing calendar
+
+### "No active calendar available"
+
+- No calendar is set as active
+- **Solution:** Switch to a valid calendar in **Settings Panel** > **Calendar** tab
+
+### "Error saving calendar" / "Error adding calendar"
+
+- Failed to save calendar data to settings
+- **Solution:** Check console for specific error details; may indicate format issues
+
+---
+
+## Macro Trigger Issues
+
+### "Select a moon, phase, and macro"
+
+- Moon phase trigger missing required fields
+- **Solution:** Select all three options before adding the trigger
+
+### "A trigger for this moon/phase already exists"
+
+- Duplicate moon phase trigger detected
+- **Solution:** Edit the existing trigger instead of creating a duplicate
+
+### "Select a season and macro"
+
+- Season trigger missing required fields
+- **Solution:** Select both a season and macro before adding the trigger
+
+### "A trigger for this season already exists"
+
+- Duplicate season trigger detected
+- **Solution:** Edit the existing trigger instead of creating a duplicate
+
 ---
 
 ## Resetting Settings
@@ -182,13 +264,40 @@ Common import errors and solutions:
 1. **Settings Panel** > **Appearance** tab
 2. Click **Reset All** to restore default colors
 
+### Theme Import Failed
+
+- "Failed to import theme. Check the file format."
+- **Solution:** Ensure the JSON file contains a valid `colors` object exported from Calendaria
+
 ### Full Settings Reset
 
-To completely reset Calendaria:
+> [!CAUTION]
+> This will erase all calendar customizations, notes, and settings for this module.
 
-1. Close Foundry VTT
-2. Delete the module settings from your world's database
-3. Restart Foundry
+Run this macro to completely reset Calendaria:
+
+```javascript
+if (!game.user.isGM) {
+  ui.notifications.error("Only GMs can reset Calendaria");
+  return;
+}
+
+const confirm = await foundry.applications.api.DialogV2.confirm({
+  window: { title: "Reset Calendaria" },
+  content: "<p>This will delete ALL Calendaria settings, custom calendars, and notes. This cannot be undone.</p><p>Are you sure?</p>",
+  yes: { default: false },
+  no: { default: true }
+});
+
+if (!confirm) return;
+await game.settings.set("calendaria", "devMode", true);
+await CALENDARIA.api.deleteAllNotes();
+const folders = game.folders.filter(f => f.flags?.calendaria && !f.folder?.flags?.calendaria);
+for (const folder of folders) await folder.delete({ deleteSubfolders: true, deleteContents: true });
+const settings = game.settings.storage.get("world").filter(s => s.key.startsWith("calendaria."));
+for (const setting of settings) await setting.delete();
+ui.notifications.info("Calendaria reset complete. Please refresh.");
+```
 
 ---
 
@@ -199,34 +308,9 @@ To completely reset Calendaria:
 | Level | Output |
 |-------|--------|
 | Off | No logging |
-| Errors | Only errors (red) |
-| Warnings | Errors + warnings (orange) |
-| Verbose | All debug output (purple) |
-
-### Common Console Patterns
-
-```
-CALENDARIA | Error initializing logger: [error details]
-CALENDARIA | Active calendar "X" not found, using "Y"
-CALENDARIA | Loaded X calendars from settings
-CALENDARIA | Migrated calendar "X": added missing fields
-```
-
----
-
-## Multi-GM Sessions
-
-### Time Desync Between GMs
-
-1. Designate a single Primary GM in **Settings Panel** > **Time**
-2. Verify all GMs have the same module version
-3. Refresh all clients if issues persist
-
-### Calendar Changes Not Syncing
-
-1. Check socket connection (no Foundry connection warnings)
-2. Verify both GMs are viewing the same calendar
-3. Refresh pages for all GMs
+| Errors Only | Only errors (red) |
+| Warnings & Errors | Errors + warnings (orange) |
+| Verbose (All) | All debug output (violet) |
 
 ---
 
@@ -241,4 +325,4 @@ If you cannot resolve an issue:
    - Other active modules
    - Console errors (F12 > Console)
    - Steps to reproduce
-3. Enable **Verbose** logging and capture relevant console output
+3. Enable **Verbose (All)** logging and capture relevant console output

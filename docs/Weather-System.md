@@ -80,7 +80,8 @@ Climate zones are stored in the calendar's `weather.zones` array. The `weather.a
 
 ### Auto-Generation
 
-When `calendar.weather.autoGenerate` is `true`, weather regenerates automatically on day change (GM only).
+> [!NOTE]
+> When **Auto-generate weather on day change** is enabled, weather regenerates automatically on day change (GM only).
 
 ---
 
@@ -110,12 +111,101 @@ In Calendar Editor > Weather tab:
 
 ## Temperature Units
 
-Stored in Celsius internally. Display unit configurable via `SETTINGS.TEMPERATURE_UNIT`:
+> [!NOTE]
+> Temperature is stored in Celsius internally regardless of display preference.
 
-- `celsius` (default)
-- `fahrenheit`
+Display unit configurable via **Temperature Unit** setting (Settings Panel > Weather tab):
 
-Conversion handled by `WeatherManager.formatTemperature(celsius)`.
+- Celsius (default)
+- Fahrenheit
+
+---
+
+## Scene Ambience
+
+Weather and climate zones can affect scene lighting when "Sync Scene Ambience with Weather" is enabled (Settings > Time tab).
+
+### Darkness Penalty
+
+Weather presets apply darkness adjustments to scenes:
+
+- Overcast conditions increase darkness slightly
+- Storms and blizzards reduce visibility significantly
+- Magical weather may brighten or alter scene lighting
+
+### Environment Lighting
+
+Hue and saturation adjustments create atmospheric effects:
+
+- **Hue**: Shift environment color (0-360 degrees)
+- **Saturation**: Adjust color intensity (-100% to +100%)
+
+### Brightness Multiplier
+
+Control how strongly weather affects scene brightness at three levels:
+
+| Level | Description |
+|-------|-------------|
+| Per-Scene | Override in Scene Configuration > Ambiance |
+| Per-Climate-Zone | Set in Calendar Editor > Weather tab |
+| Global Default | Set in Settings > Weather tab (default 1.0) |
+
+### Value Priority
+
+When both weather preset and climate zone define lighting values:
+
+1. Weather preset values take precedence when set
+2. Climate zone values used as fallback
+3. Global defaults if neither is configured
+
+### Darkness Penalty Values
+
+Each weather preset defines a `darknessPenalty` that increases scene darkness:
+
+| Category | Preset | Darkness Penalty |
+|----------|--------|------------------|
+| Standard | Clear, Windy | 0 |
+| Standard | Partly Cloudy, Sunshower | 0.05 |
+| Standard | Cloudy, Drizzle, Mist | 0.1 |
+| Standard | Rain, Overcast | 0.15 |
+| Standard | Fog | 0.2 |
+| Severe | Snow | 0.1 |
+| Severe | Hail | 0.2 |
+| Severe | Thunderstorm | 0.25 |
+| Severe | Blizzard, Tornado | 0.3 |
+| Severe | Hurricane | 0.35 |
+| Environmental | Sandstorm | 0.2 |
+| Environmental | Ashfall | 0.25 |
+| Environmental | Luminous Sky | -0.1 (brightens) |
+| Fantasy | Arcane | -0.05 (brightens) |
+| Fantasy | Ley Surge | -0.1 (brightens) |
+| Fantasy | Permafrost Surge, Veilfall | 0.1 |
+| Fantasy | Gravewind, Aether Haze | 0.15 |
+| Fantasy | Nullfront | 0.2 |
+| Fantasy | Black Sun | 0.4 |
+
+### Built-in Preset Defaults
+
+| Category | Preset | Lighting Effect |
+|----------|--------|-----------------|
+| Standard | Overcast | Desaturated |
+| Severe | Blizzard | Blue-tinted, dark |
+| Environmental | Sandstorm | Warm orange |
+| Fantasy | Various | Magical coloring |
+
+### Climate Zone Templates
+
+Built-in climate zones include environment lighting defaults (`environmentBase` and `environmentDark`):
+
+| Zone | Hue | Saturation | Notes |
+|------|-----|------------|-------|
+| Arctic | 200 | 0.6 | Blue-tinted, dark variant at 210/0.5 |
+| Subarctic | 200 | 0.7 | Blue-tinted |
+| Temperate | - | - | Neutral (no override) |
+| Subtropical | - | - | Neutral (no override) |
+| Tropical | 40 | 0.9 | Warm/golden |
+| Arid | 35 | 0.8 | Warm/orange tinted |
+| Polar | 210 | 0.5 | Blue-tinted, dark variant at 220/0.4 |
 
 ---
 
@@ -128,19 +218,19 @@ Conversion handled by `WeatherManager.formatTemperature(celsius)`.
 3. Temperature generated from zone's seasonal range (or preset's `tempMin`/`tempMax` override)
 4. Optional seeded randomness via `dateSeed(year, month, day)` for deterministic forecasts
 
-### Inertia (Not Used by Default)
+### Weather Inertia (Coming Soon)
 
-`applyWeatherInertia(currentWeatherId, probabilities, inertia)` exists to smooth transitions but is not called in standard generation.
+Weather inertia creates smoother, more realistic transitions by favoring the current weather when generating new conditions. For example, if it's raining, it's more likely to continue raining rather than suddenly becoming clear.
 
 ---
 
 ## Weather Picker
 
-`openWeatherPicker()` opens a dialog displaying all presets grouped by category. Features:
+GMs can manually set weather by clicking the weather indicator on the CalendariaHUD or MiniCalendar. This opens the Weather Picker dialog with:
 
-- Climate zone selector (if zones configured)
-- Select preset directly
-- Random generation button
+- All weather presets grouped by category (Standard, Severe, Fantasy, Environmental, Custom)
+- Climate zone selector (if multiple zones configured)
+- Random generation button to roll new weather based on current zone/season probabilities
 
 ---
 
@@ -166,172 +256,12 @@ Custom presets appear in:
 - Calendar Editor Weather tab preset lists
 - Climate settings dialog preset chances
 
-Custom presets are stored in `SETTINGS.CUSTOM_WEATHER_PRESETS` with `category: 'custom'`. See API Reference for `addWeatherPreset()` and `removeWeatherPreset()`.
+Custom presets are stored in the `calendaria.customWeatherPresets` setting with `category: 'custom'`. See [API Reference](API-Reference) for `addWeatherPreset()`, `removeWeatherPreset()`, and `updateWeatherPreset()`.
 
 ---
 
-## API Reference
+## For Developers
 
-### getCurrentWeather()
+See [API Reference](API-Reference#weather) for weather-related methods including `getCurrentWeather()`, `setWeather()`, `generateWeather()`, and more.
 
-Returns current weather state or `null`.
-
-```javascript
-const weather = CALENDARIA.api.getCurrentWeather();
-// { id, label, description, icon, color, category, temperature, setAt, setBy }
-```
-
-### setWeather(presetId, options)
-
-Set weather by preset ID.
-
-```javascript
-await CALENDARIA.api.setWeather('thunderstorm');
-await CALENDARIA.api.setWeather('rain', { temperature: 15 });
-```
-
-### setCustomWeather(weatherData)
-
-Set arbitrary weather values.
-
-```javascript
-await CALENDARIA.api.setCustomWeather({
-  label: 'Magical Storm',
-  icon: 'fa-wand-magic-sparkles',
-  color: '#9933FF',
-  description: 'Arcane energy crackles',
-  temperature: 20
-});
-```
-
-### clearWeather()
-
-Clear current weather.
-
-```javascript
-await CALENDARIA.api.clearWeather();
-```
-
-### generateWeather(options)
-
-Generate weather from active climate zone.
-
-```javascript
-await CALENDARIA.api.generateWeather();
-await CALENDARIA.api.generateWeather({ zoneId: 'arctic', season: 'Winter' });
-```
-
-### getWeatherForecast(options)
-
-Generate multi-day forecast.
-
-```javascript
-const forecast = await CALENDARIA.api.getWeatherForecast({ days: 7 });
-// [{ year, month, day, preset, temperature }, ...]
-```
-
-### getActiveZone() / setActiveZone(zoneId)
-
-Get or set the active climate zone.
-
-```javascript
-const zone = CALENDARIA.api.getActiveZone();
-await CALENDARIA.api.setActiveZone('tropical');
-```
-
-### getCalendarZones()
-
-Get all zones configured for active calendar.
-
-```javascript
-const zones = CALENDARIA.api.getCalendarZones();
-```
-
-### getWeatherPresets()
-
-Get all presets (built-in + custom).
-
-```javascript
-const presets = await CALENDARIA.api.getWeatherPresets();
-```
-
----
-
-## Hooks
-
-### calendaria.weatherChange
-
-Fires when weather changes.
-
-```javascript
-Hooks.on('calendaria.weatherChange', ({ previous, current, remote }) => {
-  console.log(`Weather: ${previous?.id} -> ${current?.id}`);
-  if (remote) console.log('Changed by another client');
-});
-```
-
----
-
-## Data Structures
-
-### Weather State
-
-```javascript
-{
-  id: 'rain',
-  label: 'CALENDARIA.Weather.Rain',
-  description: 'CALENDARIA.Weather.RainDesc',
-  icon: 'fa-cloud-showers-heavy',
-  color: '#A0D8EF',
-  category: 'standard',
-  temperature: 15,
-  setAt: 1234567890,
-  setBy: 'userId',
-  generated: true  // present if auto-generated
-}
-```
-
-### Zone Config
-
-```javascript
-{
-  id: 'temperate',
-  name: 'CALENDARIA.Weather.Climate.Temperate',
-  description: '...',
-  temperatures: {
-    Spring: { min: 8, max: 18 },
-    Summer: { min: 18, max: 30 },
-    Autumn: { min: 8, max: 18 },
-    Winter: { min: -5, max: 5 },
-    _default: { min: 8, max: 20 }
-  },
-  presets: [
-    { id: 'clear', enabled: true, chance: 15, tempMin: null, tempMax: null },
-    { id: 'rain', enabled: true, chance: 10, tempMin: null, tempMax: null },
-    // ...
-  ]
-}
-```
-
-### Zone Config with Season Overrides
-
-```javascript
-{
-  id: 'temperate',
-  temperatures: {
-    Spring: { min: 8, max: 18 },
-    Summer: { min: 18, max: 30 },
-    // ...
-  },
-  presets: [/* base presets */],
-  seasonOverrides: {
-    Winter: {
-      temperatures: { min: -10, max: 2 },
-      presets: [
-        { id: 'snow', enabled: true, chance: 30 },
-        { id: 'blizzard', enabled: true, chance: 10 }
-      ]
-    }
-  }
-}
-```
+See [Hooks](Hooks#calendariaweatherchange) for the `calendaria.weatherChange` hook.

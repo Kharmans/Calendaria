@@ -4,39 +4,6 @@ Calendaria fires hooks for module integration and automation.
 
 ---
 
-## Lifecycle Hooks
-
-### calendaria.init
-
-Fired during module initialization, before calendars are loaded.
-
-```javascript
-Hooks.on("calendaria.init", () => {
-  console.log("Calendaria initializing");
-});
-```
-
-### calendaria.ready
-
-Fired when Calendaria is fully loaded and ready.
-
-**Parameters:**
-- `data` (object)
-  - `api` (CalendariaAPI) - The public API
-  - `calendar` (CalendariaCalendar|null) - Active calendar
-  - `version` (string) - Module version
-
-```javascript
-Hooks.on("calendaria.ready", ({ api, calendar, version }) => {
-  console.log(`Calendaria v${version} ready`);
-  if (calendar) {
-    console.log(`Active: ${calendar.name}`);
-  }
-});
-```
-
----
-
 ## Calendar Hooks
 
 ### calendaria.calendarSwitched
@@ -44,6 +11,7 @@ Hooks.on("calendaria.ready", ({ api, calendar, version }) => {
 Fired when the active calendar changes (local switch).
 
 **Parameters:**
+
 - `id` (string) - Calendar ID
 - `calendar` (CalendariaCalendar) - Calendar instance
 
@@ -58,6 +26,7 @@ Hooks.on("calendaria.calendarSwitched", (id, calendar) => {
 Fired when another client switches the active calendar.
 
 **Parameters:**
+
 - `id` (string) - Calendar ID
 - `calendar` (CalendariaCalendar) - Calendar instance
 
@@ -72,6 +41,7 @@ Hooks.on("calendaria.remoteCalendarSwitch", (id, calendar) => {
 Fired when a calendar is created or imported.
 
 **Parameters:**
+
 - `id` (string) - Calendar ID
 - `calendar` (CalendariaCalendar) - Calendar instance
 
@@ -86,6 +56,7 @@ Hooks.on("calendaria.calendarAdded", (id, calendar) => {
 Fired when a calendar is modified.
 
 **Parameters:**
+
 - `id` (string) - Calendar ID
 - `calendar` (CalendariaCalendar) - Updated calendar instance
 
@@ -100,6 +71,7 @@ Hooks.on("calendaria.calendarUpdated", (id, calendar) => {
 Fired when a calendar is deleted.
 
 **Parameters:**
+
 - `id` (string) - Calendar ID
 
 ```javascript
@@ -117,6 +89,7 @@ Hooks.on("calendaria.calendarRemoved", (id) => {
 Fired on every world time change. Primary hook for time tracking.
 
 **Parameters:**
+
 - `data` (object)
   - `previous` (object) - Previous time components (year, month, dayOfMonth, hour, minute, second)
   - `current` (object) - Current time components
@@ -136,6 +109,7 @@ Hooks.on("calendaria.dateTimeChange", (data) => {
 Fired when the day changes.
 
 **Parameters:**
+
 - `data` (object)
   - `previous` (object) - Previous time components
   - `current` (object) - Current time components
@@ -152,6 +126,7 @@ Hooks.on("calendaria.dayChange", (data) => {
 Fired when the month changes.
 
 **Parameters:**
+
 - `data` (object) - Same structure as `calendaria.dayChange`
 
 ```javascript
@@ -165,6 +140,7 @@ Hooks.on("calendaria.monthChange", (data) => {
 Fired when the year changes.
 
 **Parameters:**
+
 - `data` (object) - Same structure as `calendaria.dayChange`
 
 ```javascript
@@ -178,6 +154,7 @@ Hooks.on("calendaria.yearChange", (data) => {
 Fired when the season changes.
 
 **Parameters:**
+
 - `data` (object)
   - `previous` (object) - Previous time components
   - `current` (object) - Current time components
@@ -196,6 +173,7 @@ Hooks.on("calendaria.seasonChange", (data) => {
 Fired when time changes from another client.
 
 **Parameters:**
+
 - `data` (object)
   - `worldTime` (number) - New world time in seconds
   - `delta` (number) - Time delta in seconds
@@ -215,6 +193,7 @@ Fired when crossing time-of-day thresholds.
 ### calendaria.sunrise
 
 **Parameters:**
+
 - `data` (object)
   - `worldTime` (number) - World time in seconds
   - `components` (object) - Time components
@@ -265,6 +244,7 @@ Hooks.on("calendaria.midday", (data) => {
 Fired when any moon's phase changes.
 
 **Parameters:**
+
 - `data` (object)
   - `moons` (array) - Array of changed moon data
     - `moonIndex` (number) - Index of the moon
@@ -293,6 +273,7 @@ Hooks.on("calendaria.moonPhaseChange", (data) => {
 Fired when transitioning to or from a rest day.
 
 **Parameters:**
+
 - `data` (object)
   - `isRestDay` (boolean) - Current rest day status
   - `wasRestDay` (boolean) - Previous rest day status
@@ -315,6 +296,7 @@ Hooks.on("calendaria.restDayChange", (data) => {
 Fired when the real-time clock starts or stops.
 
 **Parameters:**
+
 - `data` (object)
   - `running` (boolean) - Whether clock is running
   - `increment` (number) - Time increment in seconds
@@ -327,16 +309,17 @@ Hooks.on("calendaria.clockStartStop", (data) => {
 
 ### calendaria.clockUpdate
 
-Fired on remote clock state updates.
+Fired when clock state is updated from another client. Used to sync real-time clock state across all connected clients.
 
 **Parameters:**
+
 - `data` (object)
   - `running` (boolean) - Whether clock is running
   - `ratio` (number) - Real-time to game-time ratio
 
 ```javascript
 Hooks.on("calendaria.clockUpdate", (data) => {
-  console.log(`Clock sync: running=${data.running}`);
+  console.log(`Remote clock sync: running=${data.running}, ratio=${data.ratio}`);
 });
 ```
 
@@ -349,6 +332,7 @@ Hooks.on("calendaria.clockUpdate", (data) => {
 Fired when a calendar note is created.
 
 **Parameters:**
+
 - `stub` (object) - Note stub with id, name, flagData
 
 ```javascript
@@ -362,6 +346,7 @@ Hooks.on("calendaria.noteCreated", (stub) => {
 Fired when a calendar note is modified.
 
 **Parameters:**
+
 - `stub` (object) - Note stub with id, name, flagData
 
 ```javascript
@@ -375,6 +360,7 @@ Hooks.on("calendaria.noteUpdated", (stub) => {
 Fired when a calendar note is deleted.
 
 **Parameters:**
+
 - `pageId` (string) - Journal page ID
 
 ```javascript
@@ -392,6 +378,7 @@ Hooks.on("calendaria.noteDeleted", (pageId) => {
 Fired when a scheduled event or reminder occurs.
 
 **Parameters:**
+
 - `data` (object)
   - `id` (string) - Note/event ID
   - `name` (string) - Event name
@@ -412,6 +399,7 @@ Hooks.on("calendaria.eventTriggered", (data) => {
 Fired when a multi-day event progresses to a new day.
 
 **Parameters:**
+
 - `data` (object)
   - `id` (string) - Note ID
   - `name` (string) - Event name
@@ -425,21 +413,52 @@ Hooks.on("calendaria.eventDayChanged", (data) => {
 
 ---
 
+## Reminder Hooks
+
+### calendaria.reminderReceived
+
+Fired when a reminder notification is received from another client. Used internally by `ReminderScheduler` to display notifications, but also available for module integration.
+
+**Parameters:**
+
+- `data` (object)
+  - `type` (string) - Reminder type (`"toast"` or `"dialog"`)
+  - `noteId` (string) - Journal page ID
+  - `noteName` (string) - Note name
+  - `journalId` (string) - Parent journal entry ID
+  - `message` (string) - Formatted reminder message
+  - `icon` (string|null) - Icon identifier
+  - `iconType` (string|null) - Icon type (`"fontawesome"`, `"image"`, etc.)
+  - `color` (string|null) - Icon color
+  - `targets` (string[]) - Array of user IDs who should receive the reminder
+
+```javascript
+Hooks.on("calendaria.reminderReceived", (data) => {
+  if (data.targets.includes(game.user.id)) {
+    console.log(`Reminder: ${data.noteName}`);
+  }
+});
+```
+
+---
+
 ## Weather Hooks
 
 ### calendaria.weatherChange
 
-Fired when weather changes.
+Fired when weather changes. Note: This hook is fired with varying payloads depending on the source.
 
 **Parameters:**
-- `data` (object)
+
+- `data` (object|undefined) - May be undefined when triggered from UI picker
   - `previous` (object|null) - Previous weather state
   - `current` (object|null) - Current weather state
   - `remote` (boolean) - True if change originated from another client (optional)
 
 ```javascript
 Hooks.on("calendaria.weatherChange", (data) => {
-  if (data.current) {
+  // data may be undefined when triggered from weather picker UI
+  if (data?.current) {
     console.log(`Weather: ${data.current.id}`);
   }
 });
@@ -454,6 +473,7 @@ Hooks.on("calendaria.weatherChange", (data) => {
 Fired when a calendar import begins.
 
 **Parameters:**
+
 - `data` (object)
   - `importerId` (string) - Importer ID
   - `calendarId` (string) - Target calendar ID
@@ -469,6 +489,7 @@ Hooks.on("calendaria.importStarted", (data) => {
 Fired when import finishes successfully.
 
 **Parameters:**
+
 - `data` (object)
   - `importerId` (string) - Importer ID
   - `calendarId` (string) - Created calendar ID
@@ -485,6 +506,7 @@ Hooks.on("calendaria.importComplete", (data) => {
 Fired when import fails.
 
 **Parameters:**
+
 - `data` (object)
   - `importerId` (string) - Importer ID
   - `calendarId` (string) - Target calendar ID
@@ -505,6 +527,7 @@ Hooks.on("calendaria.importFailed", (data) => {
 Fired when display format settings are saved.
 
 **Parameters:**
+
 - `newFormats` (object) - Updated display format configuration
 
 ```javascript

@@ -6,25 +6,7 @@ Calendar notes are journal entry pages that attach to specific dates. Notes supp
 
 Notes are stored as individual `JournalEntry` documents within a dedicated folder per calendar. Each note contains a single `JournalEntryPage` of type `calendaria.calendarnote`.
 
-### Folder Structure
-
-```
-📁 [Calendar Name] Notes (hidden from sidebar)
-  📄 Note 1 (JournalEntry)
-  📄 Note 2 (JournalEntry)
-  ...
-```
-
 Calendar infrastructure folders are hidden from the Journal sidebar to reduce clutter. Access notes through the calendar UI instead.
-
-### Migration
-
-Existing worlds with the legacy journal-based storage (single JournalEntry with pages) are automatically migrated to the folder-based system on world load. The migration:
-
-- Creates a folder for each calendar with existing notes
-- Converts each note page to its own JournalEntry
-- Preserves all note data and ownership
-- Cleans up orphaned legacy journals
 
 ## Creating a Note
 
@@ -49,22 +31,72 @@ await CALENDARIA.api.createNote({
 
 ## Note Properties
 
+### Core Fields
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | String | Note title |
 | `text.content` | HTML | Rich text content (ProseMirror) |
+| `author` | String | User ID of the note creator |
+
+### Date & Time Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `startDate` | Object | `{year, month, day, hour, minute}` |
 | `endDate` | Object | Optional end date/time |
 | `allDay` | Boolean | Ignores time fields when true |
+
+### Recurrence Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `repeat` | String | Recurrence pattern |
+| `repeatInterval` | Number | Interval for repeating (e.g., every N days/weeks) |
+| `repeatEndDate` | Object | Stop repeating after this date `{year, month, day}` |
 | `maxOccurrences` | Number | Limit total recurrences (0 = unlimited) |
+| `weekday` | Number | Target weekday for `weekOfMonth` pattern (0-indexed) |
+| `weekNumber` | Number | Week ordinal for `weekOfMonth` (1-5, or -1 to -5 for last) |
+| `moonConditions` | Array | Moon phase conditions `[{moonIndex, phaseStart, phaseEnd}]` |
+| `randomConfig` | Object | Random event config `{seed, probability, checkInterval}` |
+| `linkedEvent` | Object | Linked event config `{noteId, offset}` |
+| `rangePattern` | Object | Range pattern `{year, month, day}` with values or `[min, max]` |
+| `seasonalConfig` | Object | Seasonal config `{seasonIndex, trigger}` |
+| `computedConfig` | Object | Computed event chain `{chain, yearOverrides}` |
+| `conditions` | Array | Advanced conditions `[{field, op, value, value2?, offset?}]` |
+
+### Display Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `categories` | String[] | Category IDs |
-| `color` | Hex | Display color |
+| `color` | Hex | Display color (default: `#4a9eff`) |
 | `icon` | String | FontAwesome class or image path |
 | `iconType` | String | `fontawesome` or `image` |
+
+### Visibility Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `gmOnly` | Boolean | Visible only to GMs |
 | `silent` | Boolean | Suppresses reminders and announcements |
+
+### Reminder Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `reminderType` | String | `none`, `toast`, `chat`, or `dialog` |
+| `reminderOffset` | Number | Minutes before event to trigger reminder |
+| `reminderTargets` | String | Who receives reminders: `all`, `gm`, `author`, `specific` |
+| `reminderUsers` | String[] | User IDs when `reminderTargets` is `specific` |
+
+### Trigger Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `macro` | String | Macro ID to execute on trigger |
+| `sceneId` | String | Scene ID to activate when event triggers |
+| `playlistId` | String | Playlist ID to play when event triggers |
 
 ## Editing and Deleting
 
@@ -102,6 +134,7 @@ Set the **Repeat** dropdown to enable recurrence. Available patterns:
 
 ### Repeat Options
 
+- **Repeat Interval**: For `daily`, `weekly`, `monthly`, and `yearly` patterns, set how often the event repeats (e.g., every 2 weeks)
 - **Max Occurrences**: Limits total recurrences (0 = unlimited)
 - **Repeat End Date**: Stop repeating after this date
 
@@ -154,6 +187,20 @@ Events relative to another note:
 
 Example: "-3" offset creates an event 3 days before each occurrence of the linked event.
 
+### Computed Events (Moveable Feasts)
+
+Events that follow complex calculation rules, like Easter:
+
+1. Set Repeat to **computed**
+2. Configure a calculation chain with steps:
+   - **Anchor**: Starting point (`springEquinox`, `autumnEquinox`, `summerSolstice`, `winterSolstice`, `seasonStart:N`, `seasonEnd:N`, `event:noteId`)
+   - **First After**: Find first occurrence of a condition after the anchor (`moonPhase`, `weekday`)
+   - **Days After**: Add a fixed number of days
+   - **Weekday On Or After**: Find the next occurrence of a weekday on or after the current date
+3. Optionally set year overrides for manual exceptions
+
+Example chain for Easter: Spring Equinox -> First Full Moon After -> First Sunday After
+
 ### Range Pattern
 
 Match dates using exact values, ranges, or wildcards:
@@ -176,12 +223,14 @@ Available condition fields:
 | Weekday | weekday, weekNumberInMonth, inverseWeekNumber |
 | Week | weekInMonth, weekInYear, totalWeek, weeksBeforeMonthEnd, weeksBeforeYearEnd |
 | Season | season, seasonPercent, seasonDay, isLongestDay, isShortestDay, isSpringEquinox, isAutumnEquinox |
-| Moon | moonPhaseIndex, moonPhaseCountMonth, moonPhaseCountYear |
+| Moon | moonPhase, moonPhaseIndex, moonPhaseCountMonth, moonPhaseCountYear |
 | Cycle | cycle (if calendar has cycles) |
-| Era | era, yearInEra (if calendar has eras) |
+| Era | era, eraYear (if calendar has eras) |
 | Other | intercalary (for intercalary days) |
 
 Operators: `==`, `!=`, `>=`, `<=`, `>`, `<`, `%` (modulo)
+
+The `%` (modulo) operator supports an optional offset for patterns like "every 3rd year starting from year 2".
 
 ## Categories
 
@@ -222,6 +271,48 @@ Right-click the icon picker to switch between modes. The icon color is controlle
 - **GM Only**: Note is only visible to GMs (uses Foundry ownership system)
 - **Silent**: Suppresses reminders and event announcements
 
+## Reminders
+
+Notes can trigger reminders before the event starts.
+
+### Reminder Types
+
+| Type | Description |
+|------|-------------|
+| `none` | No reminder |
+| `toast` | UI notification popup |
+| `chat` | Message in chat log |
+| `dialog` | Modal dialog box |
+
+### Reminder Targets
+
+| Target | Description |
+|--------|-------------|
+| `all` | All connected users |
+| `gm` | Game Master only |
+| `author` | Note creator only |
+| `specific` | Selected users from a list |
+
+### Reminder Offset
+
+Set how many minutes before the event the reminder should trigger. Set to 0 for reminders at event start time.
+
+## Event Triggers
+
+Notes can trigger actions when the event starts.
+
+### Scene Activation
+
+Select a scene to automatically activate when the event triggers. Useful for transitioning to specific locations at scheduled times.
+
+### Playlist Playback
+
+Select a playlist to start playing when the event triggers. Useful for ambient music or sound effects tied to in-game events.
+
+### Macro Execution
+
+Select a macro to execute when the event triggers. The macro runs when the event scheduler detects the event has started.
+
 ## Player Permissions
 
 Players can create, edit, and delete their own notes. Ownership is determined by standard Foundry document permissions.
@@ -254,61 +345,6 @@ When a GM creates a note:
 2. If checked, ownership is set to GM-only
 3. If unchecked, default permissions apply
 
-## Macro Triggers
+## For Developers
 
-Select a macro from the dropdown to execute when the event triggers. Macros run when the event scheduler detects the event has started.
-
-## API Examples
-
-### Get Notes for a Date
-
-```javascript
-const notes = CALENDARIA.api.getNotesForDate(1492, 5, 15);
-```
-
-### Get Notes in a Range
-
-```javascript
-const notes = CALENDARIA.api.getNotesInRange(
-  { year: 1492, month: 5, day: 1 },
-  { year: 1492, month: 5, day: 31 }
-);
-```
-
-### Get Notes by Category
-
-```javascript
-const meetings = CALENDARIA.api.getNotesByCategory("meeting");
-```
-
-### Update a Note
-
-```javascript
-await CALENDARIA.api.updateNote(pageId, {
-  name: "Updated Title",
-  categories: ["quest", "deadline"]
-});
-```
-
-### Delete a Note
-
-```javascript
-await CALENDARIA.api.deleteNote(pageId);
-```
-
-### Search Notes
-
-```javascript
-const results = CALENDARIA.api.searchNotes("dragon", {
-  categories: ["quest"]
-});
-```
-
-## Relevant Files
-
-- `scripts/notes/note-manager.mjs` - CRUD operations and indexing
-- `scripts/notes/note-data.mjs` - Data validation and categories
-- `scripts/notes/utils/recurrence.mjs` - Recurrence pattern matching
-- `scripts/sheets/calendar-note-sheet.mjs` - Note editor UI
-- `scripts/sheets/calendar-note-data-model.mjs` - Data schema
-- `templates/sheets/calendar-note-form.hbs` - Editor form template
+See [API Reference](API-Reference#notes) for note methods including `getNotesForDate()`, `getNotesInRange()`, `createNote()`, `updateNote()`, `deleteNote()`, and more.

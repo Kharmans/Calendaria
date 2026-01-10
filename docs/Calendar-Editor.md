@@ -27,9 +27,9 @@ Configure fundamental calendar properties.
 
 ### Calendar Selector
 
-- **Calendar Dropdown** — Select an existing calendar template or custom calendar to load
-- **Load Calendar** — Load the selected calendar into the editor
-- **Create New** — Start a fresh calendar from scratch
+- **Calendar Dropdown** — Select an existing calendar template or custom calendar to edit (auto-loads on selection)
+- **Duplicate** — Create a copy of the currently loaded calendar
+- **Create New** — Start a fresh blank calendar from scratch
 
 ### Calendar Identity
 
@@ -45,10 +45,10 @@ Configure fundamental calendar properties.
 ### Leap Year Configuration
 
 - **Leap Rule** — Select how leap years are calculated:
-    - **None** — No leap years
-    - **Simple** — Every N years
-    - **Gregorian** — Standard Earth calendar rules (every 4 years, except centuries, except 400-year marks)
-    - **Custom** — Pattern-based rules
+  - **None** — No leap years
+  - **Simple** — Every N years
+  - **Gregorian** — Standard Earth calendar rules (every 4 years, except centuries, except 400-year marks)
+  - **Custom** — Pattern-based rules
 
 #### Simple Leap Year Fields
 
@@ -93,6 +93,13 @@ Define your calendar's months.
 
 When enabled, a month can have its own weekday names independent of the global weekdays. Useful for intercalary periods or months with special day naming.
 
+### Zero-Day Months
+
+Months can have 0 days in their base configuration, making them only appear during leap years when extra days are added. Useful for leap-year-only festival periods.
+
+- Navigation automatically skips 0-day months in non-leap years
+- Year view displays 0-day months with reduced opacity
+
 ---
 
 ## Weekdays Tab
@@ -119,8 +126,8 @@ Give each week a name (like "Week of the Wolf" or "Tenday of Stars").
 
 - **Enabled** — Turn named weeks on/off
 - **Type** — How weeks are numbered:
-    - **Yearly** — Week numbers continue through the entire year
-    - **Monthly** — Week numbers reset at the start of each month
+  - **Year-based** — Week numbers continue through the entire year
+  - **Month-based** — Week numbers reset at the start of each month
 
 ### Named Weeks List
 
@@ -137,13 +144,14 @@ Set how time works in your world, including daylight and date formatting.
 
 ### Time Structure
 
-- **Days Per Year** — Computed automatically from months (display only)
+- **Days Per Year** — Calculated automatically from month definitions; displays normal and leap year totals if different
 - **Hours Per Day** — Number of hours in one day (default: 24)
 - **Minutes Per Hour** — Number of minutes per hour (default: 60)
 - **Seconds Per Minute** — Number of seconds per minute (default: 60)
 - **Seconds Per Round** — Combat round duration in seconds (default: 6)
 
-> **Warning**: Changing time settings affects how Foundry's world time is interpreted. Existing timestamps may display differently.
+> [!WARNING]
+> Changing time settings affects how Foundry's world time is interpreted. Existing timestamps may display differently.
 
 ### Daylight Configuration
 
@@ -226,6 +234,14 @@ Define seasonal periods with visual styling.
 
 - **Add** (+) — Insert a new season after this one
 - **Remove** (−) — Delete this season
+- **Climate** (thermometer icon) — Configure per-season temperature ranges and weather chance overrides
+
+### Season Climate Configuration
+
+Each season can have its own climate settings that override the zone defaults:
+
+- **Temperature Range** — Min/max temperatures for this season (in your configured unit)
+- **Weather Chances** — Per-weather-type probability overrides for this season
 
 ---
 
@@ -246,9 +262,9 @@ Define historical periods for your calendar.
 ### Era Template
 
 - **Template** — Custom format string for year display using placeholders:
-    - `[year]` — The year number
-    - `[abbreviation]` — Era abbreviation
-    - Example: `[year] [abbreviation]` → "1492 DR"
+  - `[year]` — The year number
+  - `[abbreviation]` — Era abbreviation
+  - Example: `[year] [abbreviation]` → "1492 DR"
 - **Preview** — Live preview of the template output
 
 ### Era Controls
@@ -269,11 +285,11 @@ Create holidays and special days that appear on the calendar.
 | **Name** | Festival name (e.g., "Midwinter") |
 | **Month** | Which month the festival falls in |
 | **Day** | Day of the month |
-| **Day of Year** | For monthless calendars, the absolute day of year (1-365) |
 | **Leap Year Only** | Checkbox — festival only occurs in leap years |
 | **Counts for Weekday** | Checkbox — whether this day advances weekday counting (uncheck for intercalary days that exist "outside" normal weeks) |
 
-**Note:** For monthless calendars (like Traveller), use the Day of Year field instead of Month/Day to position festivals.
+> [!NOTE]
+> For monthless calendars (like Traveller), festival positioning uses the internal `dayOfYear` field (1-365) instead of Month/Day. This is set programmatically when importing calendars.
 
 ### Festival Controls
 
@@ -293,18 +309,18 @@ Add one or more moons with customizable phases.
 | Field | Description |
 |-------|-------------|
 | **Name** | Moon name (e.g., "Selûne") |
-| **Cycle Length** | Days for a complete lunar cycle (new moon to new moon). Earth's moon is ~29.5 days. |
+| **Cycle Length** | Days for a complete lunar cycle (new moon to new moon). Accepts decimal values (e.g., `29.53059` for Earth's synodic month). |
 | **Color** | Tint color for the moon icon |
 
 ### Reference Date
 
-A known date when the moon was at a specific phase (typically new moon at day 0 of the cycle).
+A known date when the moon was at a specific phase (typically new moon at day 0 of the cycle). The moon's phase on any date is calculated from this reference point.
 
 - **Year** — Reference year
-- **Month** — Reference month
-- **Day** — Reference day
-- **Cycle Day Adjust** — Offset in days to fine-tune phase alignment
-- **Hidden** — Checkbox to hide this moon from players (GM only)
+- **Month** — Reference month (0-indexed internally; displays as month name in dropdown)
+- **Day** — Reference day of the month
+- **Cycle Day Adjust** — Offset in days to fine-tune phase alignment (positive or negative)
+- **Hidden** — Checkbox to hide this moon from players (GM-only visibility)
 
 ### Moon Phases
 
@@ -343,7 +359,16 @@ Create repeating patterns like zodiac signs, elemental weeks, or numbered years.
 | **Name** | Cycle name (e.g., "Zodiac") |
 | **Length** | How many entries before the cycle repeats |
 | **Offset** | Starting offset (which entry is "first") |
-| **Based On** | What unit drives the cycle: Day, Month, or Year |
+| **Based On** | What unit drives the cycle (see options below) |
+
+#### Based On Options
+
+- **Year** — Cycle advances each calendar year
+- **Era Year** — Cycle advances based on years within the current era
+- **Month** — Cycle advances each month
+- **Month Day** — Cycle advances each day of the month (resets monthly)
+- **Day** — Cycle advances each day (total days since epoch)
+- **Year Day** — Cycle advances each day of the year (resets yearly)
 
 ### Cycle Entries
 
@@ -409,18 +434,42 @@ Weather presets are organized into collapsible categories:
 
 Displays the sum of all enabled weather chances. Shows a warning if the total doesn't equal 100%.
 
+### Climate Zone Editor
+
+Click the **Edit Zone** (pencil) button to configure zone-specific settings:
+
+- **Name** — Display name for the zone
+- **Description** — Optional notes about this climate zone
+- **Brightness Multiplier** — Scene darkness adjustment (0.5x to 1.5x, default 1.0x)
+- **Environment Lighting** — Optional hue and saturation overrides for base and dark lighting
+- **Temperatures** — Per-season temperature ranges (min/max) for this zone
+
 ---
 
 ## Saving Your Calendar
 
 Click **Save** to store your calendar. Options:
 
-- **Set as Active** — Switch to this calendar immediately (reloads the world)
-- **Save as New** — Create a copy with a new name
+- **Set as Active** — Checkbox to switch to this calendar immediately after saving (reloads the world)
 
 ### Editing Built-in Calendars
 
-When you modify a bundled calendar, Calendaria saves your changes as an override. Click **Reset to Default** to restore the original.
+When you modify a bundled calendar, Calendaria saves your changes as an override. The **Delete** button becomes **Reset to Default** to restore the original bundled calendar.
+
+### Deleting Calendars
+
+The **Delete** button behavior depends on the calendar type:
+
+- **Custom calendars** — Permanently deletes the calendar
+- **Bundled calendars with overrides** — Resets to the original bundled version
+- **Bundled calendars without overrides** — Cannot be deleted
+
+> [!NOTE]
+> You must save a new calendar before the Delete button becomes available.
+
+### Reset Button
+
+The **Reset** button clears all current editor data and starts with a blank calendar template. This does not affect saved calendars.
 
 ---
 

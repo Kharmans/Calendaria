@@ -16,7 +16,7 @@ This guide covers installation and initial setup of Calendaria.
 
 Paste this manifest URL in the Install Module dialog:
 
-```
+```text
 https://github.com/Sayshal/calendaria/releases/latest/download/module.json
 ```
 
@@ -37,43 +37,51 @@ Search for "Calendaria" in The Forge's Bazaar.
 
 ### 2. Choose a Calendar
 
-Calendaria includes 15+ pre-built calendars:
+On first load, the MiniCalendar appears with the Gregorian calendar selected by default. To change calendars:
+
+1. Click the **gear icon** on the MiniCalendar (or any Calendaria application) to open the Settings Panel
+2. In the **Calendar** tab, select a calendar from the dropdown
+3. The world will reload to apply the change
+
+Calendaria includes 17 pre-built calendars:
 
 | Calendar | Setting |
 |----------|---------|
+| Athasian | Dark Sun / Athas |
+| Barovian | Ravenloft / Barovia |
+| Cerilian | Birthright |
+| Drakkenheim | Drakkenheim |
+| Exandrian | Critical Role / Exandria |
+| Forbidden Lands | Forbidden Lands |
+| Galifar | Eberron variant |
+| Golarion | Pathfinder |
 | Gregorian | Real-world calendar |
 | Greyhawk | World of Greyhawk |
 | Harptos | Forgotten Realms |
 | Khorvaire | Eberron |
-| Exandrian | Critical Role / Exandria |
-| Barovian | Ravenloft / Barovia |
-| Athasian | Dark Sun / Athas |
 | Krynn (Elven) | Dragonlance |
 | Krynn (Solamnic) | Dragonlance |
-| Golarion | Pathfinder |
-| Cerilian | Birthright |
-| Thyatian | Mystara |
-| Galifar | Eberron variant |
-| Drakkenheim | Drakkenheim |
-| Forbidden Lands | Forbidden Lands |
 | Renescara | Showcase calendar with advanced features |
+| Thyatian | Mystara |
+| Traveller | Traveller RPG |
 
-To select a calendar:
+To create a custom calendar or import from another source, use the buttons in the Calendar tab. See [Calendar Editor](Calendar-Editor) and [Importing Calendars](Importing-Calendars) for details.
 
-1. Go to **Settings** → **Module Settings** → **Calendaria**
-2. Find **Active Calendar**
-3. Select your calendar from the dropdown
-4. The world will reload to apply the change
+### 3. Configure Applications
 
-### 3. Show the Calendar
+By default, the **MiniCalendar** appears on world load. Other applications are available:
 
-The calendar HUD appears automatically based on your settings. If you don't see it:
+- **CalendariaHUD** — Floating HUD with animated sky dome
+- **TimeKeeper** — Minimal time display and controls
 
-1. Go to **Settings** → **Calendaria** → **Calendaria Settings**
-2. Click the **HUD**, **MiniCalendar**, or **Time Keeper** tab
-3. Enable **Show** to display that widget
+To configure which applications display:
 
-You can also use the keyboard shortcut **Alt+C** to toggle HUD visibility.
+1. Open the Settings Panel (gear icon on any Calendaria application)
+2. Select the **HUD**, **MiniCalendar**, or **TimeKeeper** tab
+3. Enable or disable the **Show** option for each application
+
+> [!TIP]
+> Use the keyboard shortcut **Alt+C** to quickly toggle CalendariaHUD visibility.
 
 ---
 
@@ -81,18 +89,7 @@ You can also use the keyboard shortcut **Alt+C** to toggle HUD visibility.
 
 To set the initial date for your campaign:
 
-1. Right-click the calendar HUD to open the time dial
-2. Use the time controls to adjust hours
-3. Click dates on the calendar to navigate months
-4. Use the API for precise control:
-
-```javascript
-// Set to a specific date
-await CALENDARIA.api.setDateTime({
-  year: 1492,
-  month: 5,    // 0-indexed (0 = first month)
-  day: 15,
-  hour: 10,
-  minute: 30
-});
-```
+1. Open the **CalendariaHUD** (Alt+C) or use the **MiniCalendar**
+2. Click on the **current date display** in the info bar
+3. Use the **Set Date** dialog to choose your starting date and time
+4. Click **Set** to apply the new date
