@@ -640,6 +640,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   _onRender(context, options) {
     super._onRender(context, options);
     if (options.isFirstRender) this.#restorePosition();
+    else this.#updateDockedPosition();
     this.#enableDragging();
     this.element.querySelector('[data-action="increment"]')?.addEventListener('change', (event) => {
       TimeKeeper.setIncrement(event.target.value);
@@ -806,6 +807,23 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   /* -------------------------------------------- */
 
   /**
+   * Override setPosition to prevent position updates when pinned to a DOM-parented zone.
+   * @override
+   */
+  setPosition(position) {
+    if (this.#snappedZoneId && StickyZones.usesDomParenting(this.#snappedZoneId)) {
+      if (position?.width || position?.height) {
+        const limited = {};
+        if (position.width) limited.width = position.width;
+        if (position.height) limited.height = position.height;
+        return super.setPosition(limited);
+      }
+      return;
+    }
+    return super.setPosition(position);
+  }
+
+  /**
    * Restore saved position from settings.
    */
   #restorePosition() {
@@ -851,6 +869,22 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Update position when docked to a sticky zone.
+   */
+  #updateDockedPosition() {
+    if (!this.#snappedZoneId) return;
+    if (StickyZones.usesDomParenting(this.#snappedZoneId)) {
+      requestAnimationFrame(() => {
+        if (this.rendered && this.#snappedZoneId && StickyZones.usesDomParenting(this.#snappedZoneId)) StickyZones.pinToZone(this.element, this.#snappedZoneId);
+      });
+      return;
+    }
+    const rect = this.element.getBoundingClientRect();
+    const zonePos = StickyZones.getRestorePosition(this.#snappedZoneId, rect.width, rect.height);
+    if (zonePos) this.setPosition({ left: zonePos.left, top: zonePos.top });
+  }
+
+  /**
    * Restore sticky states from settings.
    */
   #restoreStickyStates() {
@@ -893,7 +927,9 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     const originalMouseDown = drag._onDragMouseDown.bind(drag);
     drag._onDragMouseDown = (event) => {
       if (this.#stickyPosition) return;
+      if (event.target.closest('button, a, input, select, [data-action]')) return;
       previousZoneId = this.#snappedZoneId;
+      this.#snappedZoneId = null;
       const rect = this.element.getBoundingClientRect();
       elementStartLeft = rect.left;
       elementStartTop = rect.top;
