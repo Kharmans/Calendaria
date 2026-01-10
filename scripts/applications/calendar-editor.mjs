@@ -2149,7 +2149,7 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
   static async #onDeleteCalendar(_event, _target) {
     // Can't delete unsaved calendar
     if (!this.#calendarId || !this.#isEditing) {
-      ui.notifications.info(localize('CALENDARIA.Info.SaveBeforeDelete'));
+      ui.notifications.info('CALENDARIA.Info.SaveBeforeDelete', { localize: true });
       return;
     }
 
@@ -2158,7 +2158,7 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Bundled calendar without overrides - can't delete
     if (!isCustom && !hasOverride) {
-      ui.notifications.info(localize('CALENDARIA.Info.CannotDeleteBundled'));
+      ui.notifications.info('CALENDARIA.Info.CannotDeleteBundled', { localize: true });
       return;
     }
 
@@ -2174,7 +2174,7 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       if (!confirmed) return;
       const reset = await CalendarManager.resetDefaultCalendar(this.#calendarId);
       if (reset) {
-        ui.notifications.info(localize('CALENDARIA.Info.CalendarResetToDefault'));
+        ui.notifications.info('CALENDARIA.Info.CalendarResetToDefault', { localize: true });
         this.#loadExistingCalendar(this.#calendarId);
         this.render();
       }
@@ -2195,7 +2195,7 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     if (CalendarRegistry.getActiveId() === this.#calendarId) {
       const switched = await CalendarManager.switchCalendar('gregorian');
       if (!switched) {
-        ui.notifications.error(localize('CALENDARIA.Error.CalendarDeleteFailed'));
+        ui.notifications.error('CALENDARIA.Error.CalendarDeleteFailed', { localize: true });
         return;
       }
     }
@@ -2214,7 +2214,7 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       }
       this.render();
     } else {
-      ui.notifications.error(localize('CALENDARIA.Error.CalendarDeleteFailed'));
+      ui.notifications.error('CALENDARIA.Error.CalendarDeleteFailed', { localize: true });
     }
   }
 

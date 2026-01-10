@@ -1367,14 +1367,14 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
             if (isCompact) dialStyleSelect.value = 'slice';
             dialStyleGroup?.classList.toggle('disabled', isCompact);
             if (dialStyleHint) {
-              dialStyleHint.textContent = isCompact ? game.i18n.localize('CALENDARIA.Settings.HUDDialStyle.DisabledHint') : game.i18n.localize('CALENDARIA.Settings.HUDDialStyle.Hint');
+              dialStyleHint.textContent = isCompact ? localize('CALENDARIA.Settings.HUDDialStyle.DisabledHint') : localize('CALENDARIA.Settings.HUDDialStyle.Hint');
             }
           }
           if (widthScaleInput) {
             widthScaleInput.disabled = isCompact;
             widthScaleGroup?.classList.toggle('disabled', isCompact);
             if (widthScaleHint) {
-              widthScaleHint.textContent = isCompact ? game.i18n.localize('CALENDARIA.Settings.HUDWidthScale.DisabledHint') : game.i18n.localize('CALENDARIA.Settings.HUDWidthScale.Hint');
+              widthScaleHint.textContent = isCompact ? localize('CALENDARIA.Settings.HUDWidthScale.DisabledHint') : localize('CALENDARIA.Settings.HUDWidthScale.Hint');
             }
           }
         };
