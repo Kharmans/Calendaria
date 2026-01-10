@@ -255,6 +255,16 @@ export function registerSettings() {
     onChange: () => foundry.applications.instances.get('calendaria-hud')?.render()
   });
 
+  /** Calendar HUD tray direction (down or up) */
+  game.settings.register(MODULE.ID, SETTINGS.HUD_TRAY_DIRECTION, {
+    name: 'CALENDARIA.Settings.HUDTrayDirection.Name',
+    hint: 'CALENDARIA.Settings.HUDTrayDirection.Hint',
+    scope: 'user',
+    config: false,
+    type: new StringField({ choices: { down: 'CALENDARIA.Settings.HUDTrayDirection.Down', up: 'CALENDARIA.Settings.HUDTrayDirection.Up' }, initial: 'down' }),
+    onChange: () => foundry.applications.instances.get('calendaria-hud')?.render()
+  });
+
   /** Calendar HUD combat compact mode */
   game.settings.register(MODULE.ID, SETTINGS.HUD_COMBAT_COMPACT, {
     name: 'CALENDARIA.Settings.HUDCombatCompact.Name',

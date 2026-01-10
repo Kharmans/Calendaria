@@ -196,6 +196,7 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     this.#stickyTray = stickyStates.tray ?? false;
     this.#stickyPosition = stickyStates.position ?? false;
     context.stickyTray = this.#stickyTray;
+    context.trayUp = game.settings.get(MODULE.ID, SETTINGS.HUD_TRAY_DIRECTION) === 'up';
     const appSettings = TimeKeeper.getAppSettings('calendaria-hud');
     if (stickyStates.increment && stickyStates.increment !== appSettings.incrementKey) {
       TimeKeeper.setAppIncrement('calendaria-hud', stickyStates.increment);

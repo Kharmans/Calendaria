@@ -47,6 +47,7 @@ export const SETTINGS = {
   HUD_SHOW_WEATHER: 'hudShowWeather',
   HUD_STICKY_STATES: 'hudStickyStates',
   HUD_STICKY_ZONES_ENABLED: 'hudStickyZonesEnabled',
+  HUD_TRAY_DIRECTION: 'hudTrayDirection',
   HUD_WEATHER_DISPLAY_MODE: 'hudWeatherDisplayMode',
   HUD_WIDTH_SCALE: 'hudWidthScale',
   LOGGING_LEVEL: 'loggingLevel',

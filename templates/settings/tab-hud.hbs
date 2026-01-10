@@ -60,6 +60,18 @@
       <p class="hint">{{#if isCompactMode}}{{localize "CALENDARIA.Settings.HUDDialStyle.DisabledHint"}}{{else}}{{localize "CALENDARIA.Settings.HUDDialStyle.Hint"}}{{/if}}</p>
     </div>
 
+    <div class="form-group">
+      <label>{{localize "CALENDARIA.Settings.HUDTrayDirection.Name"}}</label>
+      <div class="form-fields">
+        <select name="hudTrayDirection">
+          {{#each trayDirectionOptions}}
+          <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+          {{/each}}
+        </select>
+      </div>
+      <p class="hint">{{localize "CALENDARIA.Settings.HUDTrayDirection.Hint"}}</p>
+    </div>
+
     <div class="form-group{{#if hudCombatHide}} disabled{{/if}}">
       <label>{{localize "CALENDARIA.Settings.HUDCombatCompact.Name"}}</label>
       <div class="form-fields">

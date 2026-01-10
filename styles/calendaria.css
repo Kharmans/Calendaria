@@ -5896,6 +5896,25 @@
 }
 
 /* ======================================== */
+/* Tray Up (Open Upward)                    */
+/* ======================================== */
+.calendaria-hud-bar-wrapper.tray-up {
+  position: relative;
+}
+
+.calendaria-hud-bar-wrapper.tray-up .calendaria-hud-tray {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 0;
+  margin-bottom: -1px;
+  border-top: 1px solid var(--calendaria-border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+}
+
+/* ======================================== */
 /* Compact Mode                             */
 /* ======================================== */
 .calendaria-hud-wrapper.compact .calendaria-hud-dome {
