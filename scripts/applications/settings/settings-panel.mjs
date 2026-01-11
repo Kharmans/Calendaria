@@ -1367,17 +1367,14 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
           if (dialStyleSelect) {
             dialStyleSelect.disabled = isCompact;
             if (isCompact) dialStyleSelect.value = 'slice';
+            else dialStyleSelect.value = game.settings.get(MODULE.ID, SETTINGS.HUD_DIAL_STYLE);
             dialStyleGroup?.classList.toggle('disabled', isCompact);
-            if (dialStyleHint) {
-              dialStyleHint.textContent = isCompact ? localize('CALENDARIA.Settings.HUDDialStyle.DisabledHint') : localize('CALENDARIA.Settings.HUDDialStyle.Hint');
-            }
+            if (dialStyleHint) dialStyleHint.textContent = isCompact ? localize('CALENDARIA.Settings.HUDDialStyle.DisabledHint') : localize('CALENDARIA.Settings.HUDDialStyle.Hint');
           }
           if (widthScaleInput) {
             widthScaleInput.disabled = isCompact;
             widthScaleGroup?.classList.toggle('disabled', isCompact);
-            if (widthScaleHint) {
-              widthScaleHint.textContent = isCompact ? localize('CALENDARIA.Settings.HUDWidthScale.DisabledHint') : localize('CALENDARIA.Settings.HUDWidthScale.Hint');
-            }
+            if (widthScaleHint) widthScaleHint.textContent = isCompact ? localize('CALENDARIA.Settings.HUDWidthScale.DisabledHint') : localize('CALENDARIA.Settings.HUDWidthScale.Hint');
           }
         };
         hudModeSelect.addEventListener('change', updateCompactState);
