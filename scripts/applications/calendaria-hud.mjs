@@ -1052,9 +1052,12 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {Array} Array of hour marker objects with position data
    */
   #generateHourMarkers() {
+    const hoursPerDay = this.calendar?.days?.hoursPerDay ?? 24;
+    const degreesPerHour = 360 / hoursPerDay;
+    const labelInterval = Math.max(1, Math.floor(hoursPerDay / 4));
     const markers = [];
-    for (let hour = 0; hour < 24; hour++) {
-      const angle = hour * 15 + 90;
+    for (let hour = 0; hour < hoursPerDay; hour++) {
+      const angle = hour * degreesPerHour + 90;
       const radians = (angle * Math.PI) / 180;
       const x1 = 100 + Math.cos(radians) * 80;
       const y1 = 100 + Math.sin(radians) * 80;
@@ -1070,8 +1073,8 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
         y2: y2.toFixed(2),
         textX: textX.toFixed(2),
         textY: textY.toFixed(2),
-        strokeWidth: hour % 6 === 0 ? 2 : 1,
-        showLabel: hour % 6 === 0
+        strokeWidth: hour % labelInterval === 0 ? 2 : 1,
+        showLabel: hour % labelInterval === 0
       });
     }
     return markers;
@@ -1089,13 +1092,15 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Convert time to angle in degrees.
-   * @param {number} hours - Hour value (0-23)
-   * @param {number} minutes - Minute value (0-59)
+   * @param {number} hours - Hour value (0 to hoursPerDay-1)
+   * @param {number} minutes - Minute value (0 to minutesPerHour-1)
    * @returns {number} Angle in degrees (0-360)
    */
   #timeToAngle(hours, minutes) {
-    const totalMinutes = hours * 60 + minutes;
-    let angle = (totalMinutes / (24 * 60)) * 360;
+    const hoursPerDay = this.calendar?.days?.hoursPerDay ?? 24;
+    const minutesPerHour = this.calendar?.days?.minutesPerHour ?? 60;
+    const totalMinutes = hours * minutesPerHour + minutes;
+    let angle = (totalMinutes / (hoursPerDay * minutesPerHour)) * 360;
     angle = (angle + 180) % 360;
     return angle;
   }
@@ -1106,11 +1111,13 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {{hours: number, minutes: number}} Time object with hours and minutes
    */
   #angleToTime(angle) {
+    const hoursPerDay = this.calendar?.days?.hoursPerDay ?? 24;
+    const minutesPerHour = this.calendar?.days?.minutesPerHour ?? 60;
     angle = ((angle % 360) + 360) % 360;
     angle = (angle - 180 + 360) % 360;
-    const totalMinutes = Math.round((angle / 360) * (24 * 60));
-    const hours = Math.floor(totalMinutes / 60) % 24;
-    const minutes = totalMinutes % 60;
+    const totalMinutes = Math.round((angle / 360) * (hoursPerDay * minutesPerHour));
+    const hours = Math.floor(totalMinutes / minutesPerHour) % hoursPerDay;
+    const minutes = totalMinutes % minutesPerHour;
     return { hours, minutes };
   }
 
@@ -1154,8 +1161,10 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const sunPosition = normalizedAngle;
     if (sunPosition >= 91 && sunPosition <= 269) sunOpacity = 0;
     if (moonPosition >= 91 && moonPosition <= 269) moonOpacity = 0;
-    const totalMinutes = time.hours * 60 + time.minutes;
-    const dayProgress = ((totalMinutes / (24 * 60)) * 2 + 1.5) % 2;
+    const hoursPerDay = this.calendar?.days?.hoursPerDay ?? 24;
+    const minutesPerHour = this.calendar?.days?.minutesPerHour ?? 60;
+    const totalMinutes = time.hours * minutesPerHour + time.minutes;
+    const dayProgress = ((totalMinutes / (hoursPerDay * minutesPerHour)) * 2 + 1.5) % 2;
     sky.style.setProperty('--calendar-day-progress', dayProgress);
     sky.style.setProperty('--calendar-night-progress', dayProgress);
     sky.style.setProperty('--sun-opacity', sunOpacity);

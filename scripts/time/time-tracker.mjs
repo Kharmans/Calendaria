@@ -194,8 +194,11 @@ export default class TimeTracker {
    */
   static #getAllThresholdsCrossed(startComponents, endComponents, calendar) {
     const thresholds = [];
-    const startHour = startComponents.hour + startComponents.minute / 60 + (startComponents.second || 0) / 3600;
-    const endHour = endComponents.hour + endComponents.minute / 60 + (endComponents.second || 0) / 3600;
+    const minutesPerHour = calendar?.days?.minutesPerHour ?? 60;
+    const secondsPerMinute = calendar?.days?.secondsPerMinute ?? 60;
+    const secondsPerHour = minutesPerHour * secondsPerMinute;
+    const startHour = startComponents.hour + startComponents.minute / minutesPerHour + (startComponents.second || 0) / secondsPerHour;
+    const endHour = endComponents.hour + endComponents.minute / minutesPerHour + (endComponents.second || 0) / secondsPerHour;
     const totalDays = this.#calculateDaysBetween(startComponents, endComponents, calendar);
 
     if (totalDays === 0) {

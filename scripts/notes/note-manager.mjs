@@ -427,9 +427,10 @@ export default class NoteManager {
       if (this.#matchesDate(stub, targetDate)) matchingNotes.push(stub);
     }
 
+    const minutesPerHour = CalendarManager.getActiveCalendar()?.days?.minutesPerHour ?? 60;
     matchingNotes.sort((a, b) => {
-      const aTime = a.flagData.allDay ? 0 : a.flagData.startDate.hour * 60 + a.flagData.startDate.minute;
-      const bTime = b.flagData.allDay ? 0 : b.flagData.startDate.hour * 60 + b.flagData.startDate.minute;
+      const aTime = a.flagData.allDay ? 0 : a.flagData.startDate.hour * minutesPerHour + a.flagData.startDate.minute;
+      const bTime = b.flagData.allDay ? 0 : b.flagData.startDate.hour * minutesPerHour + b.flagData.startDate.minute;
       return aTime - bTime;
     });
 

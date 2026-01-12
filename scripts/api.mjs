@@ -243,13 +243,15 @@ export const CalendariaAPI = {
    */
   getTimeUntilTarget(targetHour) {
     const components = game.time.components;
-    const currentHour = components.hour + components.minute / 60 + components.second / 3600;
     const hoursPerDay = this.calendar?.days?.hoursPerDay ?? 24;
+    const minutesPerHour = this.calendar?.days?.minutesPerHour ?? 60;
+    const secondsPerMinute = this.calendar?.days?.secondsPerMinute ?? 60;
+    const currentHour = components.hour + components.minute / minutesPerHour + components.second / (minutesPerHour * secondsPerMinute);
     const hoursUntil = currentHour < targetHour ? targetHour - currentHour : hoursPerDay - currentHour + targetHour;
     const hours = Math.floor(hoursUntil);
-    const remainingMinutes = (hoursUntil - hours) * 60;
+    const remainingMinutes = (hoursUntil - hours) * minutesPerHour;
     const minutes = Math.floor(remainingMinutes);
-    const seconds = Math.floor((remainingMinutes - minutes) * 60);
+    const seconds = Math.floor((remainingMinutes - minutes) * secondsPerMinute);
     return { hours, minutes, seconds };
   },
 
@@ -274,7 +276,10 @@ export const CalendariaAPI = {
 
   /** @returns {object|null} Time until midday */
   getTimeUntilMidday() {
-    return CalendarManager.getActiveCalendar() ? this.getTimeUntilTarget(12) : null;
+    const calendar = CalendarManager.getActiveCalendar();
+    if (!calendar) return null;
+    const hoursPerDay = calendar.days?.hoursPerDay ?? 24;
+    return this.getTimeUntilTarget(hoursPerDay / 2);
   },
 
   /* -------------------------------------------- */
@@ -721,7 +726,8 @@ export const CalendariaAPI = {
     const sunset = this.getSunset();
     if (sunrise === null || sunset === null) return true;
     const components = game.time.components;
-    const currentHour = components.hour + components.minute / 60;
+    const minutesPerHour = this.calendar?.days?.minutesPerHour ?? 60;
+    const currentHour = components.hour + components.minute / minutesPerHour;
     return currentHour >= sunrise && currentHour < sunset;
   },
 
@@ -744,8 +750,11 @@ export const CalendariaAPI = {
       return game.time.worldTime;
     }
     const components = game.time.components;
-    const currentHour = components.hour + components.minute / 60 + components.second / 3600;
     const hoursPerDay = this.calendar?.days?.hoursPerDay ?? 24;
+    const minutesPerHour = this.calendar?.days?.minutesPerHour ?? 60;
+    const secondsPerMinute = this.calendar?.days?.secondsPerMinute ?? 60;
+    const secondsPerHour = minutesPerHour * secondsPerMinute;
+    const currentHour = components.hour + components.minute / minutesPerHour + components.second / secondsPerHour;
     let targetHour;
     switch (preset.toLowerCase()) {
       case 'sunrise':
@@ -767,7 +776,7 @@ export const CalendariaAPI = {
     }
     let hoursUntil = targetHour - currentHour;
     if (hoursUntil <= 0) hoursUntil += hoursPerDay;
-    const secondsUntil = Math.floor(hoursUntil * 3600);
+    const secondsUntil = Math.floor(hoursUntil * secondsPerHour);
     return await game.time.advance(secondsUntil);
   },
 

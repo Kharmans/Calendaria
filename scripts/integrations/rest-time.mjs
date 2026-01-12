@@ -57,9 +57,10 @@ export function onLongRest(_actor, config) {
   const calendar = CalendarManager.getActiveCalendar();
   if (!calendar) return;
   const currentDate = getCurrentDate();
-  const currentMinutes = currentDate.hour * 60 + currentDate.minute;
-  const targetMinutes = NEW_DAY_HOUR * 60;
-  const minutesInDay = (calendar.days?.hoursPerDay ?? 24) * 60;
+  const minutesPerHour = calendar.days?.minutesPerHour ?? 60;
+  const currentMinutes = currentDate.hour * minutesPerHour + currentDate.minute;
+  const targetMinutes = NEW_DAY_HOUR * minutesPerHour;
+  const minutesInDay = (calendar.days?.hoursPerDay ?? 24) * minutesPerHour;
   const daysToAdvance = isGritty ? 7 : 1;
   const minutesUntilTarget = daysToAdvance * minutesInDay - currentMinutes + targetMinutes;
   config.duration = minutesUntilTarget;

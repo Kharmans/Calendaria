@@ -30,12 +30,12 @@ let animationFrameId = null;
 /**
  * Calculate darkness level based on time of day.
  * @param {number} hours - Hours (0 to hoursPerDay-1)
- * @param {number} minutes - Minutes (0-59)
+ * @param {number} minutes - Minutes (0 to minutesPerHour-1)
  * @param {number} [hoursPerDay] - Hours per day for this calendar
+ * @param {number} [minutesPerHour] - Minutes per hour for this calendar
  * @returns {number} Darkness level between 0.0 (brightest) and 1.0 (darkest)
  */
-export function calculateDarknessFromTime(hours, minutes, hoursPerDay = 24) {
-  const minutesPerHour = 60;
+export function calculateDarknessFromTime(hours, minutes, hoursPerDay = 24, minutesPerHour = 60) {
   const totalMinutes = hours * minutesPerHour + minutes;
   const dayProgress = totalMinutes / (hoursPerDay * minutesPerHour);
   const darkness = (Math.cos(dayProgress * 2 * Math.PI) + 1) / 2;
@@ -51,7 +51,8 @@ export function getCurrentDarkness() {
   const hours = components.hour ?? 0;
   const minutes = components.minute ?? 0;
   const hoursPerDay = game.time.calendar?.days?.hoursPerDay ?? 24;
-  return calculateDarknessFromTime(hours, minutes, hoursPerDay);
+  const minutesPerHour = game.time.calendar?.days?.minutesPerHour ?? 60;
+  return calculateDarknessFromTime(hours, minutes, hoursPerDay, minutesPerHour);
 }
 
 /**
@@ -190,7 +191,8 @@ export async function onUpdateWorldTime(worldTime, _dt) {
   if (lastHour !== null && lastHour === currentHour) return;
   lastHour = currentHour;
   const hoursPerDay = game.time.calendar?.days?.hoursPerDay ?? 24;
-  const baseDarkness = calculateDarknessFromTime(currentHour, 0, hoursPerDay);
+  const minutesPerHour = game.time.calendar?.days?.minutesPerHour ?? 60;
+  const baseDarkness = calculateDarknessFromTime(currentHour, 0, hoursPerDay, minutesPerHour);
   const newTargetDarkness = calculateAdjustedDarkness(baseDarkness, activeScene);
   startDarknessTransition(activeScene, newTargetDarkness);
   log(3, `Hour changed: ${lastHour} → ${currentHour}`);
@@ -211,7 +213,9 @@ function startDarknessTransition(scene, target) {
   targetDarkness = target;
   transitionStart = performance.now();
   const gameSecondsPerRealSecond = TimeKeeper.increment * TimeKeeper.multiplier;
-  const secondsPerHour = 3600;
+  const minutesPerHour = game.time.calendar?.days?.minutesPerHour ?? 60;
+  const secondsPerMinute = game.time.calendar?.days?.secondsPerMinute ?? 60;
+  const secondsPerHour = minutesPerHour * secondsPerMinute;
   if (gameSecondsPerRealSecond > 0) transitionDuration = Math.max(500, Math.min(3000, (secondsPerHour / gameSecondsPerRealSecond) * 800));
   else transitionDuration = 2500;
   log(3, `Starting darkness transition: ${startDarkness.toFixed(3)} → ${targetDarkness.toFixed(3)} (${transitionDuration.toFixed(0)}ms)`);
@@ -269,7 +273,8 @@ export async function onWeatherChange() {
   const components = game.time.components;
   const currentHour = components?.hour ?? 0;
   const hoursPerDay = game.time.calendar?.days?.hoursPerDay ?? 24;
-  const baseDarkness = calculateDarknessFromTime(currentHour, 0, hoursPerDay);
+  const minutesPerHour = game.time.calendar?.days?.minutesPerHour ?? 60;
+  const baseDarkness = calculateDarknessFromTime(currentHour, 0, hoursPerDay, minutesPerHour);
   const newTargetDarkness = calculateAdjustedDarkness(baseDarkness, activeScene);
   startDarknessTransition(activeScene, newTargetDarkness);
   const lighting = calculateEnvironmentLighting();

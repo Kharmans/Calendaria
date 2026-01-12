@@ -125,7 +125,8 @@ export default class ReminderScheduler {
     const startDate = note.flagData.startDate;
     if (!startDate) return false;
     if (!currentDate) return false;
-    const offsetMinutes = (note.flagData.reminderOffset ?? 0) * 60;
+    const minutesPerHour = calendar?.days?.minutesPerHour ?? 60;
+    const offsetMinutes = (note.flagData.reminderOffset ?? 0) * minutesPerHour;
     const hasRecurrence = note.flagData.repeat && note.flagData.repeat !== 'never';
     const hasConditions = note.flagData.conditions?.length > 0;
 
@@ -143,9 +144,9 @@ export default class ReminderScheduler {
 
       // For all-day events, check if we should fire reminder tonight for tomorrow's occurrence
       if (occursTomorrow && note.flagData.allDay) {
-        const currentMinutes = currentDate.hour * 60 + currentDate.minute;
+        const currentMinutes = currentDate.hour * minutesPerHour + currentDate.minute;
         const hoursPerDay = calendar?.days?.hoursPerDay ?? 24;
-        const minutesInDay = hoursPerDay * 60;
+        const minutesInDay = hoursPerDay * minutesPerHour;
         const reminderMinutes = minutesInDay - offsetMinutes;
         log(3, `  Day-before check: currentMinutes=${currentMinutes}, reminderMinutes=${reminderMinutes}, shouldFire=${currentMinutes >= reminderMinutes}`);
         if (currentMinutes >= reminderMinutes) return true;
@@ -153,10 +154,10 @@ export default class ReminderScheduler {
 
       // For timed events occurring today, check if we're in the reminder window
       if (occursToday && !note.flagData.allDay) {
-        const currentMinutes = currentDate.hour * 60 + currentDate.minute;
+        const currentMinutes = currentDate.hour * minutesPerHour + currentDate.minute;
         const eventHour = startDate.hour ?? 0;
         const eventMinute = startDate.minute ?? 0;
-        const eventMinutes = eventHour * 60 + eventMinute;
+        const eventMinutes = eventHour * minutesPerHour + eventMinute;
         const reminderMinutes = eventMinutes - offsetMinutes;
         log(3, `  Same-day check: currentMinutes=${currentMinutes}, eventMinutes=${eventMinutes}, reminderMinutes=${reminderMinutes}`);
         return currentMinutes >= reminderMinutes && currentMinutes < eventMinutes;
@@ -175,9 +176,9 @@ export default class ReminderScheduler {
 
     // For all-day events, fire reminder the evening before each day of the event
     if (note.flagData.allDay && offsetMinutes > 0 && tomorrowInRange) {
-      const currentMinutes = currentDate.hour * 60 + currentDate.minute;
+      const currentMinutes = currentDate.hour * minutesPerHour + currentDate.minute;
       const hoursPerDay = calendar?.days?.hoursPerDay ?? 24;
-      const minutesInDay = hoursPerDay * 60;
+      const minutesInDay = hoursPerDay * minutesPerHour;
       const reminderMinutes = minutesInDay - offsetMinutes;
       log(3, `  Multi-day before check: currentMinutes=${currentMinutes}, reminderMinutes=${reminderMinutes}, shouldFire=${currentMinutes >= reminderMinutes}`);
       return currentMinutes >= reminderMinutes;
@@ -186,10 +187,10 @@ export default class ReminderScheduler {
     // For timed events or same-day check
     if (todayInRange) {
       const isFirstDay = currentDate.year === startDate.year && currentDate.month === startDate.month && currentDate.day === startDate.day;
-      const currentMinutes = currentDate.hour * 60 + currentDate.minute;
+      const currentMinutes = currentDate.hour * minutesPerHour + currentDate.minute;
       const eventHour = note.flagData.allDay ? 0 : isFirstDay ? (startDate.hour ?? 0) : 0;
       const eventMinute = note.flagData.allDay ? 0 : isFirstDay ? (startDate.minute ?? 0) : 0;
-      const eventMinutes = eventHour * 60 + eventMinute;
+      const eventMinutes = eventHour * minutesPerHour + eventMinute;
       const reminderMinutes = eventMinutes - offsetMinutes;
       return currentMinutes >= reminderMinutes && currentMinutes < eventMinutes;
     }
