@@ -1071,9 +1071,9 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
     const existingDial = document.getElementById('calendaria-time-dial');
     if (existingDial) existingDial.remove();
     const currentTime = game.time.worldTime;
-    const date = new Date(currentTime * 1000);
-    const hours = date.getUTCHours();
-    const minutes = date.getUTCMinutes();
+    const components = game.time.components;
+    const hours = components.hour ?? 0;
+    const minutes = components.minute ?? 0;
     const templateData = { currentTime: this.#formatDialTime(hours, minutes), hourMarkers: this.#generateHourMarkers() };
     const html = await foundry.applications.handlebars.renderTemplate(TEMPLATES.TIME_DIAL, templateData);
     const dial = document.createElement('div');
@@ -1354,11 +1354,12 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
       minutes = 0;
     }
     const hoursPerDay = this.calendar?.days?.hoursPerDay ?? 24;
+    const minutesPerHour = this.calendar?.days?.minutesPerHour ?? 60;
     const midday = Math.floor(hoursPerDay / 2);
     if (isPM && hours < midday) hours += midday;
     else if (isAM && hours === midday) hours = 0;
     if (hours < 0 || hours >= hoursPerDay) return null;
-    if (minutes < 0 || minutes > 59) return null;
+    if (minutes < 0 || minutes >= minutesPerHour) return null;
     return { hours, minutes };
   }
 
@@ -1368,15 +1369,30 @@ export class CalendariaHUD extends HandlebarsApplicationMixin(ApplicationV2) {
   async #applyTimeChange() {
     if (!this._dialState) return;
     const { currentHours, currentMinutes, initialTime } = this._dialState;
-    const currentDate = new Date(initialTime * 1000);
-    currentDate.setUTCHours(currentHours, currentMinutes, 0, 0);
-    const newWorldTime = Math.floor(currentDate.getTime() / 1000);
-    const timeDiff = newWorldTime - initialTime;
+    const cal = game.time.calendar;
+    const days = cal?.days ?? {};
+    const secondsPerMinute = days.secondsPerMinute ?? 60;
+    const minutesPerHour = days.minutesPerHour ?? 60;
+    const hoursPerDay = days.hoursPerDay ?? 24;
+    const secondsPerHour = secondsPerMinute * minutesPerHour;
+    const secondsPerDay = secondsPerHour * hoursPerDay;
+    const initialComponents = cal?.timeToComponents?.(initialTime) ?? game.time.components;
+    const initialHours = initialComponents.hour ?? 0;
+    const initialMinutes = initialComponents.minute ?? 0;
+    const initialSeconds = initialComponents.second ?? 0;
+    const initialDaySeconds = initialHours * secondsPerHour + initialMinutes * secondsPerMinute + initialSeconds;
+    const newDaySeconds = currentHours * secondsPerHour + currentMinutes * secondsPerMinute;
+    let timeDiff = newDaySeconds - initialDaySeconds;
+    if (Math.abs(timeDiff) > secondsPerDay / 2) {
+      if (timeDiff > 0) timeDiff -= secondsPerDay;
+      else timeDiff += secondsPerDay;
+    }
+
     if (timeDiff !== 0) {
       await game.time.advance(timeDiff);
       log(3, `Time adjusted by ${timeDiff} seconds to ${this.#formatDialTime(currentHours, currentMinutes)}`);
     }
-    this._dialState.initialTime = newWorldTime;
+    this._dialState.initialTime = initialTime + timeDiff;
   }
 
   /* -------------------------------------------- */
