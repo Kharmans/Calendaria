@@ -666,13 +666,13 @@ export function migrateLegacyFormat(legacyFormat) {
     '{{e}}': '[yearInEra]',
     '{{season}}': '[season]',
     '{{moon}}': '[moon]',
-    // Era template tokens
-    '{{era}}': '[era]',
-    '{{eraYear}}': '[yearInEra]',
-    '{{yearInEra}}': '[yearInEra]',
+    // Era template tokens (convert directly to UTS#35)
+    '{{era}}': 'GGGG',
+    '{{eraYear}}': 'yy',
+    '{{yearInEra}}': 'yy',
     '{{year}}': 'YYYY',
-    '{{abbreviation}}': '[eraAbbr]',
-    '{{short}}': '[eraAbbr]'
+    '{{abbreviation}}': 'G',
+    '{{short}}': 'G'
   };
 
   let newFormat = legacyFormat;
@@ -935,6 +935,9 @@ const DEPRECATED_TOKENS = {
   d: 'e',
   '[era]': 'GGGG',
   '[eraAbbr]': 'G',
+  '[yearInEra]': 'yy',
+  '[year]': 'YYYY',
+  '[short]': 'G',
   '[season]': 'QQQQ',
   '[seasonAbbr]': 'QQQ'
 };
