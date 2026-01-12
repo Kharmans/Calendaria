@@ -231,6 +231,8 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
           month: new NumberField({ required: false, nullable: true, min: 1, integer: true }),
           day: new NumberField({ required: false, nullable: true, min: 1, integer: true }),
           dayOfYear: new NumberField({ required: false, nullable: true, min: 1, max: 400, integer: true }),
+          duration: new NumberField({ required: false, nullable: false, min: 1, integer: true, initial: 1 }),
+          leapDuration: new NumberField({ required: false, nullable: true, min: 1, integer: true }),
           leapYearOnly: new BooleanField({ required: false, initial: false }),
           countsForWeekday: new BooleanField({ required: false, initial: true })
         })
@@ -573,20 +575,40 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
   /**
    * Find festival day for current day.
    * @param {number|object} [time]  Time to use, by default the current world time.
-   * @returns {{name: string, month: number, day: number, dayOfYear: number, leapYearOnly: boolean}|null} - Festival or null
+   * @returns {{name: string, month: number, day: number, dayOfYear: number, duration: number, leapYearOnly: boolean}|null} - Festival or null
    */
   findFestivalDay(time = game.time.worldTime) {
     const components = typeof time === 'number' ? this.timeToComponents(time) : time;
     const isLeap = this.isLeapYear(components.year);
-    const currentDayOfYear = this._calculateDayOfYear(components);
+    const currentDayOfYear = this._calculateDayOfYear(components) + 1;
     return (
       this.festivals?.find((f) => {
         if (f.leapYearOnly && !isLeap) return false;
-        if (f.dayOfYear != null) return f.dayOfYear === currentDayOfYear + 1;
-        if (f.month != null && f.day != null) return f.month === components.month + 1 && f.day === components.dayOfMonth + 1;
+        const duration = (isLeap && f.leapDuration != null) ? f.leapDuration : (f.duration ?? 1);
+        if (f.dayOfYear != null) {
+          return currentDayOfYear >= f.dayOfYear && currentDayOfYear < f.dayOfYear + duration;
+        }
+        if (f.month != null && f.day != null) {
+          const festivalDayOfYear = this._calculateDayOfYearFromMonthDay(f.month - 1, f.day - 1) + 1;
+          return currentDayOfYear >= festivalDayOfYear && currentDayOfYear < festivalDayOfYear + duration;
+        }
         return false;
       }) ?? null
     );
+  }
+
+  /**
+   * Calculate day of year (1-indexed) from month and day.
+   * @param {number} month - Month index (0-indexed)
+   * @param {number} day - Day of month (0-indexed)
+   * @returns {number} Day of year (0-indexed)
+   * @private
+   */
+  _calculateDayOfYearFromMonthDay(month, day) {
+    if (this.isMonthless) return day;
+    let dayOfYear = day;
+    for (let i = 0; i < month; i++) dayOfYear += this.months?.values?.[i]?.days ?? 0;
+    return dayOfYear;
   }
 
   /**
@@ -621,20 +643,26 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
     const components = typeof time === 'number' ? this.timeToComponents(time) : time;
     const isLeap = this.isLeapYear(components.year);
     const currentDayOfYear = this._calculateDayOfYear(components) + 1;
-    const currentMonth = components.month + 1;
-    const currentDay = components.dayOfMonth + 1;
     let count = 0;
     for (const festival of this.festivals) {
       if (festival.countsForWeekday !== false) continue;
       if (festival.leapYearOnly && !isLeap) continue;
+      const duration = (isLeap && festival.leapDuration != null) ? festival.leapDuration : (festival.duration ?? 1);
+      let festivalStart;
       if (festival.dayOfYear != null) {
-        if (festival.dayOfYear < currentDayOfYear) count++;
+        festivalStart = festival.dayOfYear;
       } else if (festival.month != null && festival.day != null) {
-        if (festival.month < currentMonth) count++;
-        else if (festival.month === currentMonth && festival.day < currentDay) count++;
+        festivalStart = this._calculateDayOfYearFromMonthDay(festival.month - 1, festival.day - 1) + 1;
+      } else {
+        continue;
+      }
+      const festivalEnd = festivalStart + duration;
+      if (festivalEnd <= currentDayOfYear) {
+        count += duration;
+      } else if (festivalStart < currentDayOfYear) {
+        count += currentDayOfYear - festivalStart;
       }
     }
-
     return count;
   }
 
@@ -651,15 +679,17 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
   /**
    * Count total festival days that don't count for weekday calculation in a full year.
    * Only counts non-leap-year festivals (those that occur every year).
+   * @param {boolean} [isLeap=false] - Whether to calculate for a leap year.
    * @returns {number} Number of non-counting festival days per year.
    */
-  countNonWeekdayFestivalsInYear() {
+  countNonWeekdayFestivalsInYear(isLeap = false) {
     if (!this.festivals?.length) return 0;
     let count = 0;
     for (const festival of this.festivals) {
       if (festival.countsForWeekday !== false) continue;
-      if (festival.leapYearOnly) continue;
-      count++;
+      if (festival.leapYearOnly && !isLeap) continue;
+      const duration = (isLeap && festival.leapDuration != null) ? festival.leapDuration : (festival.duration ?? 1);
+      count += duration;
     }
     return count;
   }
@@ -668,31 +698,26 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
    * Count all non-counting festival days between the epoch (year 0) and the given year.
    * For positive years: counts festivals in years 0 through year-1 (positive return).
    * For negative years: counts festivals in years -1 through year (negative return).
-   * Accounts for leap year festivals.
+   * Accounts for leap year festivals and multi-day durations.
    * @param {number} year - Internal year (0-based from calendar epoch)
    * @returns {number} Total non-counting festival days (negative for years before epoch).
    */
   countNonWeekdayFestivalsBeforeYear(year) {
     if (!this.festivals?.length || year === 0) return 0;
-    let regularCount = 0;
-    let leapOnlyCount = 0;
-    for (const festival of this.festivals) {
-      if (festival.countsForWeekday !== false) continue;
-      if (festival.leapYearOnly) leapOnlyCount++;
-      else regularCount++;
-    }
+    const regularYearDays = this.countNonWeekdayFestivalsInYear(false);
+    const leapYearDays = this.countNonWeekdayFestivalsInYear(true);
 
     if (year > 0) {
       let leapYears = 0;
       for (let y = 0; y < year; y++) if (this.isLeapYear(y)) leapYears++;
       const regularYears = year - leapYears;
-      return regularYears * regularCount + leapYears * (regularCount + leapOnlyCount);
+      return regularYears * regularYearDays + leapYears * leapYearDays;
     } else {
       let leapYears = 0;
       for (let y = -1; y >= year; y--) if (this.isLeapYear(y)) leapYears++;
       const totalYears = -year;
       const regularYears = totalYears - leapYears;
-      return -(regularYears * regularCount + leapYears * (regularCount + leapOnlyCount));
+      return -(regularYears * regularYearDays + leapYears * leapYearDays);
     }
   }
 

@@ -2426,11 +2426,19 @@
       width: 50px;
     }
 
+    .col-duration,
+    .col-leap-duration {
+      flex: none;
+      width: 55px;
+    }
+
     .col-leap,
     .col-weekday {
+      display: flex;
       flex: none;
+      justify-content: center;
+      align-items: center;
       width: 70px;
-      text-align: center;
     }
 
     .col-controls {

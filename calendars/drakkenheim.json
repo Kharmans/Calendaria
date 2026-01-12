@@ -4,29 +4,29 @@
   "years"         : {"yearZero": 1126, "firstWeekday": 0},
   "months"        : {
     "values": [
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Deepwinter",  "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.DeepwinterShort",  "ordinal":  1, "days": 30},
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Winterwane",  "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.WinterwaneShort",  "ordinal":  2, "days": 30},
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Threshold",   "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.ThresholdShort",   "ordinal":  1, "days": 30},
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Thawing",     "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.ThawingShort",     "ordinal":  2, "days": 30},
       {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Springtide",  "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.SpringtideShort",  "ordinal":  3, "days": 31},
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Rainmoot",    "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.RainmootShort",    "ordinal":  4, "days": 30},
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Hearthstone", "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.HearthstoneShort", "ordinal":  4, "days": 30},
       {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Sowing",      "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.SowingShort",      "ordinal":  5, "days": 31},
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Summertide",  "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.SummertideShort",  "ordinal":  6, "days": 30},
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Highsun",     "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.HighsunShort",     "ordinal":  7, "days": 31},
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Summerwane",  "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.SummerwaneShort",  "ordinal":  8, "days": 30},
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Highsummer",  "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.HighsummerShort",  "ordinal":  6, "days": 30},
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Midyear",     "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.MidyearShort",     "ordinal":  7, "days": 31},
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Sunbreak",    "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.SunbreakShort",    "ordinal":  8, "days": 30},
       {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Autumntide",  "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.AutumntideShort",  "ordinal":  9, "days": 31},
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Harvestmoon", "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.HarvestmoonShort", "ordinal": 10, "days": 30},
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Frostfall",   "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.FrostfallShort",   "ordinal": 11, "days": 30},
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Wintertide",  "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.WindertideShort",  "ordinal": 12, "days": 31}
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Reaping",     "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.ReapingShort",     "ordinal": 10, "days": 30},
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Rimewind",    "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.RimewindShort",    "ordinal": 11, "days": 30},
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Month.Midwinter",   "abbreviation": "CALENDARIA.Calendar.Drakkenheim.Month.MidwinterShort",   "ordinal": 12, "days": 31}
     ]
   },
   "days"          : {
     "values"          : [
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Sunsday",     "ordinal": 1                   },
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Moonday",     "ordinal": 2                   },
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Godsday",     "ordinal": 3                   },
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Crownsday",   "ordinal": 4                   },
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Thundersday", "ordinal": 5                   },
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Steelsday",   "ordinal": 6                   },
-      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Starsday",    "ordinal": 7, "isRestDay": true}
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Moonday",   "ordinal": 1                   },
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Tidesday",  "ordinal": 2                   },
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Windsday",  "ordinal": 3                   },
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Earthsday", "ordinal": 4                   },
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Fireday",   "ordinal": 5                   },
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Starsday",  "ordinal": 6                   },
+      {"name": "CALENDARIA.Calendar.Drakkenheim.Day.Sunday",    "ordinal": 7, "isRestDay": true}
     ],
     "daysPerYear"     : 365,
     "hoursPerDay"     : 24,
@@ -34,12 +34,10 @@
     "secondsPerMinute": 60
   },
   "festivals"     : [
-    {"name": "CALENDARIA.Calendar.Drakkenheim.Festival.NewYearsDawn",      "month":  1, "day":  1},
-    {"name": "CALENDARIA.Calendar.Drakkenheim.Festival.FirstLight",        "month":  3, "day": 21},
-    {"name": "CALENDARIA.Calendar.Drakkenheim.Festival.Midsummer",         "month":  6, "day": 21},
-    {"name": "CALENDARIA.Calendar.Drakkenheim.Festival.HarvestHome",       "month":  9, "day": 21},
-    {"name": "CALENDARIA.Calendar.Drakkenheim.Festival.FallOfDrakkenheim", "month": 10, "day":  4},
-    {"name": "CALENDARIA.Calendar.Drakkenheim.Festival.LongNight",         "month": 12, "day": 21}
+    {"name": "CALENDARIA.Calendar.Drakkenheim.Festival.TarnasWakeStart", "month":  1, "day":  1, "duration": 7},
+    {"name": "CALENDARIA.Calendar.Drakkenheim.Festival.Angelmeet",       "month":  7, "day":  1},
+    {"name": "CALENDARIA.Calendar.Drakkenheim.Festival.AllHallowsEve",   "month": 10, "day": 30},
+    {"name": "CALENDARIA.Calendar.Drakkenheim.Festival.TarnasWakeEnd",   "month": 12, "day": 25, "duration": 7}
   ],
   "seasons"       : {
     "values": [
