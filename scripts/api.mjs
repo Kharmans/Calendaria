@@ -10,6 +10,7 @@ import { MiniCalendar } from './applications/mini-calendar.mjs';
 import CalendarManager from './calendar/calendar-manager.mjs';
 import { HOOKS, SOCKET_TYPES } from './constants.mjs';
 import NoteManager from './notes/note-manager.mjs';
+import { addDays, addMonths, addYears, compareDates, compareDays, dayOfWeek, daysBetween, isSameDay, isValidDate, monthsBetween } from './notes/utils/date-utils.mjs';
 import SearchManager from './search/search-manager.mjs';
 import { DEFAULT_FORMAT_PRESETS, formatCustom, getAvailableTokens, PRESET_FORMATTERS, timeSince } from './utils/format-utils.mjs';
 import { log } from './utils/logger.mjs';
@@ -895,5 +896,114 @@ export const CalendariaAPI = {
    */
   get hooks() {
     return { ...HOOKS };
+  },
+
+  /**
+   * Add days to a date.
+   * @param {object} date - Starting date {year, month, day, hour?, minute?}
+   * @param {number} days - Days to add (can be negative)
+   * @returns {object} New date object
+   */
+  addDays(date, days) {
+    return addDays(date, days);
+  },
+
+  /**
+   * Add months to a date.
+   * @param {object} date - Starting date {year, month, day, hour?, minute?}
+   * @param {number} months - Months to add (can be negative)
+   * @returns {object} New date object
+   */
+  addMonths(date, months) {
+    return addMonths(date, months);
+  },
+
+  /**
+   * Add years to a date.
+   * @param {object} date - Starting date {year, month, day, hour?, minute?}
+   * @param {number} years - Years to add (can be negative)
+   * @returns {object} New date object
+   */
+  addYears(date, years) {
+    return addYears(date, years);
+  },
+
+  /**
+   * Calculate days between two dates.
+   * @param {object} startDate - Start date {year, month, day}
+   * @param {object} endDate - End date {year, month, day}
+   * @returns {number} Number of days (can be negative)
+   */
+  daysBetween(startDate, endDate) {
+    return daysBetween(startDate, endDate);
+  },
+
+  /**
+   * Calculate months between two dates.
+   * @param {object} startDate - Start date {year, month}
+   * @param {object} endDate - End date {year, month}
+   * @returns {number} Number of months (can be negative)
+   */
+  monthsBetween(startDate, endDate) {
+    return monthsBetween(startDate, endDate);
+  },
+
+  /**
+   * Compare two date objects including time.
+   * @param {object} date1 - First date
+   * @param {object} date2 - Second date
+   * @returns {number} -1 if date1 < date2, 0 if equal, 1 if date1 > date2
+   */
+  compareDates(date1, date2) {
+    return compareDates(date1, date2);
+  },
+
+  /**
+   * Compare two dates by day only (ignoring time).
+   * @param {object} date1 - First date
+   * @param {object} date2 - Second date
+   * @returns {number} -1 if date1 < date2, 0 if same day, 1 if date1 > date2
+   */
+  compareDays(date1, date2) {
+    return compareDays(date1, date2);
+  },
+
+  /**
+   * Check if two dates are the same day (ignoring time).
+   * @param {object} date1 - First date
+   * @param {object} date2 - Second date
+   * @returns {boolean} True if same day
+   */
+  isSameDay(date1, date2) {
+    return isSameDay(date1, date2);
+  },
+
+  /**
+   * Get day of week for a date (0 = first day of week).
+   * @param {object} date - Date to check {year, month, day}
+   * @returns {number} Day of week index
+   */
+  dayOfWeek(date) {
+    return dayOfWeek(date);
+  },
+
+  /**
+   * Check if a date is valid for the current calendar.
+   * @param {object} date - Date to validate {year, month, day, hour?, minute?}
+   * @returns {boolean} True if valid
+   */
+  isValidDate(date) {
+    return isValidDate(date);
+  },
+
+  /**
+   * Get the full JournalEntryPage document for a note.
+   * @param {string} pageId - The journal entry page ID
+   * @returns {object|null} The page document or null if not found
+   */
+  getNoteDocument(pageId) {
+    return NoteManager.getFullNote(pageId);
   }
+
+  // Widget API - TODO: implement with insertion points
 };
