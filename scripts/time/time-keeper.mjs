@@ -104,7 +104,7 @@ export default class TimeKeeper {
    * Called during initialization (which happens on ready).
    */
   static #autoStartIfSynced() {
-    if (!game.user.isGM) return;
+    if (!CalendariaSocket.isPrimaryGM()) return;
     if (!game.settings.get(MODULE.ID, SETTINGS.SYNC_CLOCK_PAUSE)) return;
     if (game.paused || game.combat?.started) return;
     this.start();
@@ -137,7 +137,7 @@ export default class TimeKeeper {
    */
   static #onPauseGame(paused) {
     if (!game.settings.get(MODULE.ID, SETTINGS.SYNC_CLOCK_PAUSE)) return;
-    if (!game.user.isGM) return;
+    if (!CalendariaSocket.isPrimaryGM()) return;
 
     if (paused) {
       if (this.#running) this.stop();
@@ -154,7 +154,7 @@ export default class TimeKeeper {
    */
   static #onCombatStart(_combat) {
     if (!game.settings.get(MODULE.ID, SETTINGS.SYNC_CLOCK_PAUSE)) return;
-    if (!game.user.isGM) return;
+    if (!CalendariaSocket.isPrimaryGM()) return;
 
     if (this.#running) {
       this.stop();
@@ -168,7 +168,7 @@ export default class TimeKeeper {
    */
   static #onCombatEnd(_combat) {
     if (!game.settings.get(MODULE.ID, SETTINGS.SYNC_CLOCK_PAUSE)) return;
-    if (!game.user.isGM) return;
+    if (!CalendariaSocket.isPrimaryGM()) return;
 
     if (!game.paused) {
       if (!this.#running) this.start();
@@ -393,7 +393,7 @@ export default class TimeKeeper {
     log(3, `TimeKeeper interval: ${intervalMs.toFixed(0)}ms, advance: ${advanceAmount.toFixed(1)}s (speed: ${targetRate})`);
     this.#intervalId = setInterval(async () => {
       if (!this.#running) return;
-      if (!game.user.isGM) return;
+      if (!CalendariaSocket.isPrimaryGM()) return;
       await game.time.advance(advanceAmount);
     }, intervalMs);
   }

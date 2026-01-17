@@ -285,8 +285,7 @@ export default class WeatherManager {
   static async #onDayChange() {
     const calendar = CalendarManager.getActiveCalendar();
     const autoGenerate = calendar?.weather?.autoGenerate ?? false;
-    if (!autoGenerate || !game.user.isGM) return;
-    if (!CalendariaSocket.isPrimaryGM()) return;
+    if (!autoGenerate || !CalendariaSocket.isPrimaryGM()) return;
     await this.generateAndSetWeather();
   }
 

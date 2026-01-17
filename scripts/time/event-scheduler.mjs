@@ -8,6 +8,7 @@
 
 import CalendarManager from '../calendar/calendar-manager.mjs';
 import { HOOKS, MODULE, TEMPLATES } from '../constants.mjs';
+import { CalendariaSocket } from '../utils/socket.mjs';
 import NoteManager from '../notes/note-manager.mjs';
 import { compareDates, getCurrentDate } from '../notes/utils/date-utils.mjs';
 import { generateRandomOccurrences, needsRandomRegeneration } from '../notes/utils/recurrence.mjs';
@@ -47,7 +48,7 @@ export default class EventScheduler {
    * @returns {void}
    */
   static onUpdateWorldTime(worldTime, _delta) {
-    if (!game.user.isGM) return;
+    if (!CalendariaSocket.isPrimaryGM()) return;
     const currentDate = getCurrentDate();
     if (!currentDate) return;
     if (!NoteManager.isInitialized()) return;

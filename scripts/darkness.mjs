@@ -7,6 +7,7 @@
 import { MODULE, SCENE_FLAGS, SETTINGS, TEMPLATES } from './constants.mjs';
 import TimeKeeper from './time/time-keeper.mjs';
 import { log } from './utils/logger.mjs';
+import { CalendariaSocket } from './utils/socket.mjs';
 import WeatherManager from './weather/weather-manager.mjs';
 
 /** @type {number|null} Last hour we calculated darkness for */
@@ -104,7 +105,7 @@ export function calculateEnvironmentLighting() {
  * @param {{base: {hue: number|null, saturation: number|null}, dark: {hue: number|null, saturation: number|null}}|null} lighting - Lighting overrides
  */
 async function applyEnvironmentLighting(scene, lighting) {
-  if (!game.user.isGM) return;
+  if (!CalendariaSocket.isPrimaryGM()) return;
   const ambienceSync = game.settings.get(MODULE.ID, SETTINGS.AMBIENCE_SYNC);
   if (!ambienceSync) return;
   if (!lighting) {
@@ -136,7 +137,7 @@ async function applyEnvironmentLighting(scene, lighting) {
  * @returns {Promise<void>}
  */
 export async function updateSceneDarkness(scene) {
-  if (!game.user.isGM) return;
+  if (!CalendariaSocket.isPrimaryGM()) return;
   if (!scene) return;
   const baseDarkness = getCurrentDarkness();
   const darkness = calculateAdjustedDarkness(baseDarkness, scene);
@@ -186,7 +187,7 @@ export async function onRenderSceneConfig(app, html, _data) {
  * @param {number} _dt - The time delta
  */
 export async function onUpdateWorldTime(worldTime, _dt) {
-  if (!game.user.isGM) return;
+  if (!CalendariaSocket.isPrimaryGM()) return;
   const activeScene = game.scenes.active;
   if (!activeScene) return;
   if (!shouldSyncSceneDarkness(activeScene)) return;
@@ -270,7 +271,7 @@ function shouldSyncSceneDarkness(scene) {
  * Handle weather change to update scene darkness and environment lighting.
  */
 export async function onWeatherChange() {
-  if (!game.user.isGM) return;
+  if (!CalendariaSocket.isPrimaryGM()) return;
   const activeScene = game.scenes.active;
   if (!activeScene) return;
   if (!shouldSyncSceneDarkness(activeScene)) return;
@@ -292,7 +293,7 @@ export async function onWeatherChange() {
  * @param {object} change - The change data
  */
 export async function onUpdateScene(scene, change) {
-  if (!game.user.isGM) return;
+  if (!CalendariaSocket.isPrimaryGM()) return;
   if (!change.active) return;
   if (!shouldSyncSceneDarkness(scene)) return;
   resetDarknessState();
