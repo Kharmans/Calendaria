@@ -619,6 +619,7 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       if (activeZoneId) weather.activeZone = activeZoneId;
     }
     context.zoneOptions = zones.map((z) => ({ value: z.id, label: localize(z.name), selected: z.id === activeZoneId }));
+    context.zoneOptions.sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang));
     if (context.zoneOptions.length === 0) context.zoneOptions = [{ value: '', label: 'CALENDARIA.Editor.Weather.Zone.NoZones', selected: true }];
     const activeZone = zones.find((z) => z.id === activeZoneId) || null;
     const savedPresets = activeZone?.presets || [];

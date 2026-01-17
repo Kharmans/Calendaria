@@ -555,6 +555,7 @@ export default class CalendarManager {
       const name = calendar.name ? localize(calendar.name) : id;
       templates.push({ id, name, description: calendar.metadata?.description || '', isCustom: calendar.metadata?.isCustom || false });
     }
+    templates.sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));
     return templates;
   }
 

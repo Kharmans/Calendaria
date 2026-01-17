@@ -553,6 +553,7 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
     const activeZone = WeatherManager.getActiveZone();
     context.hasZones = zones.length > 0;
     context.zoneOptions = zones.map((z) => ({ value: z.id, label: localize(z.name), selected: z.id === activeZone?.id }));
+    context.zoneOptions.sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang));
   }
 
   /**
@@ -596,6 +597,7 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
   async #prepareMacrosContext(context) {
     const config = game.settings.get(MODULE.ID, SETTINGS.MACRO_TRIGGERS);
     context.macros = game.macros.contents.map((m) => ({ id: m.id, name: m.name }));
+    context.macros.sort((a, b) => a.name.localeCompare(b.name, game.i18n.lang));
 
     // Global triggers
     const globalTriggers = [
@@ -658,6 +660,11 @@ export class SettingsPanel extends HandlebarsApplicationMixin(ApplicationV2) {
     const primaryGM = game.settings.get(MODULE.ID, SETTINGS.PRIMARY_GM);
     context.primaryGMOptions = [{ value: '', label: localize('CALENDARIA.Settings.PrimaryGM.Auto'), selected: !primaryGM }];
     for (const user of game.users.filter((u) => u.isGM)) context.primaryGMOptions.push({ value: user.id, label: user.name, selected: user.id === primaryGM });
+    context.primaryGMOptions.sort((a, b) => {
+      if (a.value === '') return -1;
+      if (b.value === '') return 1;
+      return a.label.localeCompare(b.label, game.i18n.lang);
+    });
     const logLevel = game.settings.get(MODULE.ID, SETTINGS.LOGGING_LEVEL);
     context.loggingLevelOptions = [
       { value: '0', label: localize('CALENDARIA.Settings.Logger.Choices.Off'), selected: logLevel === '0' || logLevel === 0 },

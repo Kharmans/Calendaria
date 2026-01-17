@@ -46,6 +46,11 @@ class WeatherPickerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const selectedZone = this.#selectedZoneId ? zones.find((z) => z.id === this.#selectedZoneId) : null;
     context.zoneOptions = [{ value: '', label: localize('CALENDARIA.Weather.Picker.NoZone'), selected: !this.#selectedZoneId }];
     for (const z of zones) context.zoneOptions.push({ value: z.id, label: localize(z.name), selected: z.id === this.#selectedZoneId });
+    context.zoneOptions.sort((a, b) => {
+      if (a.value === '') return -1;
+      if (b.value === '') return 1;
+      return a.label.localeCompare(b.label, game.i18n.lang);
+    });
     const enabledPresetIds = new Set();
     if (selectedZone?.presets) for (const p of selectedZone.presets) if (p.enabled !== false) enabledPresetIds.add(p.id);
     const shouldFilter = selectedZone && enabledPresetIds.size > 0;

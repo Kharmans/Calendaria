@@ -62,7 +62,7 @@ export function getDetectedImporters() {
  * @returns {Array<{value: string, label: string, icon: string, detected: boolean}>} - Importer options
  */
 export function getImporterOptions() {
-  return getAvailableImporters().map((importer) => ({
+  const options = getAvailableImporters().map((importer) => ({
     value: importer.id,
     label: importer.label,
     icon: importer.icon,
@@ -71,6 +71,8 @@ export function getImporterOptions() {
     supportsLiveImport: importer.supportsLiveImport,
     detected: importer.supportsLiveImport && importer.detect()
   }));
+  options.sort((a, b) => a.label.localeCompare(b.label));
+  return options;
 }
 
 /**
