@@ -480,7 +480,7 @@ export default class SimpleTimekeepingImporter extends BaseImporter {
     const secondsPerHour = minutesPerHour * secondsPerMinute;
     const hour = Math.floor(timeOfDay / secondsPerHour);
     const minute = Math.floor((timeOfDay % secondsPerHour) / secondsPerMinute);
-    return { year, month, day: remainingDays, hour, minute };
+    return { year, month, day: remainingDays + 1, hour, minute };
   }
 
   /**

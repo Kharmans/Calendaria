@@ -646,7 +646,7 @@ export const CalendariaAPI = {
     const yearZero = calendar.years?.yearZero ?? 0;
     const year = date.year - yearZero;
     const month = date.month ?? 0;
-    const dayOfMonth = date.day ?? date.dayOfMonth ?? 0;
+    const dayOfMonth = date.dayOfMonth ?? (date.day != null ? date.day - 1 : 0);
     let day = dayOfMonth;
     const months = calendar.months?.values ?? [];
     for (let i = 0; i < month; i++) {
@@ -664,7 +664,7 @@ export const CalendariaAPI = {
    */
   chooseRandomDate(startDate, endDate) {
     const current = this.getCurrentDateTime();
-    if (!startDate) startDate = { year: current.year, month: current.month, day: current.dayOfMonth };
+    if (!startDate) startDate = { year: current.year, month: current.month, day: current.dayOfMonth + 1 };
     if (!endDate) endDate = { year: startDate.year + 1, month: startDate.month, day: startDate.day };
     const startTimestamp = this.dateToTimestamp(startDate);
     const endTimestamp = this.dateToTimestamp(endDate);
