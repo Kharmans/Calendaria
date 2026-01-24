@@ -514,6 +514,44 @@ export function formatCustom(calendar, components, formatStr) {
 }
 
 /**
+ * Validate a custom format string and generate a preview.
+ * @param {string} formatStr - The format string to validate
+ * @param {object} [calendar] - Optional calendar data for preview
+ * @param {object} [components] - Optional date components for preview
+ * @returns {{valid: boolean, preview?: string, error?: string}} Validation result
+ */
+export function validateFormatString(formatStr, calendar, components) {
+  // Empty/missing strings are handled by UI reset logic
+  if (!formatStr || typeof formatStr !== 'string') return { valid: true };
+
+  // Check for unclosed brackets
+  const openBrackets = (formatStr.match(/\[/g) || []).length;
+  const closeBrackets = (formatStr.match(/]/g) || []).length;
+  if (openBrackets !== closeBrackets) {
+    return { valid: false, error: 'CALENDARIA.Format.Error.UnclosedBracket' };
+  }
+
+  // Check for empty brackets
+  if (/\[\]/.test(formatStr)) {
+    return { valid: false, error: 'CALENDARIA.Format.Error.EmptyBracket' };
+  }
+
+  // Generate preview if calendar and components provided
+  if (calendar && components) {
+    try {
+      const preview = formatCustom(calendar, components, formatStr);
+      // Strip moon icon markers for text preview
+      const cleanPreview = stripMoonIconMarkers(preview);
+      return { valid: true, preview: cleanPreview };
+    } catch (e) {
+      return { valid: false, error: 'CALENDARIA.Format.Error.Invalid' };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
  * Get moon phase name for the given date.
  * @param {object} calendar - Calendar data
  * @param {object} components - Date components
@@ -862,20 +900,12 @@ export function migrateLegacyFormat(legacyFormat) {
 
 /**
  * Map of preset names to formatter functions.
+ * Most presets use formatCustom with a format string from DEFAULT_FORMAT_PRESETS.
  */
 export const PRESET_FORMATTERS = {
   off: () => '',
-  short: formatShort,
-  long: formatLong,
-  full: formatFull,
-  ordinal: formatOrdinal,
-  fantasy: formatFantasy,
-  time: formatTime,
-  time12: formatTime12,
   approxTime: formatApproximateTime,
-  approxDate: formatApproximateDate,
-  datetime: formatDateTime,
-  datetime12: formatDateTime12
+  approxDate: formatApproximateDate
 };
 
 /**
@@ -883,22 +913,40 @@ export const PRESET_FORMATTERS = {
  * @type {Object<string, string>}
  */
 export const DEFAULT_FORMAT_PRESETS = {
-  short: 'D MMM',
-  long: 'D MMMM, YYYY',
-  full: 'EEEE, D MMMM YYYY',
-  ordinal: 'Do of MMMM, GGGG',
-  fantasy: 'Do of MMMM, YYYY GGGG',
-  time: 'HH:mm',
-  time12: 'h:mm A',
-  approxTime: '[approxTime]',
+  // Approximate
   approxDate: '[approxDate]',
-  datetime: 'D MMMM YYYY, HH:mm',
+  approxTime: '[approxTime]',
+  // Date - Standard
+  dateShort: 'D MMM',
+  dateMedium: 'D MMMM',
+  dateLong: 'D MMMM, YYYY',
+  dateFull: 'EEEE, D MMMM YYYY',
+  // Date - Regional
+  dateUS: 'MMMM D, YYYY',
+  dateUSFull: 'EEEE, MMMM D, YYYY',
+  dateISO: 'YYYY-MM-DD',
+  dateNumericUS: 'MM/DD/YYYY',
+  dateNumericEU: 'DD/MM/YYYY',
+  // Date - Ordinal/Fantasy
+  ordinal: 'Do of MMMM',
+  ordinalLong: 'Do of MMMM, YYYY',
+  ordinalEra: 'Do of MMMM, YYYY GGGG',
+  ordinalFull: 'EEEE, Do of MMMM, YYYY GGGG',
+  seasonDate: 'QQQQ, Do of MMMM',
+  // Time
+  time12: 'h:mm A',
+  time12Sec: 'h:mm:ss A',
+  time24: 'HH:mm',
+  time24Sec: 'HH:mm:ss',
+  // Date + Time
+  datetimeShort12: 'D MMM, h:mm A',
+  datetimeShort24: 'D MMM, HH:mm',
   datetime12: 'D MMMM YYYY, h:mm A',
+  datetime24: 'D MMMM YYYY, HH:mm',
   // Stopwatch duration presets (realtime)
   stopwatchRealtimeFull: 'HH:mm:ss.SSS',
   stopwatchRealtimeNoMs: 'HH:mm:ss',
   stopwatchRealtimeMinSec: 'mm:ss.SSS',
-  stopwatchRealtimeMinSecNoMs: 'mm:ss',
   stopwatchRealtimeSecOnly: 'ss.SSS',
   // Stopwatch duration presets (gametime)
   stopwatchGametimeFull: 'HH:mm:ss',
@@ -911,14 +959,14 @@ export const DEFAULT_FORMAT_PRESETS = {
  * Used for "Calendar Default" preset resolution.
  */
 const LOCATION_FORMAT_KEYS = {
-  hudDate: 'long',
-  hudTime: 'time',
-  timekeeperDate: 'long',
-  timekeeperTime: 'time',
-  miniCalendarHeader: 'long',
-  miniCalendarTime: 'time',
-  fullCalendarHeader: 'full',
-  chatTimestamp: 'long'
+  hudDate: 'dateLong',
+  hudTime: 'time24',
+  timekeeperDate: 'dateLong',
+  timekeeperTime: 'time24',
+  miniCalHeader: 'dateLong',
+  miniCalTime: 'time24',
+  bigCalHeader: 'dateFull',
+  chatTimestamp: 'dateLong'
 };
 
 /**
@@ -927,13 +975,13 @@ const LOCATION_FORMAT_KEYS = {
  */
 export const LOCATION_DEFAULTS = {
   hudDate: 'ordinal',
-  hudTime: 'time',
-  timekeeperDate: 'long',
-  timekeeperTime: 'time',
-  miniCalendarHeader: 'long',
-  miniCalendarTime: 'time',
-  fullCalendarHeader: 'full',
-  chatTimestamp: 'short',
+  hudTime: 'time24',
+  timekeeperDate: 'dateLong',
+  timekeeperTime: 'time24',
+  miniCalHeader: 'dateLong',
+  miniCalTime: 'time24',
+  bigCalHeader: 'dateFull',
+  chatTimestamp: 'dateShort',
   stopwatchRealtime: 'stopwatchRealtimeFull',
   stopwatchGametime: 'stopwatchGametimeFull'
 };
@@ -947,7 +995,7 @@ export const LOCATION_DEFAULTS = {
 export function getDisplayFormat(locationId) {
   const MODULE_ID = 'calendaria';
   const SETTINGS_KEY = 'displayFormats';
-  const defaultFormat = LOCATION_DEFAULTS[locationId] || 'long';
+  const defaultFormat = LOCATION_DEFAULTS[locationId] || 'dateLong';
 
   try {
     const formats = game.settings.get(MODULE_ID, SETTINGS_KEY);
@@ -968,9 +1016,18 @@ export function getDisplayFormat(locationId) {
  * @returns {string} - Resolved format string or fallback preset name
  */
 function resolveCalendarDefault(calendar, locationId) {
-  const formatKey = LOCATION_FORMAT_KEYS[locationId] || 'long';
+  const formatKey = LOCATION_FORMAT_KEYS[locationId] || 'dateLong';
   const calendarFormat = calendar?.dateFormats?.[formatKey];
   return calendarFormat || formatKey;
+}
+
+/**
+ * Resolve a preset name or format string to an actual format string.
+ * @param {string} formatSetting - Preset name or custom format string
+ * @returns {string} - Format string
+ */
+export function resolveFormatString(formatSetting) {
+  return DEFAULT_FORMAT_PRESETS[formatSetting] || formatSetting;
 }
 
 /**
@@ -985,7 +1042,8 @@ export function formatForLocation(calendar, components, locationId) {
   let formatSetting = getDisplayFormat(locationId);
   if (formatSetting === 'calendarDefault') formatSetting = resolveCalendarDefault(calendar, locationId);
   if (PRESET_FORMATTERS[formatSetting]) return PRESET_FORMATTERS[formatSetting](calendar, components);
-  return formatCustom(calendar, components, formatSetting);
+  const formatStr = resolveFormatString(formatSetting);
+  return formatCustom(calendar, components, formatStr);
 }
 
 /**
@@ -996,9 +1054,9 @@ export function getDisplayLocationDefinitions() {
   return [
     { id: 'hudDate', label: 'CALENDARIA.Format.Location.HudDate', category: 'hud' },
     { id: 'hudTime', label: 'CALENDARIA.Format.Location.HudTime', category: 'hud' },
-    { id: 'miniCalendarHeader', label: 'CALENDARIA.Format.Location.MiniCalendarHeader', category: 'miniCalendar' },
-    { id: 'miniCalendarTime', label: 'CALENDARIA.Format.Location.MiniCalendarTime', category: 'miniCalendar' },
-    { id: 'fullCalendarHeader', label: 'CALENDARIA.Format.Location.FullCalendarHeader', category: 'fullcal' },
+    { id: 'miniCalHeader', label: 'CALENDARIA.Format.Location.MiniCalHeader', category: 'miniCal' },
+    { id: 'miniCalTime', label: 'CALENDARIA.Format.Location.MiniCalTime', category: 'miniCal' },
+    { id: 'bigCalHeader', label: 'CALENDARIA.Format.Location.BigCalHeader', category: 'bigcal' },
     { id: 'chatTimestamp', label: 'CALENDARIA.Format.Location.ChatTimestamp', category: 'chat' }
   ];
 }

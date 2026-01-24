@@ -6,7 +6,7 @@
  */
 
 import { HOOKS, MODULE, SETTINGS, TEMPLATES } from '../constants.mjs';
-import TimeKeeper from '../time/time-keeper.mjs';
+import TimeClock from '../time/time-clock.mjs';
 import { DEFAULT_FORMAT_PRESETS, formatDuration, formatGameDuration, getDisplayFormat } from '../utils/format-utils.mjs';
 import { localize } from '../utils/localization.mjs';
 import { log } from '../utils/logger.mjs';
@@ -203,7 +203,7 @@ export class Stopwatch extends HandlebarsApplicationMixin(ApplicationV2) {
     } else {
       this.#startWorldTime = game.time.worldTime;
       this.#registerTimeHook();
-      if (game.settings.get(MODULE.ID, SETTINGS.STOPWATCH_AUTO_START_TIME)) TimeKeeper.start();
+      if (game.settings.get(MODULE.ID, SETTINGS.STOPWATCH_AUTO_START_TIME)) TimeClock.start();
     }
     this.#notificationFired = false;
     this.#saveState();
@@ -307,7 +307,7 @@ export class Stopwatch extends HandlebarsApplicationMixin(ApplicationV2) {
           <label>${localize('CALENDARIA.Stopwatch.NotificationSoundFile')}</label>
           <div class="form-fields">
             <input type="text" name="sound" value="${currentSound}" placeholder="sounds/notify.wav" />
-            <button type="button" class="file-picker" data-type="audio" data-target="sound" title="${localize('FILES.BrowseTooltip')}">
+            <button type="button" class="file-picker" data-type="audio" data-target="sound" data-tooltip="${localize('FILES.BrowseTooltip')}">
               <i class="fas fa-file-audio"></i>
             </button>
           </div>
@@ -543,8 +543,9 @@ export class Stopwatch extends HandlebarsApplicationMixin(ApplicationV2) {
   /** Clamp position to viewport. */
   #clampToViewport() {
     const rect = this.element.getBoundingClientRect();
+    const rightBuffer = StickyZones.getSidebarBuffer();
     let { left, top } = this.position;
-    left = Math.max(0, Math.min(left, window.innerWidth - rect.width));
+    left = Math.max(0, Math.min(left, window.innerWidth - rect.width - rightBuffer));
     top = Math.max(0, Math.min(top, window.innerHeight - rect.height));
     this.setPosition({ left, top });
   }
@@ -583,9 +584,10 @@ export class Stopwatch extends HandlebarsApplicationMixin(ApplicationV2) {
       const deltaX = event.clientX - dragStartX;
       const deltaY = event.clientY - dragStartY;
       const rect = this.element.getBoundingClientRect();
+      const rightBuffer = StickyZones.getSidebarBuffer();
       let newLeft = elementStartLeft + deltaX;
       let newTop = elementStartTop + deltaY;
-      newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - rect.width));
+      newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - rect.width - rightBuffer));
       newTop = Math.max(0, Math.min(newTop, window.innerHeight - rect.height));
       this.setPosition({ left: newLeft, top: newTop });
       this.#activeSnapZone = StickyZones.checkStickyZones(dragHandle, newLeft, newTop, rect.width, rect.height);
@@ -611,9 +613,17 @@ export class Stopwatch extends HandlebarsApplicationMixin(ApplicationV2) {
       event.preventDefault();
       isDragging = true;
       previousZoneId = this.#snappedZoneId;
-      const rect = this.element.getBoundingClientRect();
-      elementStartLeft = rect.left;
-      elementStartTop = rect.top;
+      if (previousZoneId && StickyZones.usesDomParenting(previousZoneId)) {
+        const preserved = StickyZones.unpinFromZone(this.element);
+        if (preserved) {
+          elementStartLeft = preserved.left;
+          elementStartTop = preserved.top;
+        }
+      } else {
+        const rect = this.element.getBoundingClientRect();
+        elementStartLeft = rect.left;
+        elementStartTop = rect.top;
+      }
       dragStartX = event.clientX;
       dragStartY = event.clientY;
       window.addEventListener('mousemove', onMouseMove);
@@ -662,12 +672,60 @@ export class Stopwatch extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** Setup context menu. */
   #setupContextMenu() {
-    new foundry.applications.ux.ContextMenu.implementation(
-      this.element,
-      '.stopwatch-face',
-      [{ name: 'CALENDARIA.Common.Close', icon: '<i class="fas fa-times"></i>', callback: () => Stopwatch.hide() }],
-      { fixed: true, jQuery: false }
-    );
+    const container = this.element.querySelector('.stopwatch-face');
+    container?.addEventListener('contextmenu', (e) => {
+      if (e.target.closest('#context-menu')) return;
+      e.preventDefault();
+      document.getElementById('context-menu')?.remove();
+      const menu = new foundry.applications.ux.ContextMenu.implementation(this.element, '.stopwatch-face', this.#getContextMenuItems(), { fixed: true, jQuery: false });
+      menu._onActivate(e);
+    });
+  }
+
+  /**
+   * Get context menu items for the Stopwatch.
+   * @returns {object[]} Array of context menu item configs
+   * @private
+   */
+  #getContextMenuItems() {
+    const items = [];
+    items.push({
+      name: 'CALENDARIA.Stopwatch.ContextMenu.ResetPosition',
+      icon: '<i class="fas fa-arrows-to-dot"></i>',
+      callback: () => this.resetPosition()
+    });
+    const stickyStates = game.settings.get(MODULE.ID, SETTINGS.STOPWATCH_STICKY_STATES) || {};
+    const isLocked = stickyStates.position ?? false;
+    items.push({
+      name: isLocked ? 'CALENDARIA.Stopwatch.ContextMenu.UnlockPosition' : 'CALENDARIA.Stopwatch.ContextMenu.LockPosition',
+      icon: `<i class="fas fa-${isLocked ? 'unlock' : 'lock'}"></i>`,
+      callback: () => this.#toggleStickyPosition()
+    });
+    items.push({ name: 'CALENDARIA.Common.Close', icon: '<i class="fas fa-times"></i>', callback: () => this.close() });
+    return items;
+  }
+
+  /**
+   * Toggle position lock state.
+   * @private
+   */
+  async #toggleStickyPosition() {
+    const current = game.settings.get(MODULE.ID, SETTINGS.STOPWATCH_STICKY_STATES) || {};
+    const newLocked = !(current.position ?? false);
+    await game.settings.set(MODULE.ID, SETTINGS.STOPWATCH_STICKY_STATES, { ...current, position: newLocked });
+    ui.notifications.info(newLocked ? 'CALENDARIA.Stopwatch.ContextMenu.PositionLocked' : 'CALENDARIA.Stopwatch.ContextMenu.PositionUnlocked', { localize: true });
+  }
+
+  /**
+   * Reset position to default and clear any sticky zone.
+   */
+  async resetPosition() {
+    StickyZones.unregisterFromZoneUpdates(this);
+    StickyZones.unpinFromZone(this.element);
+    this.#snappedZoneId = null;
+    this.setPosition({ left: 150, top: 150 });
+    await game.settings.set(MODULE.ID, SETTINGS.STOPWATCH_POSITION, { left: 150, top: 150, size: 140, zoneId: null });
+    ui.notifications.info('CALENDARIA.Stopwatch.ContextMenu.PositionReset', { localize: true });
   }
 
   /**
@@ -683,26 +741,19 @@ export class Stopwatch extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {Stopwatch} The instance
    */
   static show() {
-    const existing = foundry.applications.instances.get('calendaria-stopwatch');
-    if (existing) {
-      existing.render({ force: true });
-      return existing;
-    }
-    const instance = new Stopwatch();
-    instance.render(true);
+    const instance = this.instance ?? new Stopwatch();
+    instance.render({ force: true });
     return instance;
   }
 
   /** Hide the Stopwatch. */
   static hide() {
-    const instance = foundry.applications.instances.get('calendaria-stopwatch');
-    if (instance) instance.close();
+    this.instance?.close();
   }
 
   /** Toggle visibility. */
   static toggle() {
-    const existing = foundry.applications.instances.get('calendaria-stopwatch');
-    if (existing?.rendered) this.hide();
+    if (this.instance?.rendered) this.hide();
     else this.show();
   }
 

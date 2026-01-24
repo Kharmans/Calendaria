@@ -6,12 +6,12 @@
  */
 
 import { CalendariaAPI } from './scripts/api.mjs';
-import { CalendarApplication } from './scripts/applications/calendar-application.mjs';
+import { BigCal } from './scripts/applications/big-cal.mjs';
 import { CalendarEditor } from './scripts/applications/calendar-editor.mjs';
-import { CalendariaHUD } from './scripts/applications/calendaria-hud.mjs';
-import { MiniCalendar } from './scripts/applications/mini-calendar.mjs';
+import { HUD } from './scripts/applications/hud.mjs';
+import { MiniCal } from './scripts/applications/mini-cal.mjs';
 import { Stopwatch } from './scripts/applications/stopwatch.mjs';
-import { TimeKeeperHUD } from './scripts/applications/time-keeper-hud.mjs';
+import { TimeKeeper } from './scripts/applications/time-keeper.mjs';
 import CalendarManager from './scripts/calendar/calendar-manager.mjs';
 import CalendariaCalendar from './scripts/calendar/data/calendaria-calendar.mjs';
 import { overrideChatLogTimestamps } from './scripts/chat/chat-timestamp.mjs';
@@ -24,10 +24,10 @@ import { CalendarNoteDataModel } from './scripts/sheets/calendar-note-data-model
 import { CalendarNoteSheet } from './scripts/sheets/calendar-note-sheet.mjs';
 import EventScheduler from './scripts/time/event-scheduler.mjs';
 import ReminderScheduler from './scripts/time/reminder-scheduler.mjs';
-import TimeKeeper from './scripts/time/time-keeper.mjs';
+import TimeClock from './scripts/time/time-clock.mjs';
 import TimeTracker from './scripts/time/time-tracker.mjs';
 import { migrateAllDeprecatedTokens, migrateCustomCalendars } from './scripts/utils/format-utils.mjs';
-import { registerKeybindings, toggleCalendarVisibility } from './scripts/utils/keybinds.mjs';
+import { registerKeybindings } from './scripts/utils/keybinds.mjs';
 import { initializeLogger, log } from './scripts/utils/logger.mjs';
 import * as Permissions from './scripts/utils/permissions.mjs';
 import { CalendariaSocket } from './scripts/utils/socket.mjs';
@@ -35,7 +35,7 @@ import * as StickyZones from './scripts/utils/sticky-zones.mjs';
 import { initializeTheme } from './scripts/utils/theme-utils.mjs';
 import WeatherManager from './scripts/weather/weather-manager.mjs';
 
-const { canViewMiniCalendar, canViewTimeKeeper } = Permissions;
+const { canViewMiniCal, canViewTimeKeeper } = Permissions;
 
 Hooks.once('init', async () => {
   Hooks.callAll(HOOKS.INIT);
@@ -67,18 +67,18 @@ Hooks.once('ready', async () => {
   await migrateAllDeprecatedTokens();
   await NoteManager.initialize();
   TimeTracker.initialize();
-  TimeKeeper.initialize();
+  TimeClock.initialize();
   EventScheduler.initialize();
   ReminderScheduler.initialize();
   initializeTheme();
   await WeatherManager.initialize();
-  TimeKeeperHUD.updateIdleOpacity();
-  CalendariaHUD.updateIdleOpacity();
-  MiniCalendar.updateIdleOpacity();
-  if (game.settings.get(MODULE.ID, SETTINGS.SHOW_TIME_KEEPER) && canViewTimeKeeper()) TimeKeeperHUD.show({ silent: true });
-  if (game.settings.get(MODULE.ID, SETTINGS.FORCE_MINI_CALENDAR)) await game.settings.set(MODULE.ID, SETTINGS.SHOW_MINI_CALENDAR, true);
+  TimeKeeper.updateIdleOpacity();
+  HUD.updateIdleOpacity();
+  MiniCal.updateIdleOpacity();
+  if (game.settings.get(MODULE.ID, SETTINGS.SHOW_TIME_KEEPER) && canViewTimeKeeper()) TimeKeeper.show({ silent: true });
+  if (game.settings.get(MODULE.ID, SETTINGS.FORCE_MINI_CAL)) await game.settings.set(MODULE.ID, SETTINGS.SHOW_MINI_CAL, true);
   if (game.settings.get(MODULE.ID, SETTINGS.FORCE_HUD)) await game.settings.set(MODULE.ID, SETTINGS.SHOW_CALENDAR_HUD, true);
-  if (game.settings.get(MODULE.ID, SETTINGS.SHOW_MINI_CALENDAR) && canViewMiniCalendar()) MiniCalendar.show({ silent: true });
+  if (game.settings.get(MODULE.ID, SETTINGS.SHOW_MINI_CAL) && canViewMiniCal()) MiniCal.show({ silent: true });
   if (game.system.id === 'dnd5e' && foundry.utils.isNewerVersion(game.system.version, '5.1.10')) {
     const calendarConfig = game.settings.get('dnd5e', 'calendarConfig');
     if (calendarConfig?.enabled) {
@@ -94,7 +94,7 @@ Hooks.once('ready', async () => {
       ui.notifications.warn('CALENDARIA.Notification.PF2eDarknessSyncDisabled', { localize: true });
     }
   }
-  if (game.settings.get(MODULE.ID, SETTINGS.SHOW_CALENDAR_HUD)) CalendariaHUD.show();
+  if (game.settings.get(MODULE.ID, SETTINGS.SHOW_CALENDAR_HUD)) HUD.show();
   if (game.settings.get(MODULE.ID, SETTINGS.DEV_MODE)) StickyZones.showDebugZones();
   Hooks.on('renderSceneControls', () => StickyZones.updateZonePositions('below-controls'));
   Hooks.callAll(HOOKS.READY, { api: CalendariaAPI, calendar: CalendarManager.getActiveCalendar(), version: game.modules.get('calendaria')?.version });
@@ -104,19 +104,18 @@ Hooks.once('setup', () => {
 });
 
 globalThis['CALENDARIA'] = {
-  CalendariaHUD,
+  HUD,
   CalendariaCalendar,
   CalendarManager,
   CalendariaSocket,
   NoteManager,
-  CalendarApplication,
+  BigCal,
   CalendarEditor,
-  MiniCalendar,
+  MiniCal,
   Stopwatch,
+  TimeClock,
   TimeKeeper,
-  TimeKeeperHUD,
   WeatherManager,
-  toggleCalendarVisibility,
   api: CalendariaAPI,
   ...Permissions
 };

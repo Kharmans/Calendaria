@@ -6,6 +6,7 @@
  * @author Tyler
  */
 
+import { DEFAULT_MOON_PHASES } from '../../constants.mjs';
 import { format, localize } from '../../utils/localization.mjs';
 import CalendarRegistry from '../calendar-registry.mjs';
 import { formatEraTemplate } from '../calendar-utils.mjs';
@@ -253,7 +254,8 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
               icon: new StringField({ required: false }),
               start: new NumberField({ required: true, min: 0, max: 1 }),
               end: new NumberField({ required: true, min: 0, max: 1 })
-            })
+            }),
+            { initial: DEFAULT_MOON_PHASES }
           ),
           referenceDate: new SchemaField({
             year: new NumberField({ required: true, integer: true, initial: 1 }),
@@ -1422,10 +1424,10 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
    * Format a date using a custom template or predefined format.
    * @param {object} calendar - The calendar instance.
    * @param {object} components - Time components.
-   * @param {string} format - Template key ('short', 'long', 'full', 'time', 'time12') or custom template.
+   * @param {string} format - Template key (dateShort, dateLong, dateFull, time24, time12, etc.) or custom template.
    * @returns {string} Formatted date string.
    */
-  static formatDateWithTemplate(calendar, components, format = 'long') {
+  static formatDateWithTemplate(calendar, components, format = 'dateLong') {
     const context = CalendariaCalendar.dateFormattingParts(calendar, components);
     let template;
     if (calendar.dateFormats?.[format]) {
@@ -1433,8 +1435,11 @@ export default class CalendariaCalendar extends foundry.data.CalendarData {
     } else if (format.includes('{{') || format.includes('[')) {
       template = format;
     } else {
-      const defaults = { short: 'D MMM', long: 'D MMMM, YYYY', full: 'MMMM D, YYYY', time: 'HH:mm', time12: 'h:mm a' };
-      template = defaults[format] ?? defaults.long;
+      const defaults = {
+        dateShort: 'D MMM', dateMedium: 'D MMMM', dateLong: 'D MMMM, YYYY', dateFull: 'EEEE, D MMMM YYYY',
+        time24: 'HH:mm', time12: 'h:mm A', time24Sec: 'HH:mm:ss', time12Sec: 'h:mm:ss A'
+      };
+      template = defaults[format] ?? defaults.dateLong;
     }
 
     return template.replace(/\[(\w+)]/g, (match, key) => {

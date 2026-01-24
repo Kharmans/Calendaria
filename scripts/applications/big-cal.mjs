@@ -1,8 +1,6 @@
 /**
- * Calendar Application
  * Standalone application for displaying the calendar UI.
- * This is NOT a sheet - it's an independent application.
- * @module Applications/CalendarApplication
+ * @module Applications/BigCal
  * @author Tyler
  */
 
@@ -12,14 +10,14 @@ import NoteManager from '../notes/note-manager.mjs';
 import { addDays, dayOfWeek, daysBetween } from '../notes/utils/date-utils.mjs';
 import { isRecurringMatch } from '../notes/utils/recurrence.mjs';
 import SearchManager from '../search/search-manager.mjs';
-import { formatForLocation, hasMoonIconMarkers, renderMoonIcons } from '../utils/format-utils.mjs';
+import { formatForLocation, hasMoonIconMarkers, renderMoonIcons, toRomanNumeral } from '../utils/format-utils.mjs';
 import { format, localize } from '../utils/localization.mjs';
-import { canViewFullCalendar } from '../utils/permissions.mjs';
+import { canViewBigCal } from '../utils/permissions.mjs';
 import * as WidgetManager from '../utils/widget-manager.mjs';
 import WeatherManager from '../weather/weather-manager.mjs';
 import { openWeatherPicker } from '../weather/weather-picker.mjs';
 import * as ViewUtils from './calendar-view-utils.mjs';
-import { MiniCalendar } from './mini-calendar.mjs';
+import { MiniCal } from './mini-cal.mjs';
 import { SettingsPanel } from './settings/settings-panel.mjs';
 
 const { HandlebarsApplicationMixin, ApplicationV2 } = foundry.applications.api;
@@ -45,7 +43,7 @@ function processMoonPhases(phases) {
  * Calendar Application - displays the calendar UI.
  * @extends ApplicationV2
  */
-export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV2) {
+export class BigCal extends HandlebarsApplicationMixin(ApplicationV2) {
   /**
    * @param {object} options - Application options
    */
@@ -63,28 +61,29 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
   }
 
   static DEFAULT_OPTIONS = {
-    classes: ['calendaria', 'calendar-application'],
+    id: 'calendaria-big-cal',
+    classes: ['calendaria', 'big-cal'],
     tag: 'div',
-    window: { contentClasses: ['calendar-application'], icon: 'fas fa-calendar', resizable: false },
+    window: { contentClasses: ['big-cal'], icon: 'fas fa-calendar', resizable: false },
     actions: {
-      navigate: CalendarApplication._onNavigate,
-      today: CalendarApplication._onToday,
-      addNote: CalendarApplication._onAddNote,
-      addNoteToday: CalendarApplication._onAddNoteToday,
-      editNote: CalendarApplication._onEditNote,
-      deleteNote: CalendarApplication._onDeleteNote,
-      changeView: CalendarApplication._onChangeView,
-      selectDay: CalendarApplication._onSelectDay,
-      selectMonth: CalendarApplication._onSelectMonth,
-      setAsCurrentDate: CalendarApplication._onSetAsCurrentDate,
-      selectTimeSlot: CalendarApplication._onSelectTimeSlot,
-      toggleCompact: CalendarApplication._onToggleCompact,
-      openWeatherPicker: CalendarApplication._onOpenWeatherPicker,
-      toggleSearch: CalendarApplication._onToggleSearch,
-      closeSearch: CalendarApplication._onCloseSearch,
-      openSearchResult: CalendarApplication._onOpenSearchResult,
-      openSettings: CalendarApplication._onOpenSettings,
-      navigateToMonth: CalendarApplication._onNavigateToMonth
+      navigate: BigCal._onNavigate,
+      today: BigCal._onToday,
+      addNote: BigCal._onAddNote,
+      addNoteToday: BigCal._onAddNoteToday,
+      editNote: BigCal._onEditNote,
+      deleteNote: BigCal._onDeleteNote,
+      changeView: BigCal._onChangeView,
+      selectDay: BigCal._onSelectDay,
+      selectMonth: BigCal._onSelectMonth,
+      setAsCurrentDate: BigCal._onSetAsCurrentDate,
+      selectTimeSlot: BigCal._onSelectTimeSlot,
+      toggleCompact: BigCal._onToggleCompact,
+      openWeatherPicker: BigCal._onOpenWeatherPicker,
+      toggleSearch: BigCal._onToggleSearch,
+      closeSearch: BigCal._onCloseSearch,
+      openSearchResult: BigCal._onOpenSearchResult,
+      openSettings: BigCal._onOpenSettings,
+      navigateToMonth: BigCal._onNavigateToMonth
     },
     position: { width: 'auto', height: 'auto' }
   };
@@ -93,7 +92,7 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
 
   /** @override */
   async render(options = {}, _options = {}) {
-    if (!canViewFullCalendar()) {
+    if (!canViewBigCal()) {
       if (!options.silent) ui.notifications.warn('CALENDARIA.Permissions.NoAccess', { localize: true });
       return this;
     }
@@ -178,14 +177,26 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
       }
     }
     context.currentMonthNotes = this._getNotesForMonth(context.visibleNotes, viewedDate.year, viewedDate.month);
-    context.showMoonPhases = game.settings.get(MODULE.ID, SETTINGS.SHOW_MOON_PHASES);
+    context.showMoonPhases = game.settings.get(MODULE.ID, SETTINGS.BIG_CAL_SHOW_MOON_PHASES);
     context.weather = this._getWeatherContext();
-    if (calendar.cycles?.length) {
+
+    // Block visibility settings
+    context.showWeather = game.settings.get(MODULE.ID, SETTINGS.BIG_CAL_SHOW_WEATHER);
+    context.showSeason = game.settings.get(MODULE.ID, SETTINGS.BIG_CAL_SHOW_SEASON);
+    context.showEra = game.settings.get(MODULE.ID, SETTINGS.BIG_CAL_SHOW_ERA);
+    context.showCycles = game.settings.get(MODULE.ID, SETTINGS.BIG_CAL_SHOW_CYCLES);
+    context.weatherDisplayMode = game.settings.get(MODULE.ID, SETTINGS.BIG_CAL_WEATHER_DISPLAY_MODE);
+    context.seasonDisplayMode = game.settings.get(MODULE.ID, SETTINGS.BIG_CAL_SEASON_DISPLAY_MODE);
+    context.eraDisplayMode = game.settings.get(MODULE.ID, SETTINGS.BIG_CAL_ERA_DISPLAY_MODE);
+    context.cyclesDisplayMode = game.settings.get(MODULE.ID, SETTINGS.BIG_CAL_CYCLES_DISPLAY_MODE);
+
+    if (calendar.cycles?.length && context.showCycles) {
       const yearZeroOffset = calendar.years?.yearZero ?? 0;
       const viewedComponents = { year: viewedDate.year - yearZeroOffset, month: viewedDate.month, dayOfMonth: (viewedDate.day ?? 1) - 1, hour: 12, minute: 0, second: 0 };
       const cycleResult = calendar.getCycleValues(viewedComponents);
       context.cycleText = cycleResult.text;
       context.cycleValues = cycleResult.values;
+      context.cycleData = cycleResult;
     }
 
     context.searchTerm = this._searchTerm;
@@ -202,12 +213,12 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
    */
   _prepareWidgetContext(context) {
     const widgets = {};
-    widgets.actions = WidgetManager.renderWidgetsForPoint(WIDGET_POINTS.FULLCAL_ACTIONS, 'fullcal');
-    widgets.weatherIndicator = WidgetManager.renderReplacementOrOriginal(REPLACEABLE_ELEMENTS.WEATHER_INDICATOR, this._renderWeatherIndicator(context), 'fullcal');
-    widgets.seasonIndicator = WidgetManager.renderReplacementOrOriginal(REPLACEABLE_ELEMENTS.SEASON_INDICATOR, this._renderSeasonIndicator(context), 'fullcal');
-    widgets.eraIndicator = WidgetManager.renderReplacementOrOriginal(REPLACEABLE_ELEMENTS.ERA_INDICATOR, this._renderEraIndicator(context), 'fullcal');
-    widgets.cycleIndicator = WidgetManager.renderReplacementOrOriginal(REPLACEABLE_ELEMENTS.CYCLE_INDICATOR, this._renderCycleIndicator(context), 'fullcal');
-    widgets.indicators = WidgetManager.renderWidgetsForPoint(WIDGET_POINTS.HUD_INDICATORS, 'fullcal');
+    widgets.actions = WidgetManager.renderWidgetsForPoint(WIDGET_POINTS.BIGCAL_ACTIONS, 'bigcal');
+    widgets.weatherIndicator = WidgetManager.renderReplacementOrOriginal(REPLACEABLE_ELEMENTS.WEATHER_INDICATOR, this._renderWeatherIndicator(context), 'bigcal');
+    widgets.seasonIndicator = WidgetManager.renderReplacementOrOriginal(REPLACEABLE_ELEMENTS.SEASON_INDICATOR, this._renderSeasonIndicator(context), 'bigcal');
+    widgets.eraIndicator = WidgetManager.renderReplacementOrOriginal(REPLACEABLE_ELEMENTS.ERA_INDICATOR, this._renderEraIndicator(context), 'bigcal');
+    widgets.cycleIndicator = WidgetManager.renderReplacementOrOriginal(REPLACEABLE_ELEMENTS.CYCLE_INDICATOR, this._renderCycleIndicator(context), 'bigcal');
+    widgets.indicators = WidgetManager.renderWidgetsForPoint(WIDGET_POINTS.HUD_INDICATORS, 'bigcal');
     widgets.hasIndicators = WidgetManager.hasWidgetsForPoint(WIDGET_POINTS.HUD_INDICATORS);
     return widgets;
   }
@@ -218,14 +229,20 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
    * @returns {string} HTML string
    */
   _renderWeatherIndicator(context) {
-    const { weather, editable } = context;
+    if (!context.showWeather) return '';
+    const { weather, editable, weatherDisplayMode } = context;
     if (weather) {
       const clickable = editable ? ' clickable' : '';
       const action = editable ? 'data-action="openWeatherPicker"' : '';
-      const temp = weather.temperature ? `<span class="weather-temp">${weather.temperature}</span>` : '';
+      const showIcon = weatherDisplayMode === 'full' || weatherDisplayMode === 'icon' || weatherDisplayMode === 'iconTemp';
+      const showLabel = weatherDisplayMode === 'full';
+      const showTemp = weatherDisplayMode === 'full' || weatherDisplayMode === 'temp' || weatherDisplayMode === 'iconTemp';
+      const icon = showIcon ? `<i class="fas ${weather.icon}"></i>` : '';
+      const label = showLabel ? ` ${weather.label}` : '';
+      const temp = showTemp && weather.temperature ? `<span class="weather-temp">${weather.temperature}</span>` : '';
       return `<span class="weather-indicator${clickable}" ${action}
         style="--weather-color: ${weather.color}" data-tooltip="${weather.tooltip}">
-        <i class="fas ${weather.icon}"></i> ${weather.label} ${temp}
+        ${icon}${label} ${temp}
       </span>`;
     } else if (editable) {
       return `<span class="weather-indicator clickable no-weather" data-action="openWeatherPicker"
@@ -242,9 +259,15 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
    * @returns {string} HTML string
    */
   _renderSeasonIndicator(context) {
+    if (!context.showSeason) return '';
     const season = context.calendarData?.currentSeason;
     if (!season) return '';
-    return `<span class="season-indicator" style="--season-color: ${season.color}" data-tooltip="${localize('CALENDARIA.UI.CurrentSeason')}"><i class="${season.icon}"></i> ${localize(season.name)}</span>`;
+    const mode = context.seasonDisplayMode;
+    const showIcon = mode === 'full' || mode === 'icon';
+    const showLabel = mode === 'full' || mode === 'text';
+    const icon = showIcon ? `<i class="${season.icon}"></i>` : '';
+    const label = showLabel ? ` ${localize(season.name)}` : '';
+    return `<span class="season-indicator" style="--season-color: ${season.color}" data-tooltip="${localize(season.name)}">${icon}${label}</span>`;
   }
 
   /**
@@ -253,9 +276,18 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
    * @returns {string} HTML string
    */
   _renderEraIndicator(context) {
+    if (!context.showEra) return '';
     const era = context.calendarData?.currentEra;
     if (!era) return '';
-    return `<span class="era-indicator" data-tooltip="${localize('CALENDARIA.UI.CurrentEra')}"><i class="fas fa-hourglass-half"></i> ${localize(era.name)}</span>`;
+    const mode = context.eraDisplayMode;
+    const showIcon = mode === 'full' || mode === 'icon';
+    const showLabel = mode === 'full' || mode === 'text';
+    const showAbbr = mode === 'abbr';
+    const icon = showIcon ? '<i class="fas fa-hourglass-half"></i>' : '';
+    let label = '';
+    if (showLabel) label = ` ${localize(era.name)}`;
+    else if (showAbbr) label = ` ${localize(era.abbreviation || era.name)}`;
+    return `<span class="era-indicator" data-tooltip="${localize(era.name)}">${icon}${label}</span>`;
   }
 
   /**
@@ -264,8 +296,23 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
    * @returns {string} HTML string
    */
   _renderCycleIndicator(context) {
-    if (!context.cycleText) return '';
-    return `<span class="cycle-indicator" data-tooltip="${localize('CALENDARIA.UI.CurrentCycle')}"><i class="fas fa-arrows-rotate"></i> ${context.cycleText}</span>`;
+    if (!context.showCycles || !context.cycleData?.values?.length) return '';
+    const mode = context.cyclesDisplayMode;
+    const icon = '<i class="fas fa-arrows-rotate"></i>';
+    // Icon only mode - just show icon with tooltip
+    if (mode === 'icon') {
+      return `<span class="cycle-indicator" data-tooltip="${context.cycleText}">${icon}</span>`;
+    }
+    let displayText = '';
+    if (mode === 'number') {
+      displayText = context.cycleData.values.map((v) => v.index + 1).join(', ');
+    } else if (mode === 'roman') {
+      displayText = context.cycleData.values.map((v) => toRomanNumeral(v.index + 1)).join(', ');
+    } else {
+      displayText = context.cycleData.values.map((v) => v.entryName).join(', ');
+    }
+    const label = `<span class="cycle-label">${displayText}</span>`;
+    return `<span class="cycle-indicator" data-tooltip="${context.cycleText || displayText}">${icon}${label}</span>`;
   }
 
   /**
@@ -303,7 +350,7 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     const daysInWeek = calendar.days?.values?.length || 7;
     const weeks = [];
     let currentWeek = [];
-    const showMoons = game.settings.get(MODULE.ID, SETTINGS.SHOW_MOON_PHASES) && calendar.moons?.length;
+    const showMoons = game.settings.get(MODULE.ID, SETTINGS.BIG_CAL_SHOW_MOON_PHASES) && calendar.moons?.length;
     const hasFixedStart = monthData?.startingWeekday != null;
     const startDayOfWeek = hasFixedStart ? monthData.startingWeekday : dayOfWeek({ year, month, day: 1 });
     if (startDayOfWeek > 0) {
@@ -364,6 +411,7 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
 
       if (isIntercalary) {
         // Don't add to weekday grid - collect separately
+        const festivalNameStr = festivalDay ? localize(festivalDay.name) : null;
         intercalaryDays.push({
           day,
           year,
@@ -372,12 +420,14 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
           isSelected: this._isSelected(year, month, day),
           notes: dayNotes,
           isFestival: true,
-          festivalName: festivalDay ? localize(festivalDay.name) : null,
+          festivalName: festivalNameStr,
+          dayTooltip: ViewUtils.generateDayTooltip(calendar, year, month, day, festivalNameStr),
           moonPhases,
           isIntercalary: true
         });
       } else {
         const weekdayData = calendar.days?.values?.[currentWeek.length];
+        const festivalNameStr = festivalDay ? localize(festivalDay.name) : null;
         currentWeek.push({
           day,
           year,
@@ -387,7 +437,8 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
           notes: dayNotes,
           isOddDay: dayIndex % 2 === 1,
           isFestival: !!festivalDay,
-          festivalName: festivalDay ? localize(festivalDay.name) : null,
+          festivalName: festivalNameStr,
+          dayTooltip: ViewUtils.generateDayTooltip(calendar, year, month, day, festivalNameStr),
           isRestDay: weekdayData?.isRestDay || false,
           moonPhases
         });
@@ -452,7 +503,7 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     const monthWeekdays = calendar.getWeekdaysForMonth?.(month) ?? calendar.days?.values ?? [];
     const weekdaysData = monthWeekdays.map((wd) => ({ name: localize(wd.name), isRestDay: wd.isRestDay || false }));
     const headerComponents = { year, month, dayOfMonth: date.day };
-    const rawHeader = formatForLocation(calendar, headerComponents, 'fullCalendarHeader');
+    const rawHeader = formatForLocation(calendar, headerComponents, 'bigCalHeader');
     const formattedHeader = hasMoonIconMarkers(rawHeader) ? renderMoonIcons(rawHeader) : rawHeader;
     return {
       year,
@@ -482,7 +533,7 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     const daysInWeek = calendar.days?.values?.length || 7;
     const yearZero = calendar.years?.yearZero ?? 0;
     const daysInYear = calendar.getDaysInYear(year - yearZero);
-    const showMoons = game.settings.get(MODULE.ID, SETTINGS.SHOW_MOON_PHASES) && calendar.moons?.length;
+    const showMoons = game.settings.get(MODULE.ID, SETTINGS.BIG_CAL_SHOW_MOON_PHASES) && calendar.moons?.length;
     const weekNumber = Math.floor((viewedDay - 1) / daysInWeek);
     const totalWeeks = Math.ceil(daysInYear / daysInWeek);
     const weeks = [];
@@ -692,7 +743,7 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     const currentEra = calendar.getCurrentEra?.();
     const weekWeekdays = calendar.getWeekdaysForMonth?.(weekStartMonth) ?? calendar.days?.values ?? [];
     const weekHeaderComponents = { year: weekStartYear, month: weekStartMonth, dayOfMonth: weekStartDay };
-    const rawHeader = formatForLocation(calendar, weekHeaderComponents, 'fullCalendarHeader');
+    const rawHeader = formatForLocation(calendar, weekHeaderComponents, 'bigCalHeader');
     const formattedHeader = hasMoonIconMarkers(rawHeader) ? renderMoonIcons(rawHeader) : rawHeader;
     return {
       year: weekStartYear,
@@ -828,7 +879,7 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
         conditions: page.system.conditions
       };
       return isRecurringMatch(noteData, targetDate);
-    });
+    }).sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /**
@@ -1124,11 +1175,22 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     this.element.classList.add(`view-${this._displayMode}`);
     const content = this.element.querySelector('.window-content');
     content?.addEventListener('dblclick', (e) => {
-      if (e.target.closest('button, a, input, select, [data-action], .calendar-day, .note-item, .event-block, .multi-day-event')) return;
+      if (e.target.closest('button, a, input, select, .note-item, .event-block, .multi-day-event')) return;
       e.preventDefault();
       this.close();
-      MiniCalendar.show();
+      MiniCal.show();
     });
+
+    // Right-click context menu on header
+    const header = this.element.querySelector('.window-header');
+    header?.addEventListener('contextmenu', (e) => {
+      if (e.target.closest('#context-menu')) return;
+      e.preventDefault();
+      document.getElementById('context-menu')?.remove();
+      const menu = new foundry.applications.ux.ContextMenu.implementation(this.element, '.window-header', this.#getContextMenuItems(), { fixed: true, jQuery: false });
+      menu._onActivate(e);
+    });
+
     const searchInput = this.element.querySelector('.search-input');
     if (searchInput) {
       if (this._searchOpen) searchInput.focus();
@@ -1160,6 +1222,34 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     }
 
     WidgetManager.attachWidgetListeners(this.element);
+  }
+
+  /**
+   * Build context menu items for BigCal.
+   * @returns {object[]} Array of context menu item definitions
+   */
+  #getContextMenuItems() {
+    const items = [];
+    items.push({
+      name: 'CALENDARIA.BigCal.ContextMenu.Settings',
+      icon: '<i class="fas fa-gear"></i>',
+      callback: () => {
+        const panel = new SettingsPanel();
+        panel.render(true).then(() => {
+          requestAnimationFrame(() => panel.changeTab('bigcal', 'primary'));
+        });
+      }
+    });
+    items.push({
+      name: 'CALENDARIA.BigCal.ContextMenu.SwapToMiniCal',
+      icon: '<i class="fas fa-calendar-alt"></i>',
+      callback: () => {
+        this.close();
+        MiniCal.show();
+      }
+    });
+    items.push({ name: 'CALENDARIA.Common.Close', icon: '<i class="fas fa-times"></i>', callback: () => this.close() });
+    return items;
   }
 
   /**
@@ -1205,8 +1295,8 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
   _positionSearchPanel() {
     const panel = this.element.querySelector('.calendaria-hud-search-panel');
     if (!panel) return;
-    panel.style.width = '280px';
-    panel.style.maxHeight = '350px';
+    panel.style.width = '17.5rem';
+    panel.style.maxHeight = '21.875rem';
   }
 
   /**
@@ -1237,7 +1327,8 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
         this._selectedDate = null;
         this.render();
       },
-      onCreateNote: () => this.render()
+      onCreateNote: () => this.render(),
+      extraItems: this.#getContextMenuItems()
     });
     this._hooks = [];
     const c = game.time.components;
@@ -1410,7 +1501,7 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
       day = target.dataset.day;
       month = target.dataset.month;
       year = target.dataset.year;
-      hour = 12;
+      hour = target.dataset.hour ?? 12;
     }
     const calendar = this.calendar;
     const hoursPerDay = calendar?.days?.hoursPerDay ?? 24;
@@ -1544,18 +1635,10 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
 
   /**
    * Select a day in the calendar.
-   * @param {PointerEvent} event - The click event
+   * @param {PointerEvent} _event - The click event
    * @param {HTMLElement} target - The clicked element with date data
    */
-  static async _onSelectDay(event, target) {
-    const wasDoubleClick = await ViewUtils.handleDayClick(event, this.calendar, {
-      onSetDate: () => {
-        this._selectedDate = null;
-        this.render();
-      },
-      onCreateNote: () => this.render()
-    });
-    if (wasDoubleClick) return;
+  static async _onSelectDay(_event, target) {
     const day = parseInt(target.dataset.day);
     const month = parseInt(target.dataset.month);
     const year = parseInt(target.dataset.year);
@@ -1593,16 +1676,14 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
   }
 
   /**
-   * Toggle between full and MiniCalendar views.
-   * Closes this window and opens the MiniCalendar.
+   * Toggle between full and MiniCal views.
+   * Closes this window and opens the MiniCal.
    * @param {PointerEvent} _event - The click event
    * @param {HTMLElement} _target - The clicked element
    */
   static async _onToggleCompact(_event, _target) {
     await this.close();
-    const existing = foundry.applications.instances.get('mini-calendar');
-    if (existing) existing.render(true, { focus: true });
-    else new MiniCalendar().render(true);
+    MiniCal.show();
   }
 
   /**
@@ -1697,5 +1778,34 @@ export class CalendarApplication extends HandlebarsApplicationMixin(ApplicationV
     const year = parseInt(target.dataset.year);
     this.viewedDate = { year, month, day: 1 };
     await this.render();
+  }
+
+  /**
+   * Toggle the BigCal visibility.
+   */
+  /**
+   * Get the singleton instance from Foundry's application registry.
+   * @returns {BigCal|undefined} The instance if it exists
+   */
+  static get instance() {
+    return foundry.applications.instances.get(this.DEFAULT_OPTIONS.id);
+  }
+
+  /** Show the BigCal. */
+  static show() {
+    const instance = this.instance ?? new BigCal();
+    instance.render({ force: true });
+    return instance;
+  }
+
+  /** Hide the BigCal. */
+  static hide() {
+    this.instance?.close();
+  }
+
+  /** Toggle the BigCal visibility. */
+  static toggle() {
+    if (this.instance?.rendered) this.hide();
+    else this.show();
   }
 }

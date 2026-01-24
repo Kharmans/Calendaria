@@ -344,8 +344,9 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
       color: moon.color || '',
       index: idx,
       refMonthOptions: context.monthOptionsZeroIndexed.map((opt) => ({ ...opt, selected: opt.value === moon.referenceDate?.month })),
-      phasesWithIndex: (moon.phases || DEFAULT_MOON_PHASES).map((phase, pIdx) => ({
+      phasesWithIndex: moon.phases.map((phase, pIdx) => ({
         ...phase,
+        name: localize(phase.name),
         index: pIdx,
         moonIndex: idx,
         isImagePath: phase.icon?.includes('/') ?? false,
@@ -452,10 +453,10 @@ export class CalendarEditor extends HandlebarsApplicationMixin(ApplicationV2) {
     context.summerSolsticeMonthOptions = context.monthOptions.map((opt) => ({ ...opt, selected: opt.value === summerSolstice.month }));
     this.#prepareWeatherContext(context);
     context.buttons = [
-      { type: 'button', action: 'saveCalendar', icon: 'fas fa-save', label: 'CALENDARIA.Common.Save' },
-      { type: 'button', action: 'exportCalendar', icon: 'fas fa-file-export', label: 'CALENDARIA.Common.Export' },
+      { type: 'button', action: 'deleteCalendar', icon: 'fas fa-trash', label: 'CALENDARIA.Common.Delete', cssClass: 'delete-button' },
       { type: 'button', action: 'resetCalendar', icon: 'fas fa-undo', label: 'CALENDARIA.Common.Reset' },
-      { type: 'button', action: 'deleteCalendar', icon: 'fas fa-trash', label: 'CALENDARIA.Common.DeleteCalendar', cssClass: 'delete-button' }
+      { type: 'button', action: 'exportCalendar', icon: 'fas fa-file-export', label: 'CALENDARIA.Common.Export' },
+      { type: 'button', action: 'saveCalendar', icon: 'fas fa-floppy-disk', label: 'SETTINGS.Save', cssClass: 'primary' }
     ];
 
     return context;

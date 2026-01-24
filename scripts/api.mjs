@@ -4,15 +4,15 @@
  * @author Tyler
  */
 
-import { CalendarApplication } from './applications/calendar-application.mjs';
+import { BigCal } from './applications/big-cal.mjs';
 import { CalendarEditor } from './applications/calendar-editor.mjs';
-import { MiniCalendar } from './applications/mini-calendar.mjs';
+import { MiniCal } from './applications/mini-cal.mjs';
 import CalendarManager from './calendar/calendar-manager.mjs';
 import { HOOKS, REPLACEABLE_ELEMENTS, SOCKET_TYPES, WIDGET_POINTS } from './constants.mjs';
 import NoteManager from './notes/note-manager.mjs';
 import { addDays, addMonths, addYears, compareDates, compareDays, dayOfWeek, daysBetween, isSameDay, isValidDate, monthsBetween } from './notes/utils/date-utils.mjs';
 import SearchManager from './search/search-manager.mjs';
-import { DEFAULT_FORMAT_PRESETS, formatCustom, getAvailableTokens, PRESET_FORMATTERS, timeSince } from './utils/format-utils.mjs';
+import { DEFAULT_FORMAT_PRESETS, formatCustom, getAvailableTokens, PRESET_FORMATTERS, resolveFormatString, timeSince } from './utils/format-utils.mjs';
 import { log } from './utils/logger.mjs';
 import { canAddNotes, canChangeActiveCalendar, canChangeDateTime, canEditCalendars, canEditNotes } from './utils/permissions.mjs';
 import { CalendariaSocket } from './utils/socket.mjs';
@@ -332,16 +332,21 @@ export const CalendariaAPI = {
   /**
    * Format date and time components as a string.
    * @param {object} [components] - Time components to format (defaults to current time)
-   * @param {string} [formatOrPreset] - Format string with tokens OR preset name (short, long, full, time, time12, datetime)
+   * @param {string} [formatOrPreset] - Format string with tokens OR preset name (dateLong, dateFull, time24, etc.)
    * @returns {string} Formatted date/time string
    */
-  formatDate(components = null, formatOrPreset = 'long') {
+  formatDate(components = null, formatOrPreset = 'dateLong') {
     const calendar = CalendarManager.getActiveCalendar();
     if (!calendar) return '';
     const raw = components || game.time.components;
-    const formatted = { ...raw, dayOfMonth: (raw.dayOfMonth ?? 0) + 1 };
+    const formatted = {
+      ...raw,
+      year: components ? raw.year : raw.year + (calendar.years?.yearZero ?? 0),
+      dayOfMonth: components ? (raw.day || 1) : (raw.dayOfMonth ?? 0) + 1
+    };
     if (PRESET_FORMATTERS[formatOrPreset]) return PRESET_FORMATTERS[formatOrPreset](calendar, formatted);
-    return formatCustom(calendar, formatted, formatOrPreset);
+    const formatStr = resolveFormatString(formatOrPreset);
+    return formatCustom(calendar, formatted, formatStr);
   },
 
   /**
@@ -575,14 +580,14 @@ export const CalendariaAPI = {
   },
 
   /**
-   * Open the main calendar application.
+   * Open the main BigCal application.
    * @param {object} [options] - Open options
    * @param {object} [options.date] - Date to display {year, month, day}
    * @param {string} [options.view] - View mode: 'month', 'week', 'year'
-   * @returns {Promise<object>} The calendar application
+   * @returns {Promise<object>} The BigCal application
    */
-  async openCalendar(options = {}) {
-    const app = new CalendarApplication();
+  async openBigCal(options = {}) {
+    const app = new BigCal();
     return app.render(true, options);
   },
 
@@ -601,25 +606,25 @@ export const CalendariaAPI = {
   },
 
   /**
-   * Show the MiniCalendar widget.
-   * @returns {Promise<object>} The MiniCalendar application
+   * Show the MiniCal widget.
+   * @returns {Promise<object>} The MiniCal application
    */
-  async showMiniCalendar() {
-    return MiniCalendar.show();
+  async showMiniCal() {
+    return MiniCal.show();
   },
 
   /**
-   * Hide the MiniCalendar widget.
+   * Hide the MiniCal widget.
    */
-  async hideMiniCalendar() {
-    MiniCalendar.hide();
+  async hideMiniCal() {
+    MiniCal.hide();
   },
 
   /**
-   * Toggle the MiniCalendar widget visibility.
+   * Toggle the MiniCal widget visibility.
    */
-  async toggleMiniCalendar() {
-    MiniCalendar.toggle();
+  async toggleMiniCal() {
+    MiniCal.toggle();
   },
 
   /**

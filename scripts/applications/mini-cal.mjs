@@ -1,7 +1,7 @@
 /**
- * MiniCalendar - All-in-one calendar widget with timekeeping.
+ * MiniCal - All-in-one calendar widget with timekeeping.
  * Frameless, draggable, with persistent position and open state.
- * @module Applications/MiniCalendar
+ * @module Applications/MiniCal
  * @author Tyler
  */
 
@@ -11,25 +11,26 @@ import NoteManager from '../notes/note-manager.mjs';
 import { dayOfWeek } from '../notes/utils/date-utils.mjs';
 import { isRecurringMatch } from '../notes/utils/recurrence.mjs';
 import SearchManager from '../search/search-manager.mjs';
-import TimeKeeper, { getTimeIncrements } from '../time/time-keeper.mjs';
-import { formatForLocation, hasMoonIconMarkers, renderMoonIcons } from '../utils/format-utils.mjs';
+import TimeClock, { getTimeIncrements } from '../time/time-clock.mjs';
+import { formatForLocation, hasMoonIconMarkers, renderMoonIcons, toRomanNumeral } from '../utils/format-utils.mjs';
 import { format, localize } from '../utils/localization.mjs';
-import { canChangeDateTime, canChangeWeather, canViewMiniCalendar } from '../utils/permissions.mjs';
+import { canChangeDateTime, canChangeWeather, canViewMiniCal } from '../utils/permissions.mjs';
 import { CalendariaSocket } from '../utils/socket.mjs';
 import * as StickyZones from '../utils/sticky-zones.mjs';
 import * as WidgetManager from '../utils/widget-manager.mjs';
 import WeatherManager from '../weather/weather-manager.mjs';
 import { openWeatherPicker } from '../weather/weather-picker.mjs';
-import { CalendarApplication } from './calendar-application.mjs';
+import { BigCal } from './big-cal.mjs';
 import * as ViewUtils from './calendar-view-utils.mjs';
 import { SettingsPanel } from './settings/settings-panel.mjs';
+import { TimeKeeper } from './time-keeper.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 /**
- * MiniCalendar widget combining mini month view with time controls.
+ * MiniCal widget combining mini month view with time controls.
  */
-export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
+export class MiniCal extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @type {object|null} Currently selected date */
   _selectedDate = null;
 
@@ -99,42 +100,44 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   static DEFAULT_OPTIONS = {
     id: 'mini-calendar',
-    classes: ['calendaria', 'mini-calendar'],
+    classes: ['calendaria', 'mini-cal'],
     position: { width: 'auto', height: 'auto' },
     window: { frame: false, positioned: true },
     actions: {
-      navigate: MiniCalendar._onNavigate,
-      today: MiniCalendar._onToday,
-      selectDay: MiniCalendar._onSelectDay,
-      navigateToMonth: MiniCalendar._onNavigateToMonth,
-      addNote: MiniCalendar._onAddNote,
-      openFull: MiniCalendar._onOpenFull,
-      toggle: MiniCalendar._onToggleClock,
-      forward: MiniCalendar._onForward,
-      forward5x: MiniCalendar._onForward5x,
-      reverse: MiniCalendar._onReverse,
-      reverse5x: MiniCalendar._onReverse5x,
-      setCurrentDate: MiniCalendar._onSetCurrentDate,
-      viewNotes: MiniCalendar._onViewNotes,
-      closeNotesPanel: MiniCalendar._onCloseNotesPanel,
-      openNote: MiniCalendar._onOpenNote,
-      editNote: MiniCalendar._onEditNote,
-      toSunrise: MiniCalendar._onToSunrise,
-      toMidday: MiniCalendar._onToMidday,
-      toSunset: MiniCalendar._onToSunset,
-      toMidnight: MiniCalendar._onToMidnight,
-      openWeatherPicker: MiniCalendar._onOpenWeatherPicker,
-      openSettings: MiniCalendar._onOpenSettings,
-      toggleSearch: MiniCalendar._onToggleSearch,
-      closeSearch: MiniCalendar._onCloseSearch,
-      openSearchResult: MiniCalendar._onOpenSearchResult,
-      showMoons: MiniCalendar._onShowMoons,
-      closeMoonsPanel: MiniCalendar._onCloseMoonsPanel
+      navigate: MiniCal._onNavigate,
+      today: MiniCal._onToday,
+      selectDay: MiniCal._onSelectDay,
+      navigateToMonth: MiniCal._onNavigateToMonth,
+      addNote: MiniCal._onAddNote,
+      openFull: MiniCal._onOpenFull,
+      toggle: MiniCal._onToggleClock,
+      forward: MiniCal._onForward,
+      reverse: MiniCal._onReverse,
+      customDec2: MiniCal.#onCustomDec2,
+      customDec1: MiniCal.#onCustomDec1,
+      customInc1: MiniCal.#onCustomInc1,
+      customInc2: MiniCal.#onCustomInc2,
+      setCurrentDate: MiniCal._onSetCurrentDate,
+      viewNotes: MiniCal._onViewNotes,
+      closeNotesPanel: MiniCal._onCloseNotesPanel,
+      openNote: MiniCal._onOpenNote,
+      editNote: MiniCal._onEditNote,
+      toSunrise: MiniCal._onToSunrise,
+      toMidday: MiniCal._onToMidday,
+      toSunset: MiniCal._onToSunset,
+      toMidnight: MiniCal._onToMidnight,
+      openWeatherPicker: MiniCal._onOpenWeatherPicker,
+      openSettings: MiniCal._onOpenSettings,
+      toggleSearch: MiniCal._onToggleSearch,
+      closeSearch: MiniCal._onCloseSearch,
+      openSearchResult: MiniCal._onOpenSearchResult,
+      showMoons: MiniCal._onShowMoons,
+      closeMoonsPanel: MiniCal._onCloseMoonsPanel
     }
   };
 
   /** @override */
-  static PARTS = { main: { template: TEMPLATES.MINI_CALENDAR } };
+  static PARTS = { main: { template: TEMPLATES.MINI_CAL } };
 
   /**
    * Get the active calendar.
@@ -169,21 +172,25 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     context.isGM = game.user.isGM;
     context.canChangeDateTime = canChangeDateTime();
     context.canChangeWeather = canChangeWeather();
-    context.running = TimeKeeper.running;
+    context.running = TimeClock.running;
     const components = game.time.components;
     const yearZero = calendar?.years?.yearZero ?? 0;
     const rawTime = calendar
-      ? formatForLocation(calendar, { ...components, year: components.year + yearZero, dayOfMonth: (components.dayOfMonth ?? 0) + 1 }, 'miniCalendarTime')
-      : TimeKeeper.getFormattedTime();
+      ? formatForLocation(calendar, { ...components, year: components.year + yearZero, dayOfMonth: (components.dayOfMonth ?? 0) + 1 }, 'miniCalTime')
+      : TimeClock.getFormattedTime();
     context.currentTime = hasMoonIconMarkers(rawTime) ? renderMoonIcons(rawTime) : rawTime;
-    context.currentDate = TimeKeeper.getFormattedDate();
+    context.currentDate = TimeClock.getFormattedDate();
     const isMonthless = calendar?.isMonthless ?? false;
+    const appSettings = TimeClock.getAppSettings('mini-calendar');
     context.increments = Object.entries(getTimeIncrements())
       .filter(([key]) => !isMonthless || key !== 'month')
-      .map(([key, seconds]) => ({ key, label: this.#formatIncrementLabel(key), seconds, selected: key === TimeKeeper.incrementKey }));
+      .map(([key, seconds]) => ({ key, label: this.#formatIncrementLabel(key), seconds, selected: key === appSettings.incrementKey }));
+    const customJumps = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_TIME_JUMPS) || {};
+    const currentJumps = customJumps[appSettings.incrementKey] || {};
+    context.customJumps = { dec2: currentJumps.dec2 ?? null, dec1: currentJumps.dec1 ?? null, inc1: currentJumps.inc1 ?? null, inc2: currentJumps.inc2 ?? null };
     const allNotes = ViewUtils.getCalendarNotes();
     const visibleNotes = ViewUtils.getVisibleNotes(allNotes);
-    if (calendar) context.calendarData = this._generateMiniCalendarData(calendar, viewedDate, visibleNotes);
+    if (calendar) context.calendarData = this._generateMiniCalData(calendar, viewedDate, visibleNotes);
     context.showSetCurrentDate = false;
     if (game.user.isGM && this._selectedDate) {
       const today = ViewUtils.getCurrentViewedDate(calendar);
@@ -215,12 +222,25 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     context.searchOpen = this.#searchOpen;
     context.searchTerm = this.#searchTerm;
     context.searchResults = this.#searchResults || [];
-    if (calendar && calendar.cycles?.length) {
+
+    // Block visibility settings
+    context.showWeather = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_SHOW_WEATHER);
+    context.showSeason = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_SHOW_SEASON);
+    context.showEra = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_SHOW_ERA);
+    context.showCycles = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_SHOW_CYCLES);
+    context.showMoonPhases = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_SHOW_MOON_PHASES);
+    context.weatherDisplayMode = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_WEATHER_DISPLAY_MODE);
+    context.seasonDisplayMode = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_SEASON_DISPLAY_MODE);
+    context.eraDisplayMode = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_ERA_DISPLAY_MODE);
+    context.cyclesDisplayMode = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_CYCLES_DISPLAY_MODE);
+
+    if (calendar && calendar.cycles?.length && context.showCycles) {
       const yearZeroOffset = calendar.years?.yearZero ?? 0;
       const viewedComponents = { year: viewedDate.year - yearZeroOffset, month: viewedDate.month, dayOfMonth: (viewedDate.day ?? 1) - 1, hour: 12, minute: 0, second: 0 };
       const cycleResult = calendar.getCycleValues(viewedComponents);
       context.cycleText = cycleResult.text;
       context.cycleValues = cycleResult.values;
+      context.cycleData = cycleResult;
     }
 
     context.widgets = this.#prepareWidgetContext(context);
@@ -250,14 +270,20 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {string} HTML string
    */
   #renderWeatherIndicator(context) {
-    const { weather, canChangeWeather } = context;
+    if (!context.showWeather) return '';
+    const { weather, canChangeWeather, weatherDisplayMode } = context;
     if (weather) {
       const clickable = canChangeWeather ? ' clickable' : '';
       const action = canChangeWeather ? 'data-action="openWeatherPicker"' : '';
-      const temp = weather.temperature ? `<span class="weather-temp">${weather.temperature}</span>` : '';
+      const showIcon = weatherDisplayMode === 'full' || weatherDisplayMode === 'icon' || weatherDisplayMode === 'iconTemp';
+      const showLabel = weatherDisplayMode === 'full';
+      const showTemp = weatherDisplayMode === 'full' || weatherDisplayMode === 'temp' || weatherDisplayMode === 'iconTemp';
+      const icon = showIcon ? `<i class="fas ${weather.icon}"></i>` : '';
+      const label = showLabel ? ` ${weather.label}` : '';
+      const temp = showTemp && weather.temperature ? `<span class="weather-temp">${weather.temperature}</span>` : '';
       return `<span class="weather-indicator${clickable}" ${action}
         style="--weather-color: ${weather.color}" data-tooltip="${weather.tooltip}">
-        <i class="fas ${weather.icon}"></i> ${weather.label} ${temp}
+        ${icon}${label} ${temp}
       </span>`;
     } else if (canChangeWeather) {
       return `<span class="weather-indicator clickable no-weather" data-action="openWeatherPicker"
@@ -274,9 +300,15 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {string} HTML string
    */
   #renderSeasonIndicator(context) {
+    if (!context.showSeason) return '';
     const season = context.calendarData?.currentSeason;
     if (!season) return '';
-    return `<span class="season-indicator" style="--season-color: ${season.color}" data-tooltip="${localize('CALENDARIA.UI.CurrentSeason')}"><i class="${season.icon}"></i> ${localize(season.name)}</span>`;
+    const mode = context.seasonDisplayMode;
+    const showIcon = mode === 'full' || mode === 'icon';
+    const showLabel = mode === 'full' || mode === 'text';
+    const icon = showIcon ? `<i class="${season.icon}"></i>` : '';
+    const label = showLabel ? ` ${localize(season.name)}` : '';
+    return `<span class="season-indicator" style="--season-color: ${season.color}" data-tooltip="${localize(season.name)}">${icon}${label}</span>`;
   }
 
   /**
@@ -285,9 +317,18 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {string} HTML string
    */
   #renderEraIndicator(context) {
+    if (!context.showEra) return '';
     const era = context.calendarData?.currentEra;
     if (!era) return '';
-    return `<span class="era-indicator" data-tooltip="${localize('CALENDARIA.UI.CurrentEra')}"><i class="fas fa-hourglass-half"></i> ${localize(era.name)}</span>`;
+    const mode = context.eraDisplayMode;
+    const showIcon = mode === 'full' || mode === 'icon';
+    const showLabel = mode === 'full' || mode === 'text';
+    const showAbbr = mode === 'abbr';
+    const icon = showIcon ? '<i class="fas fa-hourglass-half"></i>' : '';
+    let label = '';
+    if (showLabel) label = ` ${localize(era.name)}`;
+    else if (showAbbr) label = ` ${localize(era.abbreviation || era.name)}`;
+    return `<span class="era-indicator" data-tooltip="${localize(era.name)}">${icon}${label}</span>`;
   }
 
   /**
@@ -296,8 +337,23 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * @returns {string} HTML string
    */
   #renderCycleIndicator(context) {
-    if (!context.cycleText) return '';
-    return `<span class="cycle-indicator" data-tooltip="${localize('CALENDARIA.UI.CurrentCycle')}"><i class="fas fa-arrows-rotate"></i> ${context.cycleText}</span>`;
+    if (!context.showCycles || !context.cycleData?.values?.length) return '';
+    const mode = context.cyclesDisplayMode;
+    const icon = '<i class="fas fa-arrows-rotate"></i>';
+    // Icon only mode - just show icon with tooltip
+    if (mode === 'icon') {
+      return `<span class="cycle-indicator" data-tooltip="${context.cycleText}">${icon}</span>`;
+    }
+    let displayText = '';
+    if (mode === 'number') {
+      displayText = context.cycleData.values.map((v) => v.index + 1).join(', ');
+    } else if (mode === 'roman') {
+      displayText = context.cycleData.values.map((v) => toRomanNumeral(v.index + 1)).join(', ');
+    } else {
+      displayText = context.cycleData.values.map((v) => v.entryName).join(', ');
+    }
+    const label = `<span class="cycle-label">${displayText}</span>`;
+    return `<span class="cycle-indicator" data-tooltip="${context.cycleText || displayText}">${icon}${label}</span>`;
   }
 
   /**
@@ -325,7 +381,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {object[]} visibleNotes - Pre-fetched visible notes
    * @returns {object} Calendar grid data
    */
-  _generateMiniCalendarData(calendar, date, visibleNotes) {
+  _generateMiniCalData(calendar, date, visibleNotes) {
     if (calendar.isMonthless) return this._generateWeekViewData(calendar, date, visibleNotes);
     const { year, month } = date;
     const monthData = calendar.months?.values?.[month];
@@ -336,6 +392,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     const daysInWeek = calendar.days?.values?.length || 7;
     const weeks = [];
     let currentWeek = [];
+    const showMoons = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_SHOW_MOON_PHASES) && calendar.moons?.length;
     const hasFixedStart = monthData?.startingWeekday != null;
     const startDayOfWeek = hasFixedStart ? monthData.startingWeekday : dayOfWeek({ year, month, day: 1 });
     if (startDayOfWeek > 0) {
@@ -373,7 +430,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     for (let day = 1; day <= daysInMonth; day++) {
       const noteCount = this._countNotesOnDay(visibleNotes, year, month, day);
       const festivalDay = calendar.findFestivalDay({ year: internalYear, month, dayOfMonth: day - 1 });
-      const moonData = ViewUtils.getFirstMoonPhase(calendar, year, month, day);
+      const moonData = showMoons ? ViewUtils.getFirstMoonPhase(calendar, year, month, day) : null;
 
       // Check if this is a non-counting festival (intercalary day)
       const isIntercalary = festivalDay?.countsForWeekday === false;
@@ -468,7 +525,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     const currentEra = calendar.getCurrentEra?.();
     const monthWeekdays = calendar.getWeekdaysForMonth?.(month) ?? calendar.days?.values ?? [];
     const headerComponents = { year, month, dayOfMonth: date.day };
-    const rawHeader = formatForLocation(calendar, headerComponents, 'miniCalendarHeader');
+    const rawHeader = formatForLocation(calendar, headerComponents, 'miniCalHeader');
     const formattedHeader = hasMoonIconMarkers(rawHeader) ? renderMoonIcons(rawHeader) : rawHeader;
 
     return {
@@ -648,7 +705,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
         const color = page.system.color || '#4a90e2';
         let timeLabel = '';
         if (isAllDay) {
-          timeLabel = localize('CALENDARIA.MiniCalendar.AllDay');
+          timeLabel = localize('CALENDARIA.MiniCal.AllDay');
         } else {
           const startTime = this._formatTime(start.hour, start.minute);
           const endTime = this._formatTime(end.hour, end.minute);
@@ -707,7 +764,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       return `${h}:${m}`;
     }
     const components = { year: 0, month: 0, dayOfMonth: 1, hour: hour ?? 0, minute: minute ?? 0, second: 0 };
-    return formatForLocation(calendar, components, 'miniCalendarTime');
+    return formatForLocation(calendar, components, 'miniCalTime');
   }
 
   /** @override */
@@ -716,20 +773,52 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     if (options.isFirstRender) this.#restorePosition();
     else this.#updateDockedPosition();
     this.#enableDragging();
-    this.element.querySelector('[data-action="increment"]')?.addEventListener('change', (event) => {
-      TimeKeeper.setIncrement(event.target.value);
+    const incrementSelect = this.element.querySelector('[data-action="increment"]');
+    incrementSelect?.addEventListener('change', (event) => {
+      TimeClock.setAppIncrement('mini-calendar', event.target.value);
+      TimeClock.setIncrement(event.target.value);
+      this.render();
     });
+    if (incrementSelect && canChangeDateTime()) {
+      incrementSelect.addEventListener(
+        'wheel',
+        (event) => {
+          event.preventDefault();
+          const calendar = game.time?.calendar;
+          const isMonthless = calendar?.isMonthless ?? false;
+          const appSettings = TimeClock.getAppSettings('mini-calendar');
+          const incrementKeys = Object.keys(getTimeIncrements()).filter((key) => !isMonthless || key !== 'month');
+          const currentIndex = incrementKeys.indexOf(appSettings.incrementKey);
+          if (currentIndex === -1) return;
+          const direction = event.deltaY < 0 ? -1 : 1;
+          const newIndex = Math.max(0, Math.min(incrementKeys.length - 1, currentIndex + direction));
+          if (newIndex === currentIndex) return;
+          TimeClock.setAppIncrement('mini-calendar', incrementKeys[newIndex]);
+          TimeClock.setIncrement(incrementKeys[newIndex]);
+          this.render();
+        },
+        { passive: false }
+      );
+    }
     if (!this.#timeHookId) this.#timeHookId = Hooks.on('updateWorldTime', this.#onUpdateWorldTime.bind(this));
     if (!this.#hooks.some((h) => h.name === HOOKS.CLOCK_START_STOP)) this.#hooks.push({ name: HOOKS.CLOCK_START_STOP, id: Hooks.on(HOOKS.CLOCK_START_STOP, this.#onClockStateChange.bind(this)) });
-    const container = this.element.querySelector('.mini-calendar-container');
+    const container = this.element.querySelector('.mini-cal-container');
     const sidebar = this.element.querySelector('.mini-sidebar');
 
-    // Double-click on container opens full CalendarApplication
+    // Double-click anywhere (except interactive elements) opens BigCal
     container?.addEventListener('dblclick', (e) => {
-      if (e.target.closest('button, a, input, select, [data-action]')) return;
+      if (e.target.closest('button, a, input, select, .note-badge')) return;
       e.preventDefault();
-      MiniCalendar.hide();
-      new CalendarApplication().render(true);
+      this.close();
+      new BigCal().render(true);
+    });
+
+    container?.addEventListener('contextmenu', (e) => {
+      if (e.target.closest('#context-menu, .mini-day')) return;
+      e.preventDefault();
+      document.getElementById('context-menu')?.remove();
+      const menu = new foundry.applications.ux.ContextMenu.implementation(this.element, '.mini-cal-container', this.#getContextMenuItems(), { fixed: true, jQuery: false });
+      menu._onActivate(e);
     });
 
     if (container && sidebar) {
@@ -740,7 +829,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       });
       container.addEventListener('mouseleave', () => {
         if (this.#sidebarLocked || this.#stickySidebar) return;
-        const delay = game.settings.get(MODULE.ID, SETTINGS.MINI_CALENDAR_CONTROLS_DELAY) * 1000;
+        const delay = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_CONTROLS_DELAY) * 1000;
         this.#sidebarTimeout = setTimeout(() => {
           this.#sidebarVisible = false;
           sidebar.classList.remove('visible');
@@ -787,7 +876,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       };
       const hideControls = () => {
         if (this.#stickyTimeControls) return;
-        const delay = game.settings.get(MODULE.ID, SETTINGS.MINI_CALENDAR_CONTROLS_DELAY) * 1000;
+        const delay = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_CONTROLS_DELAY) * 1000;
         this.#hideTimeout = setTimeout(() => {
           this.#controlsVisible = false;
           timeControls.classList.remove('visible');
@@ -845,8 +934,8 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     // Right-click context menu for close
     new foundry.applications.ux.ContextMenu.implementation(
       this.element,
-      '.mini-calendar-container',
-      [{ name: 'CALENDARIA.Common.Close', icon: '<i class="fas fa-times"></i>', callback: () => MiniCalendar.hide() }],
+      '.mini-cal-container',
+      [{ name: 'CALENDARIA.Common.Close', icon: '<i class="fas fa-times"></i>', callback: () => MiniCal.hide() }],
       { fixed: true, jQuery: false }
     );
   }
@@ -854,7 +943,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   async close(options = {}) {
     // Prevent non-GMs from closing if force display is enabled
-    if (!game.user.isGM && game.settings.get(MODULE.ID, SETTINGS.FORCE_MINI_CALENDAR)) {
+    if (!game.user.isGM && game.settings.get(MODULE.ID, SETTINGS.FORCE_MINI_CAL)) {
       ui.notifications.warn('CALENDARIA.Common.ForcedDisplayWarning', { localize: true });
       return;
     }
@@ -901,7 +990,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * Restore saved position from settings.
    */
   #restorePosition() {
-    const savedPos = game.settings.get(MODULE.ID, SETTINGS.MINI_CALENDAR_POSITION);
+    const savedPos = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_POSITION);
     if (savedPos && Number.isFinite(savedPos.top) && Number.isFinite(savedPos.left)) {
       this.#snappedZoneId = savedPos.zoneId || null;
       if (this.#snappedZoneId && StickyZones.restorePinnedState(this.element, this.#snappedZoneId)) {
@@ -936,8 +1025,12 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   #clampToViewport() {
     const rect = this.element.getBoundingClientRect();
+    let rightBuffer = StickyZones.getSidebarBuffer();
+    // Account for MiniCal's own expanding sidebar
+    const miniSidebar = this.element.querySelector('.mini-sidebar');
+    if (miniSidebar) rightBuffer += miniSidebar.offsetWidth;
     let { left, top } = this.position;
-    left = Math.max(0, Math.min(left, window.innerWidth - rect.width));
+    left = Math.max(0, Math.min(left, window.innerWidth - rect.width - rightBuffer));
     top = Math.max(0, Math.min(top, window.innerHeight - rect.height));
     this.setPosition({ left, top });
   }
@@ -962,7 +1055,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * Restore sticky states from settings.
    */
   #restoreStickyStates() {
-    const states = game.settings.get(MODULE.ID, SETTINGS.MINI_CALENDAR_STICKY_STATES);
+    const states = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_STICKY_STATES);
     if (!states) return;
     this.#stickyTimeControls = states.timeControls ?? false;
     this.#stickySidebar = states.sidebar ?? false;
@@ -987,6 +1080,79 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Save sticky states to settings.
+   */
+  async #saveStickyStates() {
+    await game.settings.set(MODULE.ID, SETTINGS.MINI_CAL_STICKY_STATES, {
+      timeControls: this.#stickyTimeControls,
+      sidebar: this.#stickySidebar,
+      position: this.#stickyPosition
+    });
+  }
+
+  /**
+   * Build context menu items for MiniCal.
+   * @returns {object[]} Array of context menu item definitions
+   */
+  #getContextMenuItems() {
+    const items = [];
+    items.push({
+      name: 'CALENDARIA.MiniCal.ContextMenu.Settings',
+      icon: '<i class="fas fa-gear"></i>',
+      callback: () => {
+        const panel = new SettingsPanel();
+        panel.render(true).then(() => {
+          requestAnimationFrame(() => panel.changeTab('miniCal', 'primary'));
+        });
+      }
+    });
+    if (game.user.isGM) {
+      const forceMiniCal = game.settings.get(MODULE.ID, SETTINGS.FORCE_MINI_CAL);
+      items.push({
+        name: forceMiniCal ? 'CALENDARIA.MiniCal.ContextMenu.HideFromAll' : 'CALENDARIA.MiniCal.ContextMenu.ShowToAll',
+        icon: forceMiniCal ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>',
+        callback: async () => {
+          const newValue = !forceMiniCal;
+          await game.settings.set(MODULE.ID, SETTINGS.FORCE_MINI_CAL, newValue);
+          CalendariaSocket.emit(SOCKET_TYPES.MINI_CAL_VISIBILITY, { visible: newValue });
+        }
+      });
+    }
+    items.push({ name: 'CALENDARIA.MiniCal.ContextMenu.ResetPosition', icon: '<i class="fas fa-arrows-to-dot"></i>', callback: () => MiniCal.resetPosition() });
+    items.push({
+      name: this.#stickyPosition ? 'CALENDARIA.MiniCal.ContextMenu.UnlockPosition' : 'CALENDARIA.MiniCal.ContextMenu.LockPosition',
+      icon: this.#stickyPosition ? '<i class="fas fa-lock-open"></i>' : '<i class="fas fa-lock"></i>',
+      callback: () => this._toggleStickyPosition()
+    });
+    items.push({
+      name: 'CALENDARIA.MiniCal.ContextMenu.SwapToBigCal',
+      icon: '<i class="fas fa-calendar"></i>',
+      callback: () => {
+        this.close();
+        new BigCal().render(true);
+      }
+    });
+    items.push({
+      name: 'CALENDARIA.MiniCal.ContextMenu.SwapToTimeKeeper',
+      icon: '<i class="fas fa-clock"></i>',
+      callback: () => {
+        MiniCal.hide();
+        TimeKeeper.show();
+      }
+    });
+    items.push({ name: 'CALENDARIA.Common.Close', icon: '<i class="fas fa-times"></i>', callback: () => MiniCal.hide() });
+    return items;
+  }
+
+  /**
+   * Toggle sticky position state.
+   */
+  _toggleStickyPosition() {
+    this.#stickyPosition = !this.#stickyPosition;
+    this.#saveStickyStates();
+  }
+
+  /**
    * Enable dragging on the top row.
    */
   #enableDragging() {
@@ -1004,9 +1170,17 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       if (event.target.closest('button, a, input, select, [data-action]')) return;
       previousZoneId = this.#snappedZoneId;
       this.#snappedZoneId = null;
-      const rect = this.element.getBoundingClientRect();
-      elementStartLeft = rect.left;
-      elementStartTop = rect.top;
+      if (previousZoneId && StickyZones.usesDomParenting(previousZoneId)) {
+        const preserved = StickyZones.unpinFromZone(this.element);
+        if (preserved) {
+          elementStartLeft = preserved.left;
+          elementStartTop = preserved.top;
+        }
+      } else {
+        const rect = this.element.getBoundingClientRect();
+        elementStartLeft = rect.left;
+        elementStartTop = rect.top;
+      }
       dragStartX = event.clientX;
       dragStartY = event.clientY;
       originalMouseDown(event);
@@ -1021,9 +1195,13 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       const deltaX = event.clientX - dragStartX;
       const deltaY = event.clientY - dragStartY;
       const rect = this.element.getBoundingClientRect();
+      let rightBuffer = StickyZones.getSidebarBuffer();
+      // Account for MiniCal's own expanding sidebar
+      const miniSidebar = this.element.querySelector('.mini-sidebar');
+      if (miniSidebar) rightBuffer += miniSidebar.offsetWidth;
       let newLeft = elementStartLeft + deltaX;
       let newTop = elementStartTop + deltaY;
-      newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - rect.width));
+      newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - rect.width - rightBuffer));
       newTop = Math.max(0, Math.min(newTop, window.innerHeight - rect.height));
       this.setPosition({ left: newLeft, top: newTop });
       this.#activeSnapZone = StickyZones.checkStickyZones(dragHandle, newLeft, newTop, rect.width, rect.height);
@@ -1042,7 +1220,7 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
       const finalRect = this.element.getBoundingClientRect();
       const left = Number.isFinite(finalRect.left) ? finalRect.left : 16;
       const top = Number.isFinite(finalRect.top) ? finalRect.top : 100;
-      await game.settings.set(MODULE.ID, SETTINGS.MINI_CALENDAR_POSITION, { left, top, zoneId: this.#snappedZoneId });
+      await game.settings.set(MODULE.ID, SETTINGS.MINI_CAL_POSITION, { left, top, zoneId: this.#snappedZoneId });
     };
   }
 
@@ -1057,11 +1235,11 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
     const components = game.time.components;
     if (timeEl && calendar) {
       const yearZero = calendar.years?.yearZero ?? 0;
-      const timeFormatted = formatForLocation(calendar, { ...components, year: components.year + yearZero, dayOfMonth: (components.dayOfMonth ?? 0) + 1 }, 'miniCalendarTime');
+      const timeFormatted = formatForLocation(calendar, { ...components, year: components.year + yearZero, dayOfMonth: (components.dayOfMonth ?? 0) + 1 }, 'miniCalTime');
       if (hasMoonIconMarkers(timeFormatted)) timeEl.innerHTML = renderMoonIcons(timeFormatted);
       else timeEl.textContent = timeFormatted;
     }
-    if (dateEl) dateEl.textContent = TimeKeeper.getFormattedDate();
+    if (dateEl) dateEl.textContent = TimeClock.getFormattedDate();
     const currentDay = `${components.year}-${components.month}-${components.dayOfMonth}`;
     if (currentDay !== this.#lastDay) {
       this.#lastDay = currentDay;
@@ -1070,11 +1248,11 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Handle clock state changes (from other sources like TimeKeeperHUD).
+   * Handle clock state changes (from other sources like TimeKeeper).
    */
   #onClockStateChange() {
     if (!this.rendered) return;
-    const running = TimeKeeper.running;
+    const running = TimeClock.running;
     const tooltip = running ? localize('CALENDARIA.TimeKeeper.Stop') : localize('CALENDARIA.TimeKeeper.Start');
     const timeToggle = this.element.querySelector('.time-toggle');
     if (timeToggle) {
@@ -1171,18 +1349,10 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Select a day on the calendar.
-   * @param {PointerEvent} event - The click event
+   * @param {PointerEvent} _event - The click event
    * @param {HTMLElement} target - The clicked element
    */
-  static async _onSelectDay(event, target) {
-    const wasDoubleClick = await ViewUtils.handleDayClick(event, this.calendar, {
-      onSetDate: () => {
-        this._selectedDate = null;
-        this.render();
-      },
-      onCreateNote: () => this.render()
-    });
-    if (wasDoubleClick) return;
+  static async _onSelectDay(_event, target) {
     const day = parseInt(target.dataset.day);
     const month = parseInt(target.dataset.month);
     const year = parseInt(target.dataset.year);
@@ -1220,13 +1390,13 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Open the full calendar application.
+   * Open the BigCal application.
    * @param {PointerEvent} _event - The click event
    * @param {HTMLElement} _target - The clicked element
    */
   static async _onOpenFull(_event, _target) {
     await this.close();
-    new CalendarApplication().render(true);
+    new BigCal().render(true);
   }
 
   /**
@@ -1235,53 +1405,77 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {HTMLElement} _target - The clicked element
    */
   static _onToggleClock(_event, _target) {
-    TimeKeeper.toggle();
+    TimeClock.toggle();
     const timeToggle = this.element.querySelector('.time-toggle');
     if (timeToggle) {
-      timeToggle.classList.toggle('active', TimeKeeper.running);
+      timeToggle.classList.toggle('active', TimeClock.running);
       const icon = timeToggle.querySelector('i');
       if (icon) {
-        icon.classList.toggle('fa-play', !TimeKeeper.running);
-        icon.classList.toggle('fa-pause', TimeKeeper.running);
+        icon.classList.toggle('fa-play', !TimeClock.running);
+        icon.classList.toggle('fa-pause', TimeClock.running);
       }
-      timeToggle.dataset.tooltip = TimeKeeper.running ? localize('CALENDARIA.TimeKeeper.Stop') : localize('CALENDARIA.TimeKeeper.Start');
+      timeToggle.dataset.tooltip = TimeClock.running ? localize('CALENDARIA.TimeKeeper.Stop') : localize('CALENDARIA.TimeKeeper.Start');
     }
   }
 
   /**
-   * Advance time forward by one increment.
+   * Advance time forward.
    * @param {PointerEvent} _event - The click event
    * @param {HTMLElement} _target - The clicked element
    */
   static _onForward(_event, _target) {
-    TimeKeeper.forward();
+    TimeClock.forwardFor('mini-calendar');
   }
 
   /**
-   * Advance time forward by five increments.
-   * @param {PointerEvent} _event - The click event
-   * @param {HTMLElement} _target - The clicked element
-   */
-  static _onForward5x(_event, _target) {
-    TimeKeeper.forward(5);
-  }
-
-  /**
-   * Reverse time by one increment.
+   * Reverse time.
    * @param {PointerEvent} _event - The click event
    * @param {HTMLElement} _target - The clicked element
    */
   static _onReverse(_event, _target) {
-    TimeKeeper.reverse();
+    TimeClock.reverseFor('mini-calendar');
+  }
+
+  /** Handle custom decrement 2 (larger). */
+  static #onCustomDec2() {
+    MiniCal.#applyCustomJump('dec2');
+  }
+
+  /** Handle custom decrement 1 (smaller). */
+  static #onCustomDec1() {
+    MiniCal.#applyCustomJump('dec1');
+  }
+
+  /** Handle custom increment 1 (smaller). */
+  static #onCustomInc1() {
+    MiniCal.#applyCustomJump('inc1');
+  }
+
+  /** Handle custom increment 2 (larger). */
+  static #onCustomInc2() {
+    MiniCal.#applyCustomJump('inc2');
   }
 
   /**
-   * Reverse time by five increments.
-   * @param {PointerEvent} _event - The click event
-   * @param {HTMLElement} _target - The clicked element
+   * Apply a custom time jump based on the current increment.
+   * @param {string} jumpKey - The jump key (dec2, dec1, inc1, inc2)
    */
-  static _onReverse5x(_event, _target) {
-    TimeKeeper.reverse(5);
+  static #applyCustomJump(jumpKey) {
+    if (!canChangeDateTime()) return;
+    const appSettings = TimeClock.getAppSettings('mini-calendar');
+    const incrementKey = appSettings.incrementKey || 'minute';
+    const customJumps = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_TIME_JUMPS) || {};
+    const jumps = customJumps[incrementKey] || {};
+    const amount = jumps[jumpKey];
+    if (!amount) return;
+    const increments = getTimeIncrements();
+    const secondsPerUnit = increments[incrementKey] || 60;
+    const totalSeconds = amount * secondsPerUnit;
+    if (!game.user.isGM) {
+      CalendariaSocket.emit(SOCKET_TYPES.TIME_REQUEST, { action: 'advance', delta: totalSeconds });
+      return;
+    }
+    game.time.advance(totalSeconds);
   }
 
   /**
@@ -1292,12 +1486,12 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
   static async _onSetCurrentDate(_event, _target) {
     if (!this._selectedDate) return;
 
-    const confirmEnabled = game.settings.get(MODULE.ID, SETTINGS.MINI_CALENDAR_CONFIRM_SET_DATE);
+    const confirmEnabled = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_CONFIRM_SET_DATE);
     if (confirmEnabled) {
       const dateStr = this._formatSelectedDate();
       const confirmed = await foundry.applications.api.DialogV2.confirm({
-        window: { title: localize('CALENDARIA.MiniCalendar.SetCurrentDate') },
-        content: `<p>${format('CALENDARIA.MiniCalendar.SetCurrentDateConfirm', { date: dateStr })}</p>`,
+        window: { title: localize('CALENDARIA.MiniCal.SetCurrentDate') },
+        content: `<p>${format('CALENDARIA.MiniCal.SetCurrentDateConfirm', { date: dateStr })}</p>`,
         rejectClose: false,
         modal: true
       });
@@ -1718,43 +1912,45 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Get the singleton instance from Foundry's application registry.
-   * @returns {MiniCalendar|undefined} The instance if it exists
+   * @returns {MiniCal|undefined} The instance if it exists
    */
   static get instance() {
     return foundry.applications.instances.get(this.DEFAULT_OPTIONS.id);
   }
 
   /**
-   * Show the MiniCalendar singleton.
+   * Show the MiniCal singleton.
    * @param {object} [options] - Show options
    * @param {boolean} [options.silent] - If true, don't show permission warning
-   * @returns {MiniCalendar} The singleton instance
+   * @returns {MiniCal} The singleton instance
    */
   static show({ silent = false } = {}) {
-    if (!canViewMiniCalendar()) {
+    if (!canViewMiniCal()) {
       if (!silent) ui.notifications.warn('CALENDARIA.Permissions.NoAccess', { localize: true });
       return null;
     }
-    const existing = foundry.applications.instances.get('calendaria-mini-calendar');
-    if (existing) {
-      existing.render({ force: true });
-      return existing;
-    }
-    const instance = new MiniCalendar();
-    instance.render(true);
+    const instance = this.instance ?? new MiniCal();
+    instance.render({ force: true });
     return instance;
   }
 
-  /** Hide the MiniCalendar. */
+  /** Hide the MiniCal. */
   static hide() {
-    const instance = foundry.applications.instances.get('calendaria-mini-calendar');
-    if (instance) instance.close();
+    this.instance?.close();
   }
 
-  /** Toggle the MiniCalendar visibility. */
+  /** Reset position to default. */
+  static async resetPosition() {
+    await game.settings.set(MODULE.ID, SETTINGS.MINI_CAL_POSITION, null);
+    if (this.instance?.rendered) {
+      this.hide();
+      this.show();
+    }
+  }
+
+  /** Toggle the MiniCal visibility. */
   static toggle() {
-    const existing = foundry.applications.instances.get('calendaria-mini-calendar');
-    if (existing?.rendered) this.hide();
+    if (this.instance?.rendered) this.hide();
     else this.show();
   }
 
@@ -1762,9 +1958,9 @@ export class MiniCalendar extends HandlebarsApplicationMixin(ApplicationV2) {
    * Update the idle opacity CSS variable from settings.
    */
   static updateIdleOpacity() {
-    const autoFade = game.settings.get(MODULE.ID, SETTINGS.MINI_CALENDAR_AUTO_FADE);
-    const opacity = autoFade ? game.settings.get(MODULE.ID, SETTINGS.MINI_CALENDAR_IDLE_OPACITY) / 100 : 1;
-    document.documentElement.style.setProperty('--calendaria-minicalendar-idle-opacity', opacity);
+    const autoFade = game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_AUTO_FADE);
+    const opacity = autoFade ? game.settings.get(MODULE.ID, SETTINGS.MINI_CAL_IDLE_OPACITY) / 100 : 1;
+    document.documentElement.style.setProperty('--calendaria-minical-idle-opacity', opacity);
   }
 
   /**

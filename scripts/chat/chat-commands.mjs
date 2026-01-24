@@ -19,8 +19,8 @@ const COMMAND_PATTERNS = {
   moon: /^\/moon$/i,
   season: /^\/season$/i,
   today: /^\/today$/i,
-  sunrise: /^\/sunrise$/i,
-  sunset: /^\/sunset$/i,
+  sunrise: /^\/sunrise(?:\s+(.*))?$/i,
+  sunset: /^\/sunset(?:\s+(.*))?$/i,
   advance: /^\/advance\s+(.+)$/i,
   calendar: /^\/calendar$/i
 };
@@ -94,8 +94,8 @@ function handleCommand(cmd, match) {
     moon: cmdMoon,
     season: cmdSeason,
     today: cmdToday,
-    sunrise: cmdSunrise,
-    sunset: cmdSunset,
+    sunrise: () => cmdSunrise(match[1]?.trim() || ''),
+    sunset: () => cmdSunset(match[1]?.trim() || ''),
     advance: () => cmdAdvance(match[1]),
     calendar: cmdCalendar
   };
@@ -129,7 +129,7 @@ function formatHours(hours) {
 async function cmdDate(formatStr) {
   const calendar = CalendariaAPI.getActiveCalendar();
   if (!calendar) return ui.notifications.warn(localize('CALENDARIA.ChatCommand.NoCalendar'));
-  const formatted = CalendariaAPI.formatDate(null, formatStr || 'long');
+  const formatted = CalendariaAPI.formatDate(null, formatStr || 'dateLong');
   await sendChat(formatted);
 }
 
@@ -141,7 +141,7 @@ async function cmdDate(formatStr) {
 async function cmdTime(formatStr) {
   const calendar = CalendariaAPI.getActiveCalendar();
   if (!calendar) return ui.notifications.warn(localize('CALENDARIA.ChatCommand.NoCalendar'));
-  const formatted = CalendariaAPI.formatDate(null, formatStr || 'time');
+  const formatted = CalendariaAPI.formatDate(null, formatStr || 'time24');
   await sendChat(formatted);
 }
 
@@ -203,7 +203,7 @@ async function cmdMoon() {
   const lines = calendar.moons.map((moon, index) => {
     const phase = calendar.getMoonPhase(index);
     if (!phase) return null;
-    const icon = phase.icon ? `<img src="${phase.icon}" style="height:1.2em;vertical-align:middle;margin-right:4px;">` : '';
+    const icon = phase.icon ? `<img src="${phase.icon}" style="height:1.2em;vertical-align:middle;margin-right:0.25rem;">` : '';
     return `${icon}<strong>${localize(moon.name)}:</strong> ${phase.subPhaseName || localize(phase.name)}`;
   }).filter(Boolean);
   if (!lines.length) return sendChat(localize('CALENDARIA.ChatCommand.NoMoons'));
@@ -241,27 +241,39 @@ async function cmdToday() {
 }
 
 /**
- * Handle /sunrise command - output sunrise time.
+ * Handle /sunrise command - output formatted sunrise time.
+ * @param {string} formatStr - Optional format string
  * @returns {Promise<void>}
  */
-async function cmdSunrise() {
+async function cmdSunrise(formatStr) {
   const calendar = CalendariaAPI.getActiveCalendar();
   if (!calendar) return ui.notifications.warn(localize('CALENDARIA.ChatCommand.NoCalendar'));
   const sunrise = CalendariaAPI.getSunrise();
   if (sunrise == null) return sendChat(localize('CALENDARIA.ChatCommand.NoSunData'));
-  await sendChat(`<i class="fas fa-sun"></i> ${localize('CALENDARIA.ChatCommand.Sunrise')}: ${formatHours(sunrise)}`);
+  const dt = CalendariaAPI.getCurrentDateTime();
+  const h = Math.floor(sunrise);
+  const m = Math.round((sunrise - h) * 60);
+  const components = { ...dt, hour: h, minute: m, second: 0 };
+  const formatted = CalendariaAPI.formatDate(components, formatStr || 'time24');
+  await sendChat(`<i class="fas fa-sun"></i> ${localize('CALENDARIA.ChatCommand.Sunrise')}: ${formatted}`);
 }
 
 /**
- * Handle /sunset command - output sunset time.
+ * Handle /sunset command - output formatted sunset time.
+ * @param {string} formatStr - Optional format string
  * @returns {Promise<void>}
  */
-async function cmdSunset() {
+async function cmdSunset(formatStr) {
   const calendar = CalendariaAPI.getActiveCalendar();
   if (!calendar) return ui.notifications.warn(localize('CALENDARIA.ChatCommand.NoCalendar'));
   const sunset = CalendariaAPI.getSunset();
   if (sunset == null) return sendChat(localize('CALENDARIA.ChatCommand.NoSunData'));
-  await sendChat(`<i class="fas fa-moon"></i> ${localize('CALENDARIA.ChatCommand.Sunset')}: ${formatHours(sunset)}`);
+  const dt = CalendariaAPI.getCurrentDateTime();
+  const h = Math.floor(sunset);
+  const m = Math.round((sunset - h) * 60);
+  const components = { ...dt, hour: h, minute: m, second: 0 };
+  const formatted = CalendariaAPI.formatDate(components, formatStr || 'time24');
+  await sendChat(`<i class="fas fa-moon"></i> ${localize('CALENDARIA.ChatCommand.Sunset')}: ${formatted}`);
 }
 
 /**
@@ -310,8 +322,8 @@ async function cmdCalendar() {
   const calendar = CalendariaAPI.getActiveCalendar();
   if (!calendar) return ui.notifications.warn(localize('CALENDARIA.ChatCommand.NoCalendar'));
   const lines = [];
-  lines.push(`<strong>${localize('CALENDARIA.ChatCommand.Date')}:</strong> ${CalendariaAPI.formatDate(null, 'long')}`);
-  lines.push(`<strong>${localize('CALENDARIA.ChatCommand.Time')}:</strong> ${CalendariaAPI.formatDate(null, 'time')}`);
+  lines.push(`<strong>${localize('CALENDARIA.ChatCommand.Date')}:</strong> ${CalendariaAPI.formatDate(null, 'dateLong')}`);
+  lines.push(`<strong>${localize('CALENDARIA.ChatCommand.Time')}:</strong> ${CalendariaAPI.formatDate(null, 'time24')}`);
   const season = CalendariaAPI.getCurrentSeason();
   if (season) lines.push(`<strong>${localize('CALENDARIA.ChatCommand.Season')}:</strong> ${localize(season.name)}`);
   const weather = WeatherManager.getCurrentWeather();

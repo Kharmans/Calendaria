@@ -9,9 +9,9 @@
 
 **Applications**
 
-- [Calendar Application](CalendarApplication)
-- [CalendariaHUD](CalendariaHUD)
-- [MiniCalendar](MiniCalendar)
+- [BigCal](BigCal)
+- [HUD](HUD)
+- [MiniCal](MiniCal)
 - [TimeKeeper](TimeKeeper)
 - [Stopwatch](Stopwatch)
 
@@ -24,6 +24,7 @@
 - [Reminders](Reminders)
 - [Scene Darkness](Scene-Darkness)
 - [Weather System](Weather-System)
+- [Settings Backup](Settings-Backup)
 
 **Customization**
 
@@ -39,4 +40,6 @@
 
 **Reference**
 
+- [Format Tokens](Format-Tokens)
+- [Keybinds](Keybinds)
 - [Troubleshooting](Troubleshooting)

@@ -5,18 +5,18 @@
  */
 
 import { CalendarEditor } from './applications/calendar-editor.mjs';
-import { CalendariaHUD } from './applications/calendaria-hud.mjs';
+import { HUD } from './applications/hud.mjs';
 import { ImporterApp } from './applications/importer-app.mjs';
-import { MiniCalendar } from './applications/mini-calendar.mjs';
+import { MiniCal } from './applications/mini-cal.mjs';
 import { SettingsPanel } from './applications/settings/settings-panel.mjs';
-import { TimeKeeperHUD } from './applications/time-keeper-hud.mjs';
+import { TimeKeeper } from './applications/time-keeper.mjs';
 import { MODULE, SETTINGS } from './constants.mjs';
 import { migrateCustomCalendars, migrateIntercalaryFestivals } from './utils/format-utils.mjs';
 import { localize } from './utils/localization.mjs';
 import { log } from './utils/logger.mjs';
 import * as StickyZones from './utils/sticky-zones.mjs';
 
-const { ArrayField, ObjectField, BooleanField, NumberField, StringField } = foundry.data.fields;
+const { ArrayField, ObjectField, BooleanField, NumberField, SetField, StringField } = foundry.data.fields;
 
 /**
  * Register all module settings with Foundry VTT.
@@ -43,15 +43,15 @@ export function registerSettings() {
     type: new BooleanField({ initial: false })
   });
 
-  /** Saved position for the MiniCalendar */
-  game.settings.register(MODULE.ID, SETTINGS.MINI_CALENDAR_POSITION, {
-    name: 'MiniCalendar Position',
+  /** Saved position for the MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_POSITION, {
+    name: 'MiniCal Position',
     scope: 'user',
     config: false,
     type: new ObjectField({ nullable: true, initial: null })
   });
 
-  /** Saved position for the TimeKeeper HUD */
+  /** Saved position for the TimeKeeper */
   game.settings.register(MODULE.ID, SETTINGS.TIME_KEEPER_POSITION, {
     name: 'TimeKeeper Position',
     scope: 'user',
@@ -84,50 +84,308 @@ export function registerSettings() {
     type: new BooleanField({ initial: false })
   });
 
-  /** MiniCalendar auto-fade on idle */
-  game.settings.register(MODULE.ID, SETTINGS.MINI_CALENDAR_AUTO_FADE, {
+  /** Sticky states for Stopwatch */
+  game.settings.register(MODULE.ID, SETTINGS.STOPWATCH_STICKY_STATES, {
+    name: 'Stopwatch Sticky States',
+    scope: 'user',
+    config: false,
+    type: new ObjectField({ initial: { position: false } })
+  });
+
+  /** MiniCal auto-fade on idle */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_AUTO_FADE, {
     name: 'CALENDARIA.Settings.AutoFade.Name',
     hint: 'CALENDARIA.Settings.AutoFade.Hint',
     scope: 'user',
     config: false,
     type: new BooleanField({ initial: false }),
-    onChange: () => MiniCalendar.updateIdleOpacity()
+    onChange: () => MiniCal.updateIdleOpacity()
   });
 
-  /** MiniCalendar idle opacity (0-100) */
-  game.settings.register(MODULE.ID, SETTINGS.MINI_CALENDAR_IDLE_OPACITY, {
+  /** MiniCal idle opacity (0-100) */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_IDLE_OPACITY, {
     name: 'CALENDARIA.Settings.IdleOpacity.Name',
     hint: 'CALENDARIA.Settings.IdleOpacity.Hint',
     scope: 'user',
     config: false,
     type: new NumberField({ initial: 40, min: 0, max: 100, integer: true }),
-    onChange: () => MiniCalendar.updateIdleOpacity()
+    onChange: () => MiniCal.updateIdleOpacity()
   });
 
-  /** Delay before auto-hiding MiniCalendar controls */
-  game.settings.register(MODULE.ID, SETTINGS.MINI_CALENDAR_CONTROLS_DELAY, {
-    name: 'CALENDARIA.Settings.MiniCalendarControlsDelay.Name',
-    hint: 'CALENDARIA.Settings.MiniCalendarControlsDelay.Hint',
+  /** Delay before auto-hiding MiniCal controls */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_CONTROLS_DELAY, {
+    name: 'CALENDARIA.Settings.MiniCalControlsDelay.Name',
+    hint: 'CALENDARIA.Settings.MiniCalControlsDelay.Hint',
     scope: 'user',
     config: false,
     type: new NumberField({ min: 1, max: 10, step: 1, integer: true, initial: 3 })
   });
 
-  /** Sticky states for MiniCalendar */
-  game.settings.register(MODULE.ID, SETTINGS.MINI_CALENDAR_STICKY_STATES, {
-    name: 'MiniCalendar Sticky States',
+  /** Sticky states for MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_STICKY_STATES, {
+    name: 'MiniCal Sticky States',
     scope: 'user',
     config: false,
     type: new ObjectField({ initial: { timeControls: false, sidebar: false, position: false } })
   });
 
-  /** Confirm before setting current date in MiniCalendar */
-  game.settings.register(MODULE.ID, SETTINGS.MINI_CALENDAR_CONFIRM_SET_DATE, {
+  /** Confirm before setting current date in MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_CONFIRM_SET_DATE, {
     name: 'CALENDARIA.Settings.ConfirmSetDate.Name',
     hint: 'CALENDARIA.Settings.ConfirmSetDate.Hint',
     scope: 'user',
     config: false,
     type: new BooleanField({ initial: true })
+  });
+
+  // ========================================//
+  //  MiniCal Block Visibility               //
+  // ========================================//
+
+  /** Show weather on MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_SHOW_WEATHER, {
+    name: 'CALENDARIA.Settings.MiniCalShowWeather.Name',
+    hint: 'CALENDARIA.Settings.MiniCalShowWeather.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => foundry.applications.instances.get('mini-cal')?.render()
+  });
+
+  /** Weather display mode on MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_WEATHER_DISPLAY_MODE, {
+    name: 'CALENDARIA.Settings.MiniCalWeatherDisplayMode.Name',
+    hint: 'CALENDARIA.Settings.MiniCalWeatherDisplayMode.Hint',
+    scope: 'user',
+    config: false,
+    type: new StringField({
+      choices: {
+        full: 'CALENDARIA.Settings.HUDWeatherDisplayMode.Full',
+        iconTemp: 'CALENDARIA.Settings.HUDWeatherDisplayMode.IconTemp',
+        icon: 'CALENDARIA.Settings.HUDWeatherDisplayMode.IconOnly',
+        temp: 'CALENDARIA.Settings.HUDWeatherDisplayMode.TempOnly'
+      },
+      initial: 'full'
+    }),
+    onChange: () => foundry.applications.instances.get('mini-cal')?.render()
+  });
+
+  /** Show season on MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_SHOW_SEASON, {
+    name: 'CALENDARIA.Settings.MiniCalShowSeason.Name',
+    hint: 'CALENDARIA.Settings.MiniCalShowSeason.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => foundry.applications.instances.get('mini-cal')?.render()
+  });
+
+  /** Season display mode on MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_SEASON_DISPLAY_MODE, {
+    name: 'CALENDARIA.Settings.MiniCalSeasonDisplayMode.Name',
+    hint: 'CALENDARIA.Settings.MiniCalSeasonDisplayMode.Hint',
+    scope: 'user',
+    config: false,
+    type: new StringField({
+      choices: {
+        full: 'CALENDARIA.Settings.HUDSeasonDisplayMode.Full',
+        icon: 'CALENDARIA.Settings.HUDSeasonDisplayMode.IconOnly',
+        text: 'CALENDARIA.Settings.HUDSeasonDisplayMode.TextOnly'
+      },
+      initial: 'full'
+    }),
+    onChange: () => foundry.applications.instances.get('mini-cal')?.render()
+  });
+
+  /** Show era on MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_SHOW_ERA, {
+    name: 'CALENDARIA.Settings.MiniCalShowEra.Name',
+    hint: 'CALENDARIA.Settings.MiniCalShowEra.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => foundry.applications.instances.get('mini-cal')?.render()
+  });
+
+  /** Era display mode on MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_ERA_DISPLAY_MODE, {
+    name: 'CALENDARIA.Settings.MiniCalEraDisplayMode.Name',
+    hint: 'CALENDARIA.Settings.MiniCalEraDisplayMode.Hint',
+    scope: 'user',
+    config: false,
+    type: new StringField({
+      choices: {
+        full: 'CALENDARIA.Settings.HUDEraDisplayMode.Full',
+        icon: 'CALENDARIA.Settings.HUDEraDisplayMode.IconOnly',
+        text: 'CALENDARIA.Settings.HUDEraDisplayMode.TextOnly',
+        abbr: 'CALENDARIA.Settings.HUDEraDisplayMode.Abbreviation'
+      },
+      initial: 'full'
+    }),
+    onChange: () => foundry.applications.instances.get('mini-cal')?.render()
+  });
+
+  /** Show cycles on MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_SHOW_CYCLES, {
+    name: 'CALENDARIA.Settings.MiniCalShowCycles.Name',
+    hint: 'CALENDARIA.Settings.MiniCalShowCycles.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => foundry.applications.instances.get('mini-cal')?.render()
+  });
+
+  /** Cycles display mode on MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_CYCLES_DISPLAY_MODE, {
+    name: 'CALENDARIA.Settings.MiniCalCyclesDisplayMode.Name',
+    hint: 'CALENDARIA.Settings.MiniCalCyclesDisplayMode.Hint',
+    scope: 'user',
+    config: false,
+    type: new StringField({
+      choices: {
+        name: 'CALENDARIA.Settings.HUDCyclesDisplayMode.NameOption',
+        icon: 'CALENDARIA.Settings.HUDCyclesDisplayMode.IconOnly',
+        number: 'CALENDARIA.Settings.HUDCyclesDisplayMode.Number',
+        roman: 'CALENDARIA.Settings.HUDCyclesDisplayMode.Roman'
+      },
+      initial: 'icon'
+    }),
+    onChange: () => foundry.applications.instances.get('mini-cal')?.render()
+  });
+
+  /** Show moon phases on MiniCal */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_SHOW_MOON_PHASES, {
+    name: 'CALENDARIA.Settings.MiniCalShowMoonPhases.Name',
+    hint: 'CALENDARIA.Settings.MiniCalShowMoonPhases.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => foundry.applications.instances.get('mini-cal')?.render()
+  });
+
+  // ========================================//
+  //  BigCal Block Visibility                //
+  // ========================================//
+
+  /** Show weather on BigCal */
+  game.settings.register(MODULE.ID, SETTINGS.BIG_CAL_SHOW_WEATHER, {
+    name: 'CALENDARIA.Settings.BigCalShowWeather.Name',
+    hint: 'CALENDARIA.Settings.BigCalShowWeather.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => foundry.applications.instances.get('calendaria')?.render()
+  });
+
+  /** Weather display mode on BigCal */
+  game.settings.register(MODULE.ID, SETTINGS.BIG_CAL_WEATHER_DISPLAY_MODE, {
+    name: 'CALENDARIA.Settings.BigCalWeatherDisplayMode.Name',
+    hint: 'CALENDARIA.Settings.BigCalWeatherDisplayMode.Hint',
+    scope: 'user',
+    config: false,
+    type: new StringField({
+      choices: {
+        full: 'CALENDARIA.Settings.HUDWeatherDisplayMode.Full',
+        iconTemp: 'CALENDARIA.Settings.HUDWeatherDisplayMode.IconTemp',
+        icon: 'CALENDARIA.Settings.HUDWeatherDisplayMode.IconOnly',
+        temp: 'CALENDARIA.Settings.HUDWeatherDisplayMode.TempOnly'
+      },
+      initial: 'full'
+    }),
+    onChange: () => foundry.applications.instances.get('calendaria')?.render()
+  });
+
+  /** Show season on BigCal */
+  game.settings.register(MODULE.ID, SETTINGS.BIG_CAL_SHOW_SEASON, {
+    name: 'CALENDARIA.Settings.BigCalShowSeason.Name',
+    hint: 'CALENDARIA.Settings.BigCalShowSeason.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => foundry.applications.instances.get('calendaria')?.render()
+  });
+
+  /** Season display mode on BigCal */
+  game.settings.register(MODULE.ID, SETTINGS.BIG_CAL_SEASON_DISPLAY_MODE, {
+    name: 'CALENDARIA.Settings.BigCalSeasonDisplayMode.Name',
+    hint: 'CALENDARIA.Settings.BigCalSeasonDisplayMode.Hint',
+    scope: 'user',
+    config: false,
+    type: new StringField({
+      choices: {
+        full: 'CALENDARIA.Settings.HUDSeasonDisplayMode.Full',
+        icon: 'CALENDARIA.Settings.HUDSeasonDisplayMode.IconOnly',
+        text: 'CALENDARIA.Settings.HUDSeasonDisplayMode.TextOnly'
+      },
+      initial: 'full'
+    }),
+    onChange: () => foundry.applications.instances.get('calendaria')?.render()
+  });
+
+  /** Show era on BigCal */
+  game.settings.register(MODULE.ID, SETTINGS.BIG_CAL_SHOW_ERA, {
+    name: 'CALENDARIA.Settings.BigCalShowEra.Name',
+    hint: 'CALENDARIA.Settings.BigCalShowEra.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => foundry.applications.instances.get('calendaria')?.render()
+  });
+
+  /** Era display mode on BigCal */
+  game.settings.register(MODULE.ID, SETTINGS.BIG_CAL_ERA_DISPLAY_MODE, {
+    name: 'CALENDARIA.Settings.BigCalEraDisplayMode.Name',
+    hint: 'CALENDARIA.Settings.BigCalEraDisplayMode.Hint',
+    scope: 'user',
+    config: false,
+    type: new StringField({
+      choices: {
+        full: 'CALENDARIA.Settings.HUDEraDisplayMode.Full',
+        icon: 'CALENDARIA.Settings.HUDEraDisplayMode.IconOnly',
+        text: 'CALENDARIA.Settings.HUDEraDisplayMode.TextOnly',
+        abbr: 'CALENDARIA.Settings.HUDEraDisplayMode.Abbreviation'
+      },
+      initial: 'full'
+    }),
+    onChange: () => foundry.applications.instances.get('calendaria')?.render()
+  });
+
+  /** Show cycles on BigCal */
+  game.settings.register(MODULE.ID, SETTINGS.BIG_CAL_SHOW_CYCLES, {
+    name: 'CALENDARIA.Settings.BigCalShowCycles.Name',
+    hint: 'CALENDARIA.Settings.BigCalShowCycles.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => foundry.applications.instances.get('calendaria')?.render()
+  });
+
+  /** Cycles display mode on BigCal */
+  game.settings.register(MODULE.ID, SETTINGS.BIG_CAL_CYCLES_DISPLAY_MODE, {
+    name: 'CALENDARIA.Settings.BigCalCyclesDisplayMode.Name',
+    hint: 'CALENDARIA.Settings.BigCalCyclesDisplayMode.Hint',
+    scope: 'user',
+    config: false,
+    type: new StringField({
+      choices: {
+        name: 'CALENDARIA.Settings.HUDCyclesDisplayMode.NameOption',
+        icon: 'CALENDARIA.Settings.HUDCyclesDisplayMode.IconOnly',
+        number: 'CALENDARIA.Settings.HUDCyclesDisplayMode.Number',
+        roman: 'CALENDARIA.Settings.HUDCyclesDisplayMode.Roman'
+      },
+      initial: 'icon'
+    }),
+    onChange: () => foundry.applications.instances.get('calendaria')?.render()
+  });
+
+  /** Show moon phases on BigCal */
+  game.settings.register(MODULE.ID, SETTINGS.BIG_CAL_SHOW_MOON_PHASES, {
+    name: 'CALENDARIA.Settings.BigCalShowMoonPhases.Name',
+    hint: 'CALENDARIA.Settings.BigCalShowMoonPhases.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => foundry.applications.instances.get('calendaria')?.render()
   });
 
   /** Track if format migration has been run */
@@ -139,6 +397,13 @@ export function registerSettings() {
   });
 
   /** Track if intercalary weekday migration has been run */
+  game.settings.register(MODULE.ID, 'settingKeyMigrationComplete', {
+    name: 'Setting Key Migration Complete',
+    scope: 'world',
+    config: false,
+    type: new BooleanField({ initial: false })
+  });
+
   game.settings.register(MODULE.ID, 'intercalaryMigrationComplete', {
     name: 'Intercalary Migration Complete',
     scope: 'world',
@@ -173,6 +438,15 @@ export function registerSettings() {
     type: new BooleanField({ initial: true })
   });
 
+  /** Allow Calendaria windows to overlap sidebar area */
+  game.settings.register(MODULE.ID, SETTINGS.ALLOW_SIDEBAR_OVERLAP, {
+    name: 'CALENDARIA.Settings.AllowSidebarOverlap.Name',
+    hint: 'CALENDARIA.Settings.AllowSidebarOverlap.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: false })
+  });
+
   /** Default brightness multiplier for all scenes */
   game.settings.register(MODULE.ID, SETTINGS.DEFAULT_BRIGHTNESS_MULTIPLIER, {
     name: 'CALENDARIA.Settings.DefaultBrightnessMultiplier.Name',
@@ -182,16 +456,7 @@ export function registerSettings() {
     type: new NumberField({ initial: 1.0, min: 0.5, max: 1.5, step: 0.1 })
   });
 
-  /** Show moon phases on the calendar UI */
-  game.settings.register(MODULE.ID, SETTINGS.SHOW_MOON_PHASES, {
-    name: 'CALENDARIA.Settings.ShowMoonPhases.Name',
-    hint: 'CALENDARIA.Settings.ShowMoonPhases.Hint',
-    scope: 'world',
-    config: false,
-    type: new BooleanField({ initial: true })
-  });
-
-  /** Show TimeKeeper HUD on world load (GM only) */
+  /** Show TimeKeeper on world load (GM only) */
   game.settings.register(MODULE.ID, SETTINGS.SHOW_TIME_KEEPER, {
     name: 'CALENDARIA.Settings.ShowTimeKeeper.Name',
     hint: 'CALENDARIA.Settings.ShowTimeKeeper.Hint',
@@ -201,8 +466,8 @@ export function registerSettings() {
     requiresReload: false,
     onChange: (value) => {
       if (!game.user.isGM) return;
-      if (value) TimeKeeperHUD.show();
-      else TimeKeeperHUD.hide();
+      if (value) TimeKeeper.show();
+      else TimeKeeper.hide();
     }
   });
 
@@ -213,7 +478,7 @@ export function registerSettings() {
     scope: 'user',
     config: false,
     type: new BooleanField({ initial: true }),
-    onChange: () => TimeKeeperHUD.updateIdleOpacity()
+    onChange: () => TimeKeeper.updateIdleOpacity()
   });
 
   /** TimeKeeper idle opacity (0-100) */
@@ -223,7 +488,7 @@ export function registerSettings() {
     scope: 'user',
     config: false,
     type: new NumberField({ initial: 40, min: 0, max: 100, integer: true }),
-    onChange: () => TimeKeeperHUD.updateIdleOpacity()
+    onChange: () => TimeKeeper.updateIdleOpacity()
   });
 
   /** TimeKeeper custom time jump amounts per interval */
@@ -246,7 +511,35 @@ export function registerSettings() {
     })
   });
 
-  /** Show toolbar button in scene controls */
+  /** Sticky states for TimeKeeper */
+  game.settings.register(MODULE.ID, SETTINGS.TIMEKEEPER_STICKY_STATES, {
+    name: 'TimeKeeper Sticky States',
+    scope: 'user',
+    config: false,
+    type: new ObjectField({ initial: { position: false } })
+  });
+
+  /** MiniCal custom time jump amounts per interval */
+  game.settings.register(MODULE.ID, SETTINGS.MINI_CAL_TIME_JUMPS, {
+    name: 'MiniCal Time Jumps',
+    scope: 'world',
+    config: false,
+    type: new ObjectField({
+      initial: {
+        second: { dec2: -30, dec1: -5, inc1: 5, inc2: 30 },
+        round: { dec2: -5, dec1: -1, inc1: 1, inc2: 5 },
+        minute: { dec2: -30, dec1: -5, inc1: 5, inc2: 30 },
+        hour: { dec2: -6, dec1: -1, inc1: 1, inc2: 6 },
+        day: { dec2: -7, dec1: -1, inc1: 1, inc2: 7 },
+        week: { dec2: -4, dec1: -1, inc1: 1, inc2: 4 },
+        month: { dec2: -3, dec1: -1, inc1: 1, inc2: 3 },
+        season: { dec2: -2, dec1: -1, inc1: 1, inc2: 2 },
+        year: { dec2: -10, dec1: -1, inc1: 1, inc2: 10 }
+      }
+    })
+  });
+
+  /** Show toolbar buttons in scene controls */
   game.settings.register(MODULE.ID, SETTINGS.SHOW_TOOLBAR_BUTTON, {
     name: 'CALENDARIA.Settings.ShowToolbarButton.Name',
     hint: 'CALENDARIA.Settings.ShowToolbarButton.Hint',
@@ -256,10 +549,31 @@ export function registerSettings() {
     requiresReload: true
   });
 
-  /** Show MiniCalendar on world load */
-  game.settings.register(MODULE.ID, SETTINGS.SHOW_MINI_CALENDAR, {
-    name: 'CALENDARIA.Settings.ShowMiniCalendar.Name',
-    hint: 'CALENDARIA.Settings.ShowMiniCalendar.Hint',
+  /** Which apps to show as toolbar buttons */
+  game.settings.register(MODULE.ID, SETTINGS.TOOLBAR_APPS, {
+    name: 'CALENDARIA.Settings.ToolbarApps.Name',
+    hint: 'CALENDARIA.Settings.ToolbarApps.Hint',
+    scope: 'world',
+    config: false,
+    type: new SetField(new StringField()),
+    default: ['minical'],
+    requiresReload: true
+  });
+
+  /** Show Calendaria footer in journal sidebar */
+  game.settings.register(MODULE.ID, SETTINGS.SHOW_JOURNAL_FOOTER, {
+    name: 'CALENDARIA.Settings.ShowJournalFooter.Name',
+    hint: 'CALENDARIA.Settings.ShowJournalFooter.Hint',
+    scope: 'world',
+    config: false,
+    type: new BooleanField({ initial: false }),
+    requiresReload: true
+  });
+
+  /** Show MiniCal on world load */
+  game.settings.register(MODULE.ID, SETTINGS.SHOW_MINI_CAL, {
+    name: 'CALENDARIA.Settings.ShowMiniCal.Name',
+    hint: 'CALENDARIA.Settings.ShowMiniCal.Hint',
     scope: 'user',
     config: false,
     type: new BooleanField({ initial: true })
@@ -326,6 +640,16 @@ export function registerSettings() {
     type: new BooleanField({ initial: false })
   });
 
+  /** Calendar HUD dome auto-hide when near viewport top */
+  game.settings.register(MODULE.ID, SETTINGS.HUD_DOME_AUTO_HIDE, {
+    name: 'CALENDARIA.Settings.DomeAutoHide.Name',
+    hint: 'CALENDARIA.Settings.DomeAutoHide.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => HUD.instance?.render()
+  });
+
   /** Calendar HUD auto-fade on idle */
   game.settings.register(MODULE.ID, SETTINGS.HUD_AUTO_FADE, {
     name: 'CALENDARIA.Settings.AutoFade.Name',
@@ -333,7 +657,7 @@ export function registerSettings() {
     scope: 'user',
     config: false,
     type: new BooleanField({ initial: false }),
-    onChange: () => CalendariaHUD.updateIdleOpacity()
+    onChange: () => HUD.updateIdleOpacity()
   });
 
   /** Calendar HUD idle opacity (0-100) */
@@ -343,7 +667,7 @@ export function registerSettings() {
     scope: 'user',
     config: false,
     type: new NumberField({ initial: 40, min: 0, max: 100, integer: true }),
-    onChange: () => CalendariaHUD.updateIdleOpacity()
+    onChange: () => HUD.updateIdleOpacity()
   });
 
   /** Calendar HUD width scale (fullsize mode only) */
@@ -356,10 +680,10 @@ export function registerSettings() {
     onChange: () => foundry.applications.instances.get('calendaria-hud')?.render()
   });
 
-  /** Calendar HUD sticky zones enabled */
+  /** Sticky zones enabled for all Calendaria windows */
   game.settings.register(MODULE.ID, SETTINGS.HUD_STICKY_ZONES_ENABLED, {
-    name: 'CALENDARIA.Settings.HUDStickyZones.Name',
-    hint: 'CALENDARIA.Settings.HUDStickyZones.Hint',
+    name: 'CALENDARIA.Settings.StickyZones.Name',
+    hint: 'CALENDARIA.Settings.StickyZones.Hint',
     scope: 'user',
     config: false,
     type: new BooleanField({ initial: true })
@@ -474,6 +798,52 @@ export function registerSettings() {
     onChange: () => foundry.applications.instances.get('calendaria-hud')?.render({ parts: ['bar'] })
   });
 
+  /** Era display mode on HUD */
+  game.settings.register(MODULE.ID, SETTINGS.HUD_ERA_DISPLAY_MODE, {
+    name: 'CALENDARIA.Settings.HUDEraDisplayMode.Name',
+    hint: 'CALENDARIA.Settings.HUDEraDisplayMode.Hint',
+    scope: 'user',
+    config: false,
+    type: new StringField({
+      choices: {
+        full: 'CALENDARIA.Settings.HUDEraDisplayMode.Full',
+        icon: 'CALENDARIA.Settings.HUDEraDisplayMode.IconOnly',
+        text: 'CALENDARIA.Settings.HUDEraDisplayMode.TextOnly',
+        abbr: 'CALENDARIA.Settings.HUDEraDisplayMode.Abbreviation'
+      },
+      initial: 'full'
+    }),
+    onChange: () => foundry.applications.instances.get('calendaria-hud')?.render({ parts: ['bar'] })
+  });
+
+  /** Show cycles indicator on HUD */
+  game.settings.register(MODULE.ID, SETTINGS.HUD_SHOW_CYCLES, {
+    name: 'CALENDARIA.Settings.HUDShowCycles.Name',
+    hint: 'CALENDARIA.Settings.HUDShowCycles.Hint',
+    scope: 'user',
+    config: false,
+    type: new BooleanField({ initial: true }),
+    onChange: () => foundry.applications.instances.get('calendaria-hud')?.render({ parts: ['bar'] })
+  });
+
+  /** Cycles display mode on HUD */
+  game.settings.register(MODULE.ID, SETTINGS.HUD_CYCLES_DISPLAY_MODE, {
+    name: 'CALENDARIA.Settings.HUDCyclesDisplayMode.Name',
+    hint: 'CALENDARIA.Settings.HUDCyclesDisplayMode.Hint',
+    scope: 'user',
+    config: false,
+    type: new StringField({
+      choices: {
+        name: 'CALENDARIA.Settings.HUDCyclesDisplayMode.NameOption',
+        icon: 'CALENDARIA.Settings.HUDCyclesDisplayMode.IconOnly',
+        number: 'CALENDARIA.Settings.HUDCyclesDisplayMode.Number',
+        roman: 'CALENDARIA.Settings.HUDCyclesDisplayMode.Roman'
+      },
+      initial: 'icon'
+    }),
+    onChange: () => foundry.applications.instances.get('calendaria-hud')?.render({ parts: ['bar'] })
+  });
+
   /** Force HUD display for all clients */
   game.settings.register(MODULE.ID, SETTINGS.FORCE_HUD, {
     name: 'CALENDARIA.Settings.ForceHUD.Name',
@@ -484,22 +854,22 @@ export function registerSettings() {
     onChange: async (value) => {
       if (value) {
         await game.settings.set(MODULE.ID, SETTINGS.SHOW_CALENDAR_HUD, true);
-        CalendariaHUD.show();
+        HUD.show();
       }
     }
   });
 
-  /** Force MiniCalendar display for all clients */
-  game.settings.register(MODULE.ID, SETTINGS.FORCE_MINI_CALENDAR, {
-    name: 'CALENDARIA.Settings.ForceMiniCalendar.Name',
-    hint: 'CALENDARIA.Settings.ForceMiniCalendar.Hint',
+  /** Force MiniCal display for all clients */
+  game.settings.register(MODULE.ID, SETTINGS.FORCE_MINI_CAL, {
+    name: 'CALENDARIA.Settings.ForceMiniCal.Name',
+    hint: 'CALENDARIA.Settings.ForceMiniCal.Hint',
     scope: 'world',
     config: false,
     type: new BooleanField({ initial: false }),
     onChange: async (value) => {
       if (value) {
-        await game.settings.set(MODULE.ID, SETTINGS.SHOW_MINI_CALENDAR, true);
-        MiniCalendar.show();
+        await game.settings.set(MODULE.ID, SETTINGS.SHOW_MINI_CAL, true);
+        MiniCal.show();
       }
     }
   });
@@ -544,6 +914,15 @@ export function registerSettings() {
     config: false,
     type: new StringField({ initial: 'gregorian', blank: true }),
     requiresReload: true
+  });
+
+  /** Whether to show the active calendar setting to players */
+  game.settings.register(MODULE.ID, SETTINGS.SHOW_ACTIVE_CALENDAR_TO_PLAYERS, {
+    name: 'CALENDARIA.Settings.ShowActiveCalendarToPlayers.Name',
+    hint: 'CALENDARIA.Settings.ShowActiveCalendarToPlayers.Hint',
+    scope: 'world',
+    config: false,
+    type: new BooleanField({ initial: false })
   });
 
   /** User overrides for default/built-in calendars */
@@ -607,11 +986,11 @@ export function registerSettings() {
     type: new ObjectField({
       initial: {
         hudDate: { gm: 'ordinal', player: 'ordinal' },
-        hudTime: { gm: 'time', player: 'time' },
-        miniCalendarHeader: { gm: 'MMMM GGGG', player: 'MMMM GGGG' },
-        miniCalendarTime: { gm: 'time', player: 'time' },
-        fullCalendarHeader: { gm: 'MMMM GGGG', player: 'MMMM GGGG' },
-        chatTimestamp: { gm: 'short', player: 'short' },
+        hudTime: { gm: 'time24', player: 'time24' },
+        miniCalHeader: { gm: 'MMMM GGGG', player: 'MMMM GGGG' },
+        miniCalTime: { gm: 'time24', player: 'time24' },
+        bigCalHeader: { gm: 'MMMM GGGG', player: 'MMMM GGGG' },
+        chatTimestamp: { gm: 'dateShort', player: 'dateShort' },
         stopwatchRealtime: { gm: 'stopwatchRealtimeFull', player: 'stopwatchRealtimeFull' },
         stopwatchGametime: { gm: 'stopwatchGametimeFull', player: 'stopwatchGametimeFull' }
       }
@@ -669,8 +1048,8 @@ export function registerSettings() {
     config: false,
     type: new ObjectField({
       initial: {
-        viewFullCalendar: { player: false, trusted: true, assistant: true },
-        viewMiniCalendar: { player: false, trusted: true, assistant: true },
+        viewBigCal: { player: false, trusted: true, assistant: true },
+        viewMiniCal: { player: false, trusted: true, assistant: true },
         viewTimeKeeper: { player: false, trusted: true, assistant: true },
         addNotes: { player: true, trusted: true, assistant: true },
         changeDateTime: { player: false, trusted: false, assistant: true },
@@ -841,4 +1220,46 @@ export function registerReadySettings() {
   // Run migrations for custom calendars
   migrateCustomCalendars();
   migrateIntercalaryFestivals();
+  migrateSettingKeys();
+}
+
+/**
+ * Migrate old setting keys to new names.
+ * Runs once per world to preserve user settings across the rename.
+ * @async
+ */
+async function migrateSettingKeys() {
+  if (!game.user.isGM) return;
+  if (game.settings.get(MODULE.ID, 'settingKeyMigrationComplete')) return;
+
+  // Key mapping: oldKey -> newKey
+  const keyMap = {
+    'forceMiniCalendar': 'forceMiniCal',
+    'miniCalendarAutoFade': 'miniCalAutoFade',
+    'miniCalendarConfirmSetDate': 'miniCalConfirmSetDate',
+    'miniCalendarControlsDelay': 'miniCalControlsDelay',
+    'miniCalendarIdleOpacity': 'miniCalIdleOpacity',
+    'miniCalendarPosition': 'miniCalPosition',
+    'miniCalendarStickyStates': 'miniCalStickyStates',
+    'showMiniCalendar': 'showMiniCal'
+  };
+
+  let migrated = 0;
+  for (const [oldKey, newKey] of Object.entries(keyMap)) {
+    const storage = game.settings.storage.get('world');
+    const oldSetting = storage.getSetting(`${MODULE.ID}.${oldKey}`);
+    if (oldSetting) {
+      const newSetting = storage.getSetting(`${MODULE.ID}.${newKey}`);
+      if (!newSetting) {
+        await game.settings.set(MODULE.ID, newKey, oldSetting.value);
+        log(2, `Migrated setting: ${oldKey} -> ${newKey}`);
+        migrated++;
+      }
+    }
+  }
+
+  if (migrated > 0) {
+    log(2, `Setting key migration complete: ${migrated} settings migrated`);
+  }
+  await game.settings.set(MODULE.ID, 'settingKeyMigrationComplete', true);
 }

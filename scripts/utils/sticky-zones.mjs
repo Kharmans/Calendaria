@@ -14,6 +14,21 @@ export const SNAP_DISTANCE = 50;
 /** CSS class for wobble animation */
 export const WOBBLE_CLASS = 'near-snap';
 
+/** Buffer pixels between windows and sidebar */
+const SIDEBAR_BUFFER = 8;
+
+/**
+ * Get the right-side boundary buffer (Foundry sidebar width + buffer).
+ * @returns {number} Pixels to reserve on the right side
+ */
+export function getSidebarBuffer() {
+  const allowOverlap = game.settings.get(MODULE.ID, SETTINGS.ALLOW_SIDEBAR_OVERLAP);
+  if (allowOverlap) return SIDEBAR_BUFFER;
+  const sidebar = document.getElementById('sidebar');
+  const sidebarWidth = sidebar && !sidebar.classList.contains('collapsed') ? sidebar.offsetWidth : 0;
+  return sidebarWidth + SIDEBAR_BUFFER;
+}
+
 /** CSS class for pinned/docked state */
 export const PINNED_CLASS = 'calendaria-pinned';
 
@@ -41,14 +56,14 @@ export function showDebugZones(hudWidth = 200, hudHeight = 100) {
       width: ${SNAP_DISTANCE * 2}px;
       height: ${SNAP_DISTANCE * 2}px;
       background: rgba(255, 0, 255, 0.3);
-      border: 2px solid magenta;
+      border: 0.125rem solid magenta;
       border-radius: 50%;
       pointer-events: none;
       z-index: 9999;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 10px;
+      font-size: 0.625rem;
       color: magenta;
       font-weight: bold;
     `;
@@ -89,7 +104,7 @@ const ZONE_CONFIG = {
  */
 export function getStickyZones(hudWidth, hudHeight) {
   const zones = [];
-  const isSliceMode = !!document.querySelector('.calendaria-hud-wrapper.slice-mode, .calendaria-hud-wrapper.compact');
+  const isSliceMode = !!document.querySelector('.calendaria-hud.slice-mode, .calendaria-hud.compact');
   const topCenterY = isSliceMode ? 16 + hudHeight / 2 : 80 + hudHeight / 2;
   zones.push({ id: 'top-center', center: { x: window.innerWidth / 2, y: topCenterY } });
   const hotbar = document.getElementById('hotbar');
@@ -237,12 +252,17 @@ export function pinToZone(element, zoneId) {
 /**
  * Unpin an element from DOM parenting back to body with fixed positioning.
  * @param {HTMLElement} element - The element to unpin
+ * @returns {{left: number, top: number}|null} The preserved position, or null if not pinned
  */
 export function unpinFromZone(element) {
-  if (!element?.classList?.contains(PINNED_CLASS)) return;
+  if (!element?.classList?.contains(PINNED_CLASS)) return null;
+  const rect = element.getBoundingClientRect();
   element.classList.remove(PINNED_CLASS);
   element.style.position = 'fixed';
+  element.style.left = `${rect.left}px`;
+  element.style.top = `${rect.top}px`;
   document.body.appendChild(element);
+  return { left: rect.left, top: rect.top };
 }
 
 /**
