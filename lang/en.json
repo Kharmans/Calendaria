@@ -1631,7 +1631,7 @@
   "CALENDARIA.ThemeEditor.Presets.HighContrast": "High Contrast",
   "CALENDARIA.ThemeEditor.PresetSelect": "Theme Preset",
   "CALENDARIA.ThemeEditor.UsingDefault": "Using default value",
-  "CALENDARIA.TimeKeeper.ClockBlocked": "Clock blocked while game is paused or combat is active",
+  "CALENDARIA.TimeClock.ClockBlocked": "Clock blocked while game is paused or combat is active",
   "CALENDARIA.TimeKeeper.ContextMenu.HideFromAll": "Hide from All Players",
   "CALENDARIA.TimeKeeper.ContextMenu.LockPosition": "Lock Position",
   "CALENDARIA.TimeKeeper.ContextMenu.OpenStopwatch": "Open Stopwatch",
