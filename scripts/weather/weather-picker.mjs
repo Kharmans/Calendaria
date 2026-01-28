@@ -19,10 +19,13 @@ class WeatherPickerApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @type {string|null} Selected zone ID (null = no filtering) */
   #selectedZoneId = undefined;
 
+  /** @type {boolean} Whether to set selected zone as calendar's active zone */
+  #setAsActiveZone = false;
+
   /** @override */
   static DEFAULT_OPTIONS = {
     id: 'weather-picker',
-    classes: ['calendaria', 'weather-picker-app'],
+    classes: ['calendaria', 'weather-picker-app', 'standard-form'],
     tag: 'form',
     window: { title: 'CALENDARIA.Weather.Picker.Title', icon: 'fas fa-cloud-sun', resizable: false },
     position: { width: 550, height: 'auto' },
@@ -42,8 +45,9 @@ class WeatherPickerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const context = await super._prepareContext(options);
     const customPresets = WeatherManager.getCustomPresets();
     const zones = WeatherManager.getCalendarZones() || [];
-    if (this.#selectedZoneId === undefined) this.#selectedZoneId = WeatherManager.getActiveZone()?.id ?? null;
+    if (this.#selectedZoneId === undefined) this.#selectedZoneId = WeatherManager.getActiveZone(null, game.scenes.active)?.id ?? null;
     const selectedZone = this.#selectedZoneId ? zones.find((z) => z.id === this.#selectedZoneId) : null;
+    context.setAsActiveZone = this.#setAsActiveZone;
     context.zoneOptions = [{ value: '', label: localize('CALENDARIA.Common.None'), selected: !this.#selectedZoneId }];
     for (const z of zones) context.zoneOptions.push({ value: z.id, label: localize(z.name), selected: z.id === this.#selectedZoneId });
     context.zoneOptions.sort((a, b) => {
@@ -96,6 +100,8 @@ class WeatherPickerApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static async _onZoneChange(_event, _form, formData) {
     const data = foundry.utils.expandObject(formData.object);
     this.#selectedZoneId = data.climateZone || null;
+    this.#setAsActiveZone = data.setAsActiveZone ?? false;
+    if (this.#setAsActiveZone && this.#selectedZoneId) await WeatherManager.setActiveZone(this.#selectedZoneId);
     this.render();
   }
 
@@ -117,7 +123,7 @@ class WeatherPickerApp extends HandlebarsApplicationMixin(ApplicationV2) {
    * @param {HTMLElement} _target - The clicked element
    */
   static async _onRandomWeather(_event, _target) {
-    await WeatherManager.generateAndSetWeather();
+    await WeatherManager.generateAndSetWeather({ zoneId: this.#selectedZoneId });
     await this.close();
     Hooks.callAll(HOOKS.WEATHER_CHANGE);
   }

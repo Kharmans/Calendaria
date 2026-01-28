@@ -66,7 +66,7 @@ export function calculateAdjustedDarkness(baseDarkness, scene) {
   const defaultMult = game.settings.get(MODULE.ID, SETTINGS.DEFAULT_BRIGHTNESS_MULTIPLIER) ?? 1.0;
   const sceneFlag = scene?.getFlag(MODULE.ID, SCENE_FLAGS.BRIGHTNESS_MULTIPLIER);
   const sceneBrightnessMult = sceneFlag ?? defaultMult;
-  const activeZone = WeatherManager.getActiveZone?.();
+  const activeZone = WeatherManager.getActiveZone?.(null, scene);
   const climateBrightnessMult = activeZone?.brightnessMultiplier ?? 1.0;
   const brightness = 1 - baseDarkness;
   const adjustedBrightness = brightness * sceneBrightnessMult * climateBrightnessMult;
@@ -82,10 +82,11 @@ export function calculateAdjustedDarkness(baseDarkness, scene) {
 
 /**
  * Calculate environment lighting overrides from climate zone and weather.
+ * @param {object} [scene] - The scene to check for climate zone override
  * @returns {{base: {hue: number|null, saturation: number|null}, dark: {hue: number|null, saturation: number|null}}|null} - environment config
  */
-export function calculateEnvironmentLighting() {
-  const activeZone = WeatherManager.getActiveZone?.();
+export function calculateEnvironmentLighting(scene) {
+  const activeZone = WeatherManager.getActiveZone?.(null, scene);
   const currentWeather = WeatherManager.getCurrentWeather?.();
   let baseHue = activeZone?.environmentBase?.hue ?? null;
   let baseSaturation = activeZone?.environmentBase?.saturation ?? null;
@@ -166,14 +167,19 @@ export async function onRenderSceneConfig(app, html, _data) {
   else if (flagValue === false || flagValue === 'disabled') value = 'disabled';
   const brightnessMultiplier = app.document.getFlag(MODULE.ID, SCENE_FLAGS.BRIGHTNESS_MULTIPLIER) ?? 1.0;
   const hudHideForPlayers = app.document.getFlag(MODULE.ID, SCENE_FLAGS.HUD_HIDE_FOR_PLAYERS) ?? false;
+  const climateZoneOverride = app.document.getFlag(MODULE.ID, SCENE_FLAGS.CLIMATE_ZONE_OVERRIDE) ?? '';
+  const climateZones = WeatherManager.getCalendarZones?.() ?? [];
   const formGroup = await foundry.applications.handlebars.renderTemplate(TEMPLATES.PARTIALS.SCENE_DARKNESS_SYNC, {
     moduleId: MODULE.ID,
     flagName: SCENE_FLAGS.DARKNESS_SYNC,
     brightnessFlag: SCENE_FLAGS.BRIGHTNESS_MULTIPLIER,
     hudHideFlag: SCENE_FLAGS.HUD_HIDE_FOR_PLAYERS,
+    climateZoneFlag: SCENE_FLAGS.CLIMATE_ZONE_OVERRIDE,
     value,
     brightnessMultiplier,
-    hudHideForPlayers
+    hudHideForPlayers,
+    climateZoneOverride,
+    climateZones
   });
   const ambientLightField = html.querySelector('[name="environment.globalLight.enabled"]')?.closest('.form-group');
   if (ambientLightField) ambientLightField.insertAdjacentHTML('afterend', formGroup);
@@ -288,7 +294,7 @@ export async function onWeatherChange() {
   const baseDarkness = calculateDarknessFromTime(currentHour, 0, hoursPerDay, minutesPerHour);
   const newTargetDarkness = calculateAdjustedDarkness(baseDarkness, activeScene);
   startDarknessTransition(activeScene, newTargetDarkness);
-  const lighting = calculateEnvironmentLighting();
+  const lighting = calculateEnvironmentLighting(activeScene);
   await applyEnvironmentLighting(activeScene, lighting);
   log(3, `Weather changed, updating darkness to ${newTargetDarkness.toFixed(3)}`);
 }
@@ -320,7 +326,7 @@ export async function onUpdateScene(scene, change) {
   const baseDarkness = calculateDarknessFromTime(currentHour, 0, hoursPerDay, minutesPerHour);
   const newDarkness = calculateAdjustedDarkness(baseDarkness, scene);
   startDarknessTransition(scene, newDarkness);
-  const lighting = calculateEnvironmentLighting();
+  const lighting = calculateEnvironmentLighting(scene);
   await applyEnvironmentLighting(scene, lighting);
   log(3, `Scene activated, transitioning darkness to ${newDarkness.toFixed(3)}`);
 }

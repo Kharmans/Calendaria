@@ -5484,6 +5484,10 @@ span.calendaria-moon-icon {
 /* ======================================== */
 
 .weather-picker-app {
+  &.standard-form {
+    gap: 0;
+  }
+
   .window-content {
     padding: 0.75rem;
     background: var(--calendaria-bg);
@@ -5496,22 +5500,8 @@ span.calendaria-moon-icon {
   }
 
   .zone-selector {
-    gap: 0.5rem;
-    display: flex;
-    align-items: center;
     padding-bottom: 0.75rem;
     border-bottom: 0.0625rem solid var(--calendaria-border);
-
-    label {
-      color: var(--calendaria-text-dim);
-      font-weight: 600;
-      font-size: 0.85rem;
-      white-space: nowrap;
-    }
-
-    select {
-      flex: 1;
-    }
   }
 
   .weather-category {

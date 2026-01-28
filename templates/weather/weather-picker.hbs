@@ -1,11 +1,21 @@
 <div class="weather-picker-content">
   <div class="zone-selector">
-    <label>{{localize "CALENDARIA.Weather.Picker.Zone"}}</label>
-    <select name="climateZone">
-      {{#each zoneOptions}}
-        <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
-      {{/each}}
-    </select>
+    <div class="form-group">
+      <label for="climateZone">{{localize "CALENDARIA.Weather.Picker.Zone"}}</label>
+      <div class="form-fields">
+        <select id="climateZone" name="climateZone">
+          {{#each zoneOptions}}
+            <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+          {{/each}}
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="setAsActiveZone">{{localize "CALENDARIA.Weather.Picker.SetAsActiveZone"}}</label>
+      <div class="form-fields">
+        <input type="checkbox" id="setAsActiveZone" name="setAsActiveZone" {{#if setAsActiveZone}}checked{{/if}}>
+      </div>
+    </div>
   </div>
 
   {{#each categories}}

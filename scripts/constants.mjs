@@ -133,6 +133,7 @@ export const DISPLAY_LOCATIONS = {
 /** @enum {string} Scene flags for scene-specific configuration */
 export const SCENE_FLAGS = {
   BRIGHTNESS_MULTIPLIER: 'brightnessMultiplier',
+  CLIMATE_ZONE_OVERRIDE: 'climateZoneOverride',
   DARKNESS_SYNC: 'darknessSync',
   HUD_HIDE_FOR_PLAYERS: 'hudHideForPlayers'
 };
