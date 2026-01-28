@@ -571,7 +571,7 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
       const currentIcon = target.querySelector('i')?.className.replace('icon-preview', '').trim() || '';
       const newIcon = await foundry.applications.api.DialogV2.prompt({
         window: { title: localize('CALENDARIA.Note.FontAwesomeIconTitle') },
-        content: `<div class="form-group"><label>${localize('CALENDARIA.Note.FontAwesomeClasses')}</label><input type="text" name="icon-class" value="${currentIcon}" placeholder="fas fa-calendar" /></div>`,
+        content: `<div class="form-group"><label>${localize('CALENDARIA.Note.FontAwesomeClasses')}</label><input type="text" name="icon-class" value="${currentIcon}" placeholder="fas fa-calendar" /><p class="hint">${localize('CALENDARIA.Common.IconHint')}</p></div>`,
         ok: {
           callback: (_event, button) => {
             return button.form.elements['icon-class'].value;

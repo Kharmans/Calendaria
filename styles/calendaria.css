@@ -5506,12 +5506,13 @@ span.calendaria-moon-icon {
 
   .weather-category {
     .category-header {
+      display: block;
       margin: 0 0 0.5rem;
       padding-bottom: 0.25rem;
       border-bottom: 0.0625rem solid var(--calendaria-border);
       color: var(--calendaria-text-dim);
       font-weight: 600;
-      font-size: 0.85rem;
+      font-size: var(--font-size-15);
     }
 
     .weather-buttons {
@@ -5563,7 +5564,6 @@ span.calendaria-moon-icon {
   .weather-picker-footer {
     gap: 0.5rem;
     display: flex;
-    justify-content: center;
     padding-top: 0.5rem;
     border-top: 0.0625rem solid var(--calendaria-border);
 
@@ -5571,6 +5571,7 @@ span.calendaria-moon-icon {
       gap: 0.5rem;
       display: flex;
       align-items: center;
+      justify-content: center;
       padding: 0.5rem 1.5rem;
       border: none;
       border-radius: 0.25rem;
@@ -5589,12 +5590,14 @@ span.calendaria-moon-icon {
       }
     }
 
-    .random-btn {
-      background: var(--calendaria-primary);
+    .clear-btn {
+      flex-shrink: 0;
+      background: var(--calendaria-error);
     }
 
-    .clear-btn {
-      background: var(--calendaria-error);
+    .random-btn {
+      flex: 1;
+      background: var(--calendaria-primary);
     }
   }
 }
