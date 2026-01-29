@@ -207,6 +207,41 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
   }
 
   /**
+   * Selectors for temporary form fields not backed by the data model.
+   * @type {string[]}
+   */
+  static TRANSIENT_FIELDS = [
+    'select[name="newCondition.field"]',
+    'select[name="newCondition.op"]',
+    'input[name="newCondition.value"]',
+    'input[name="newCondition.offset"]',
+    'select[name="newMoonCondition.moonIndex"]',
+    'select[name="newMoonCondition.phase"]',
+    'select[name="newMoonCondition.modifier"]',
+    '.new-category-input'
+  ];
+
+  /** @inheritdoc */
+  _preSyncPartState(partId, newElement, priorElement, state) {
+    super._preSyncPartState(partId, newElement, priorElement, state);
+    state.transientValues = {};
+    for (const selector of this.constructor.TRANSIENT_FIELDS) {
+      const el = priorElement.querySelector(selector);
+      if (el) state.transientValues[selector] = el.value;
+    }
+  }
+
+  /** @inheritdoc */
+  _syncPartState(partId, newElement, priorElement, state) {
+    super._syncPartState(partId, newElement, priorElement, state);
+    if (!state.transientValues) return;
+    for (const [selector, value] of Object.entries(state.transientValues)) {
+      const el = newElement.querySelector(selector);
+      if (el && value) el.value = value;
+    }
+  }
+
+  /**
    * Render header control buttons based on current mode.
    * Creates mode toggle, save, reset, and delete buttons as appropriate.
    * @private

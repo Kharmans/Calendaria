@@ -786,6 +786,8 @@ export function isRecurringMatch(noteData, targetDate) {
       const occurrenceNum = countOccurrencesUpTo(noteData, targetDate);
       if (occurrenceNum > maxOccurrences) return false;
     }
+    if (matches && noteData.conditions?.length > 0)
+      if (!evaluateConditions(noteData.conditions, targetDate)) return false;
     return matches;
   }
 
