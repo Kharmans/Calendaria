@@ -34,6 +34,7 @@ import { CalendariaSocket } from './scripts/utils/socket.mjs';
 import * as StickyZones from './scripts/utils/sticky-zones.mjs';
 import { initializeTheme } from './scripts/utils/theme-utils.mjs';
 import WeatherManager from './scripts/weather/weather-manager.mjs';
+import { initializeChatCommander } from './scripts/integrations/chat-commander.mjs';
 
 const { canViewMiniCal, canViewTimeKeeper } = Permissions;
 
@@ -96,6 +97,7 @@ Hooks.once('ready', async () => {
   if (game.settings.get(MODULE.ID, SETTINGS.SHOW_CALENDAR_HUD)) HUD.show();
   if (game.settings.get(MODULE.ID, SETTINGS.DEV_MODE)) StickyZones.showDebugZones();
   Hooks.on('renderSceneControls', () => StickyZones.updateZonePositions('below-controls'));
+  initializeChatCommander();
   Hooks.callAll(HOOKS.READY, { api: CalendariaAPI, calendar: CalendarManager.getActiveCalendar(), version: game.modules.get('calendaria')?.version });
 });
 Hooks.once('setup', () => {
