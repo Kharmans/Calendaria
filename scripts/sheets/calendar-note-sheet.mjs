@@ -61,6 +61,11 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
     return this._mode === CalendarNoteSheet.MODES.EDIT;
   }
 
+  /** @returns {boolean} Whether user is the original author of this note. */
+  get isAuthor() {
+    return this.document.system.author?._id === game.user.id;
+  }
+
   /** @inheritdoc */
   _configureRenderOptions(options) {
     if (options.isFirstRender) {
@@ -282,7 +287,7 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
       resetBtn.dataset.tooltip = 'Reset Form';
       resetBtn.setAttribute('aria-label', 'Reset Form');
       controlsContainer.appendChild(resetBtn);
-      if (this.document.isOwner && this.document.id) {
+      if (this.isAuthor && this.document.id) {
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'header-control icon fas fa-trash';
@@ -806,7 +811,7 @@ export class CalendarNoteSheet extends HandlebarsApplicationMixin(foundry.applic
    * @param {HTMLElement} _target - The clicked element
    */
   static async _onDeleteNote(_event, _target) {
-    if (!this.document.isOwner) return;
+    if (!this.isAuthor) return;
     const confirmed = await foundry.applications.api.DialogV2.confirm({
       window: { title: localize('CALENDARIA.ContextMenu.DeleteNote') },
       content: `<p>${format('CALENDARIA.ContextMenu.DeleteConfirm', { name: this.document.name })}</p>`,

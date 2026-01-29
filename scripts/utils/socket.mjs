@@ -246,9 +246,10 @@ export class CalendariaSocket {
     const { name, content, noteData, calendarId, journalData, requesterId } = data;
     log(3, `Primary GM handling note creation request: ${name}`);
     try {
-      const page = await NoteManager.createNote({ name, content, noteData, calendarId, journalData });
+      // Set the author to the requester, not the GM
+      const noteDataWithAuthor = { ...noteData, author: requesterId };
+      const page = await NoteManager.createNote({ name, content, noteData: noteDataWithAuthor, calendarId, journalData, creatorId: requesterId });
       if (page && requesterId) {
-        await page.parent.update({ ownership: { [requesterId]: 3 } });
         this.emit(SOCKET_TYPES.CREATE_NOTE_COMPLETE, { pageId: page.id, journalId: page.parent.id, requesterId });
       }
     } catch (error) {

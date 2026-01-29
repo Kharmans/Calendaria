@@ -10,7 +10,7 @@ import CalendarManager from '../calendar/calendar-manager.mjs';
 import { HOOKS, MODULE, SETTINGS, SOCKET_TYPES } from '../constants.mjs';
 import { format, localize } from '../utils/localization.mjs';
 import { log } from '../utils/logger.mjs';
-import { canAddNotes, canDeleteNotes } from '../utils/permissions.mjs';
+import { canAddNotes, canDeleteNotes, getUsersWithPermission } from '../utils/permissions.mjs';
 import { CalendariaSocket } from '../utils/socket.mjs';
 import { createNoteStub, getCategoryDefinition, getDefaultNoteData, getPredefinedCategories, sanitizeNoteData, validateNoteData } from './note-data.mjs';
 import { compareDates } from './utils/date-utils.mjs';
@@ -43,10 +43,38 @@ export default class NoteManager {
       await this.getCalendarNotesFolder();
       await this.#initializeActiveCalendarFolder();
       await this.#migrateCalendarJournalsToFolders();
+      await this.#syncNoteOwnership();
     }
 
     this.#initialized = true;
     log(3, 'Note Manager initialized');
+  }
+
+  /**
+   * Sync ownership for all calendar notes based on editNotes permission.
+   * Grants OWNER to all users with editNotes permission for non-GM-only notes.
+   * @returns {Promise<void>}
+   * @private
+   */
+  static async #syncNoteOwnership() {
+    const usersWithPermission = getUsersWithPermission('editNotes');
+    if (usersWithPermission.length === 0) return;
+    const userIds = usersWithPermission.map((u) => u.id);
+    let updated = 0;
+    for (const journal of game.journal) {
+      if (!journal.getFlag(MODULE.ID, 'isCalendarNote')) continue;
+      const page = journal.pages.contents[0];
+      if (!page || page.system?.gmOnly) continue;
+      const currentOwnership = journal.ownership || {};
+      const needsUpdate = userIds.some((id) => currentOwnership[id] !== 3);
+      if (needsUpdate) {
+        const newOwnership = { ...currentOwnership };
+        for (const id of userIds) newOwnership[id] = 3;
+        await journal.update({ ownership: newOwnership });
+        updated++;
+      }
+    }
+    if (updated > 0) log(3, `Synced ownership for ${updated} calendar notes`);
   }
 
   /**
@@ -239,9 +267,10 @@ export default class NoteManager {
    * @param {object} options.noteData  Calendar note data
    * @param {string} [options.calendarId]  Calendar ID (defaults to active calendar)
    * @param {object} [options.journalData]  Additional journal entry data
+   * @param {string} [options.creatorId]  User ID of creator (for socket-created notes)
    * @returns {Promise<object>} Created journal entry page
    */
-  static async createNote({ name, content = '', noteData, calendarId, journalData = {} }) {
+  static async createNote({ name, content = '', noteData, calendarId, journalData = {}, creatorId }) {
     if (!canAddNotes()) {
       ui.notifications.warn('CALENDARIA.Permissions.NoAccess', { localize: true });
       return null;
@@ -266,7 +295,10 @@ export default class NoteManager {
     if (!calendar) throw new Error(`Calendar not found: ${calendarId}`);
     const folder = await this.getCalendarFolder(calendarId, calendar);
     if (!folder) throw new Error('Failed to get or create calendar folder');
+    const actualCreatorId = creatorId || game.user.id;
     const ownership = sanitized.gmOnly ? { default: 0 } : { default: 2 };
+    ownership[actualCreatorId] = 3;
+    if (!sanitized.gmOnly) for (const user of getUsersWithPermission('editNotes')) ownership[user.id] = 3;
     const journal = await JournalEntry.create({ name, folder: folder.id, ownership, flags: { [MODULE.ID]: { calendarId, isCalendarNote: true } }, ...journalData });
     const page = await JournalEntryPage.create(
       { name, type: 'calendaria.calendarnote', system: sanitized, text: { content }, title: { level: 1, show: true }, flags: { [MODULE.ID]: { calendarId } } },
