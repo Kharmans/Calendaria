@@ -498,7 +498,7 @@ async function migrateWeatherZones() {
 /**
  * Diagnose weather configuration - inspects raw settings to find any weather data.
  * Use this if weather zones appear missing after an update.
- * @param {boolean} [showDialog=true] - Whether to show a dialog with results
+ * @param {boolean} [showDialog] - Whether to show a dialog with results
  * @returns {object} Diagnostic results
  */
 export async function diagnoseWeatherConfig(showDialog = true) {

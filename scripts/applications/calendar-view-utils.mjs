@@ -6,7 +6,7 @@
  */
 
 import CalendarManager from '../calendar/calendar-manager.mjs';
-import { MODULE, SETTINGS, SOCKET_TYPES } from '../constants.mjs';
+import { MODULE, SOCKET_TYPES } from '../constants.mjs';
 import NoteManager from '../notes/note-manager.mjs';
 import { isRecurringMatch } from '../notes/utils/recurrence.mjs';
 import { formatCustom } from '../utils/format-utils.mjs';

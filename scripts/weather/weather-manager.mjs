@@ -155,6 +155,7 @@ export default class WeatherManager {
   /**
    * Clear the current weather.
    * @param {boolean} [broadcast] - Whether to broadcast
+   * @param {boolean} [fromSocket] - Whether this was triggered by a socket event
    * @returns {Promise<void>}
    */
   static async clearWeather(broadcast = true, fromSocket = false) {

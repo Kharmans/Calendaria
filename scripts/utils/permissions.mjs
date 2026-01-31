@@ -121,7 +121,7 @@ export function canEditCalendars() {
 /**
  * Get all users who have a specific permission.
  * @param {string} permissionKey - The permission key to check
- * @returns {User[]} Array of users with the permission
+ * @returns {object[]} Array of users with the permission
  */
 export function getUsersWithPermission(permissionKey) {
   const saved = game.settings.get(MODULE.ID, SETTINGS.PERMISSIONS) || {};

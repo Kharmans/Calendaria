@@ -6,7 +6,6 @@
 
 import CalendarManager from '../calendar/calendar-manager.mjs';
 import { MODULE, SETTINGS } from '../constants.mjs';
-import { CalendarEditor } from '../applications/calendar-editor.mjs';
 import { format, localize } from './localization.mjs';
 import { log } from './logger.mjs';
 
@@ -140,7 +139,7 @@ export async function exportSettings() {
       { action: 'cancel', label: localize('CALENDARIA.Common.Cancel'), icon: 'fas fa-times' }
     ],
     close: () => 'cancel',
-    render: (event, dialog) => { dialogElement = dialog.element; }
+    render: (_event, dialog) => { dialogElement = dialog.element; }
   });
 
   if (result !== 'export') return;
@@ -220,7 +219,7 @@ export async function importSettings(onComplete) {
           { action: 'cancel', label: localize('CALENDARIA.Common.Cancel'), icon: 'fas fa-times' }
         ],
         close: () => 'cancel',
-        render: (event, dialog) => { dialogElement = dialog.element; }
+        render: (_event, dialog) => { dialogElement = dialog.element; }
       });
 
       if (result !== 'import') return;

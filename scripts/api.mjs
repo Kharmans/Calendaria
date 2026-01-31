@@ -910,7 +910,7 @@ export const CalendariaAPI = {
   /**
    * Diagnose weather configuration issues.
    * Inspects raw settings to find weather data that may not be loading properly.
-   * @param {boolean} [showDialog=true] - Whether to show a dialog with results
+   * @param {boolean} [showDialog] - Whether to show a dialog with results
    * @returns {Promise<object>} Diagnostic results with settingsData and activeCalendar info
    */
   async diagnoseWeather(showDialog = true) {

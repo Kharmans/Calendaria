@@ -296,7 +296,6 @@ export class SetDateDialog extends HandlebarsApplicationMixin(ApplicationV2) {
     const minute = parseInt(data.minute) || 0;
     const skipTriggers = data.skipTriggers ?? true;
     const isMonthless = calendar.isMonthless ?? false;
-    let dayOfYear;
     let month = 0;
     if (!isMonthless) {
       month = parseInt(data.month);
